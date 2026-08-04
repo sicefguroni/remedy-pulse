@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remedy Pulse — Reputation Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #FDFCFA;
+    --surface: #FFFFFF;
+    --surface-2: #F6F2EA;
+    --line: #E9E1D3;
+    --ink: #201A14;
+    --ink-dim: #6E6355;
+    --ink-faint: #A99C89;
+    --coral: #FF5A3C;
+    --coral-tint: #FFE3DA;
+    --coral-text: #D93A1E;
+    --sage: #16A863;
+    --sage-tint: #DAF5E6;
+    --sage-text: #128A51;
+    --gold: #F5A623;
+    --gold-tint: #FDEBC9;
+    --gold-text: #B5760C;
+    --sky: #2F8FE0;
+    --sky-tint: #DCEBFB;
+    --sky-text: #1F6FBF;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(32,26,20,0.04), 0 8px 24px -12px rgba(32,26,20,0.10);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 90% -10%, #FFF3E8 0%, transparent 55%),
+      radial-gradient(ellipse 800px 500px at -5% 10%, #E9F8EF 0%, transparent 50%),
+      var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    padding-bottom: 60px;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  .display{ font-family:'Space Grotesk', sans-serif; }
+
+  header.top{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 20px 36px;
+    border-bottom:1px solid var(--line);
+    position: sticky; top:0; z-index:50;
+    background: rgba(253,252,250,0.88);
+    backdrop-filter: blur(10px);
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand .mark{
+    width:34px; height:34px; border-radius:8px;
+    background: conic-gradient(from 200deg, var(--coral), var(--gold), var(--sage), var(--coral));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: var(--shadow);
+  }
+  .brand .mark span{ width:14px; height:14px; border-radius:50%; background:var(--bg); }
+  .brand-text .name{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:17px; letter-spacing:0.2px; color:var(--ink); }
+  .brand-text .sub{ font-size:11px; color:var(--ink-faint); letter-spacing:0.06em; text-transform:uppercase; margin-top:1px; }
+
+  nav.tabs{ display:flex; gap:4px; background:var(--surface-2); padding:4px; border-radius:999px; border:1px solid var(--line); }
+  nav.tabs a{
+    color:var(--ink-dim); text-decoration:none; font-size:12.5px; font-weight:500;
+    padding:8px 16px; border-radius:999px; transition: all .15s ease; cursor:pointer;
+  }
+  nav.tabs a.active{ background:var(--surface); color:var(--ink); box-shadow: var(--shadow); }
+  nav.tabs a:hover{ color:var(--ink); }
+
+  .header-right{ display:flex; align-items:center; gap:10px; }
+  .demo-badge{
+    font-size:10px; padding:4px 9px; border-radius:999px; background:var(--gold-tint); color:var(--gold-text);
+    font-weight:600; letter-spacing:0.05em; text-transform:uppercase;
+  }
+  .icon-btn{
+    background:var(--surface); border:1px solid var(--line); border-radius:50%; width:34px; height:34px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px;
+    position:relative; transition:border-color .15s ease;
+  }
+  .icon-btn:hover{ border-color:#D8CCB4; }
+  .bell-badge{
+    position:absolute; top:-4px; right:-4px; background:var(--coral); color:#fff; font-size:9px; font-weight:700;
+    min-width:15px; height:15px; border-radius:999px; display:flex; align-items:center; justify-content:center;
+    padding:0 3px; line-height:1;
+  }
+  .live-pill{
+    display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--ink-dim);
+    padding:6px 12px; border:1px solid var(--line); border-radius:999px; background:var(--surface);
+    cursor:pointer; user-select:none; transition: border-color .15s ease;
+  }
+  .live-pill:hover{ border-color:#D8CCB4; }
+  .live-dot{ width:7px; height:7px; border-radius:50%; background:var(--sage); box-shadow:0 0 8px var(--sage); animation: pulse 2s infinite; }
+  .live-pill.syncing .live-dot{ background:var(--gold); box-shadow:0 0 8px var(--gold); animation: pulse .5s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  .avatar{ width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--gold),var(--coral)); display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:12px; color:#fff; }
+
+  main{ max-width:1320px; margin:0 auto; padding: 32px 36px; }
+
+  .page-head{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:26px; flex-wrap:wrap; gap:14px; }
+  .page-head h1{ font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:600; letter-spacing:-0.2px; }
+  .page-head .desc{ color:var(--ink-faint); font-size:13px; margin-top:4px; max-width:620px; }
+  .filters{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .chip{
+    font-size:12px; color:var(--ink-dim); background:var(--surface); border:1px solid var(--line);
+    padding:7px 13px; border-radius:8px; display:flex; align-items:center; gap:6px; cursor:pointer;
+    position:relative; user-select:none; transition: border-color .15s ease;
+  }
+  .chip:hover{ border-color:#D8CCB4; }
+  .chip.on{ color:var(--ink); border-color:#D8CCB4; background:var(--surface-2); font-weight:500; }
+  .chip-menu{
+    position:absolute; top:calc(100% + 6px); left:0; background:var(--surface); border:1px solid var(--line);
+    border-radius:8px; box-shadow:var(--shadow); z-index:20; min-width:150px; padding:4px;
+  }
+  .chip-menu-item{ padding:7px 10px; font-size:12px; border-radius:6px; color:var(--ink-dim); white-space:nowrap; cursor:pointer; }
+  .chip-menu-item:hover{ background:var(--surface-2); color:var(--ink); }
+  #mentionSearch{
+    font-size:12px; padding:7px 12px; border:1px solid var(--line); border-radius:8px;
+    background:var(--surface); color:var(--ink); min-width:180px; font-family:inherit;
+  }
+  #mentionSearch:focus{ outline:none; border-color:var(--coral); }
+
+  .kpi-row{ display:grid; grid-template-columns: 1.15fr repeat(4, 1fr); gap:14px; margin-bottom:16px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px; position:relative; overflow:hidden; box-shadow: var(--shadow); }
+
+  .clarity-card{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .clarity-card .eyebrow{ font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:2px; }
+  .gauge-wrap{ position:relative; width:172px; height:100px; margin-top:6px; }
+  .gauge-score{ position:absolute; bottom:2px; left:0; right:0; text-align:center; }
+  .gauge-score .num{ font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; color:var(--ink); }
+  .gauge-score .lbl{ font-size:10px; color:var(--ink-faint); letter-spacing:0.05em; text-transform:uppercase; margin-top:-2px; }
+  .clarity-note{ font-size:11.5px; color:var(--sage-text); margin-top:8px; font-weight:500; }
+
+  .kpi{ display:flex; flex-direction:column; justify-content:space-between; height:100%; }
+  .kpi .eyebrow{ font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .kpi .value{ font-family:'Space Grotesk',sans-serif; font-size:28px; font-weight:600; margin-top:10px; color:var(--ink); transition: color .2s ease; }
+  .kpi .delta{ font-size:12px; margin-top:8px; display:flex; align-items:center; gap:5px; font-weight:500; }
+  .delta.up{ color:var(--sage-text); } .delta.down{ color:var(--coral-text); } .delta.flat{ color:var(--ink-faint); }
+
+  .grid-2{ display:grid; grid-template-columns: 1.65fr 1fr; gap:14px; margin-bottom:14px; align-items:stretch; }
+  .card h3{ font-family:'Space Grotesk',sans-serif; font-size:14.5px; font-weight:600; color:var(--ink); }
+  .card .card-sub{ font-size:11.5px; color:var(--ink-faint); margin-top:2px; }
+  .card-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; gap:12px; flex-wrap:wrap; }
+  .tag{ font-size:10.5px; padding:3px 9px; border-radius:6px; font-weight:600; letter-spacing:0.02em; display:inline-block; }
+  .tag.gold{ background:var(--gold-tint); color:var(--gold-text); }
+  .tag.sage{ background:var(--sage-tint); color:var(--sage-text); }
+  .tag.coral{ background:var(--coral-tint); color:var(--coral-text); }
+  .tag.sky{ background:var(--sky-tint); color:var(--sky-text); }
+  .tag.neutral{ background:var(--surface-2); color:var(--ink-dim); }
+  .tag.clickable{ cursor:pointer; }
+  .tag.clickable:hover{ filter:brightness(0.96); }
+
+  .alert-item{ display:flex; gap:12px; padding:12px 0; border-top:1px solid var(--line); overflow:hidden; }
+  .alert-item:first-child{ border-top:none; padding-top:0; }
+  .alert-item.alert-crisis{ background:var(--coral-tint); border-top:none; border-radius:8px; padding:12px; margin-bottom:10px; }
+  .alert-dot{ width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .alert-dot.high{ background:var(--coral); box-shadow:0 0 6px var(--coral); }
+  .alert-dot.med{ background:var(--gold); box-shadow:0 0 6px var(--gold); }
+  .alert-dot.low{ background:var(--sky); box-shadow:0 0 6px var(--sky); }
+  .alert-body{ flex:1; min-width:0; }
+  .alert-title{ font-size:13px; font-weight:500; color:var(--ink); }
+  .alert-meta{ font-size:11px; color:var(--ink-faint); margin-top:3px; }
+  .alert-actions{ display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+  .btn-mini{
+    font-size:11px; padding:5px 11px; border-radius:6px; border:1px solid var(--line); color:var(--ink-dim);
+    background:var(--surface-2); cursor:pointer; font-family:inherit; transition: filter .12s ease;
+  }
+  .btn-mini:hover{ filter:brightness(0.97); }
+  .btn-mini.primary{ background:var(--gold-tint); color:var(--gold-text); border-color:transparent; font-weight:500; }
+  .assign-select{
+    font-size:11px; padding:5px 8px; border-radius:6px; border:1px solid var(--line); background:var(--surface);
+    color:var(--ink-dim); cursor:pointer; font-family:inherit;
+  }
+  .assigned-label{ font-size:10.5px; }
+
+  .chart-legend{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-dim); }
+  .chart-legend span{ display:flex; align-items:center; gap:6px; }
+  .swatch{ width:9px; height:9px; border-radius:2px; }
+
+  .sov-row{ display:grid; grid-template-columns: 90px 1fr 52px; align-items:center; gap:10px; padding:9px 0; }
+  .sov-track{ height:9px; background:var(--surface-2); border-radius:6px; overflow:hidden; }
+  .sov-fill{ height:100%; border-radius:6px; }
+  .sov-name{ font-size:12.5px; color:var(--ink); display:flex; align-items:center; gap:6px; }
+  .sov-name.us{ font-weight:600; color:var(--coral-text); }
+  .sov-val{ font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right; color:var(--ink-dim); }
+  .spike-badge{ font-size:9px; background:var(--coral-tint); color:var(--coral-text); padding:1px 5px; border-radius:5px; font-weight:700; }
+  .pie-wrap{ display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
+  .pie-chart{ width:128px; height:128px; border-radius:50%; flex-shrink:0; }
+  .pie-legend{ flex:1; min-width:190px; }
+  .source-link{ font-size:11px; color:var(--sky-text); text-decoration:none; cursor:pointer; white-space:nowrap; }
+  .source-link:hover{ text-decoration:underline; }
+
+  .src-row{ display:flex; align-items:center; gap:10px; padding:8px 0; }
+  .src-icon{ width:26px; height:26px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+  .src-name{ font-size:12.5px; flex:1; color:var(--ink); }
+  .src-pct{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-dim); }
+
+  .feed-item{ display:flex; gap:12px; padding:14px 0; border-top:1px solid var(--line); }
+  .feed-item:first-child{ border-top:none; padding-top:0; }
+  .feed-avatar{ width:32px; height:32px; border-radius:50%; background:var(--surface-2); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+  .feed-body{ flex:1; }
+  .feed-top{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .feed-author{ font-size:13px; font-weight:500; color:var(--ink); }
+  .feed-source{ font-size:11px; color:var(--ink-faint); }
+  .feed-text{ font-size:12.5px; color:var(--ink-dim); margin-top:5px; line-height:1.5; }
+  .feed-meta{ display:flex; gap:10px; margin-top:8px; font-size:11px; color:var(--ink-faint); align-items:center; flex-wrap:wrap; }
+
+  @keyframes flashIn{
+    0%{ background:var(--gold-tint); transform:translateY(-6px); opacity:0; }
+    60%{ opacity:1; transform:translateY(0); }
+    100%{ background:transparent; }
+  }
+  .new-flash{ animation:flashIn .9s ease; border-radius:8px; }
+
+  table{ width:100%; border-collapse:collapse; }
+  th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-faint); font-weight:500; padding:0 10px 10px 0; border-bottom:1px solid var(--line); }
+  td{ font-size:12.5px; padding:12px 10px 12px 0; border-bottom:1px solid var(--line); vertical-align:middle; color:var(--ink); }
+  tr:last-child td{ border-bottom:none; }
+  .stars{ color:var(--gold); letter-spacing:1px; }
+  .emv-val{ font-family:'IBM Plex Mono',monospace; color:var(--gold-text); font-weight:500; }
+  tr.emv-row{ cursor:pointer; }
+  tr.emv-row:hover td{ background:var(--surface-2); }
+  .chevron{ display:inline-block; width:14px; color:var(--ink-faint); font-size:10px; }
+  tr.emv-detail td{ background:var(--surface-2); font-size:11.5px; color:var(--ink-dim); padding:14px 10px; line-height:1.6; }
+
+  .sentiment-bar{ display:flex; height:8px; border-radius:6px; overflow:hidden; background:var(--surface-2); margin-top:10px; }
+  .seg{ height:100%; }
+  .seg.pos{ background:var(--sage); }
+  .seg.neu{ background:var(--ink-faint); }
+  .seg.neg{ background:var(--coral); }
+  .topic-quote{ font-size:12px; color:var(--ink-dim); margin-top:10px; font-style:italic; }
+  .topic-legend{ display:flex; gap:14px; font-size:11px; color:var(--ink-faint); margin-top:4px; }
+  .topic-legend span{ display:flex; align-items:center; gap:5px; }
+  .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+  footer.note{ max-width:1320px; margin: 30px auto 0; padding:0 36px; font-size:11.5px; color:var(--ink-faint); display:flex; justify-content:space-between; border-top:1px solid var(--line); padding-top:18px; }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(32,26,20,0.45); display:flex; align-items:center; justify-content:center;
+    z-index:200; opacity:0; pointer-events:none; transition:opacity .15s ease;
+  }
+  .modal-overlay.open{ opacity:1; pointer-events:auto; }
+  .modal{
+    background:var(--surface); border-radius:12px; max-width:460px; width:90%; padding:26px;
+    box-shadow: 0 20px 60px -20px rgba(32,26,20,0.35); max-height:80vh; overflow:auto; position:relative;
+  }
+  .modal h4{ font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; margin-bottom:6px; padding-right:24px; }
+  .modal-close{
+    position:absolute; top:16px; right:16px; background:none; border:none; font-size:18px; color:var(--ink-faint);
+    cursor:pointer; line-height:1; font-family:inherit;
+  }
+  .modal-close:hover{ color:var(--ink); }
+  .modal textarea{
+    width:100%; min-height:90px; padding:10px; border:1px solid var(--line); border-radius:8px;
+    font-family:inherit; font-size:12.5px; resize:vertical; color:var(--ink);
+  }
+  .modal textarea:focus{ outline:none; border-color:var(--coral); }
+  #cmdInput{ border:none; outline:none; font-size:13px; flex:1; font-family:inherit; color:var(--ink); background:transparent; }
+
+  .toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(12px);
+    background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:12.5px;
+    opacity:0; transition:all .25s ease; z-index:300; pointer-events:none; box-shadow:var(--shadow);
+    max-width:80vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* ---------- UI polish ---------- */
+  .card{ transition: transform .18s ease, box-shadow .18s ease; }
+  .card.kpi:hover, .clarity-card:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(32,26,20,0.05), 0 14px 30px -12px rgba(32,26,20,0.15);
+  }
+
+  @keyframes viewIn{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:none; } }
+  .view.active{ animation: viewIn .28s ease; }
+
+  nav.tabs a:focus-visible, .btn-mini:focus-visible, .chip:focus-visible,
+  .icon-btn:focus-visible, .tag.clickable:focus-visible, .source-link:focus-visible{
+    outline: 2px solid var(--sky); outline-offset: 2px;
+  }
+
+  .pie-chart{ position:relative; }
+  .pie-chart::after{
+    content: attr(data-center);
+    position:absolute; inset:24px;
+    background:var(--surface); border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:12px;
+    color:var(--ink); text-align:center; padding:6px; line-height:1.25;
+    box-shadow: inset 0 1px 3px rgba(32,26,20,0.06);
+  }
+
+  #gaugeValuePath{ transition: stroke-dashoffset 1.1s cubic-bezier(.25,.75,.4,1); }
+
+  tbody tr:not(.emv-detail):hover td{ background:var(--surface-2); }
+
+  .alerts-empty{
+    text-align:center; padding:26px 12px; margin-top:8px;
+    color:var(--sage-text); font-size:12.5px; font-weight:500;
+    background:var(--sage-tint); border-radius:8px;
+  }
+
+  .syncing-data .kpi .value, .syncing-data .gauge-score .num{ opacity:.4; }
+  .kpi .value, .gauge-score .num{ transition: opacity .3s ease, color .2s ease; }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation:none !important; transition:none !important; }
+  }
+
+  /* ---------- Mobile ---------- */
+  .table-scroll{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .cmdk-short{ display:none; }
+
+  @media (max-width: 760px){
+    header.top{ flex-wrap:wrap; padding:12px 16px; gap:10px 8px; row-gap:10px; }
+    .brand{ order:1; }
+    .header-right{ order:2; margin-left:auto; gap:6px; }
+    .header-right .demo-badge{ font-size:9px; padding:3px 7px; }
+    #syncLabel{ display:none; }
+    .live-pill{ padding:8px; }
+    nav.tabs{
+      order:3; width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
+      justify-content:flex-start; -ms-overflow-style:none; scrollbar-width:none;
+    }
+    nav.tabs::-webkit-scrollbar{ display:none; }
+    nav.tabs a{ flex-shrink:0; padding:8px 14px; }
+    .cmdk-full{ display:none; }
+    .cmdk-short{ display:inline; }
+
+    main{ padding:18px 16px; }
+    .page-head{ margin-bottom:18px; }
+    .page-head h1{ font-size:21px; }
+    .page-head .desc{ max-width:100%; }
+    .filters{ width:100%; }
+    #mentionSearch{ min-width:0; flex:1 1 140px; }
+
+    .kpi-row{ grid-template-columns: 1fr 1fr; gap:10px; }
+    .clarity-card{ grid-column: 1 / -1; }
+    .card{ padding:16px; }
+
+    .grid-2{ grid-template-columns: 1fr; }
+
+    .pie-wrap{ flex-direction:column; align-items:flex-start; gap:14px; }
+
+    table{ min-width:640px; }
+
+    .date-range-row{ flex-direction:column; }
+
+    footer.note{ flex-direction:column; gap:4px; align-items:flex-start; padding:0 16px; }
+
+    .modal{ padding:20px; }
+  }
+
+  @media (max-width: 420px){
+    .kpi-row{ grid-template-columns: 1fr 1fr; }
+    .page-head h1{ font-size:19px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="mark"><span></span></div>
+    <div class="brand-text">
+      <div class="name">Remedy Pulse</div>
+      <div class="sub">Reputation Intelligence</div>
+    </div>
+  </div>
+  <nav class="tabs" id="tabNav">
+    <a class="active" data-view="overview">Overview</a>
+    <a data-view="competitors">Competitors</a>
+    <a data-view="mentions">Mentions</a>
+    <a data-view="reviews">Reviews</a>
+    <a data-view="topics">Topics</a>
+    <a data-view="emv">EMV</a>
+  </nav>
+  <div class="header-right">
+    <span class="demo-badge">Demo</span>
+    <div class="chip" onclick="openCommandPalette()" title="Quick actions"><span class="cmdk-full">⌘K</span><span class="cmdk-short">🔎</span></div>
+    <div class="bell-wrap" style="position:relative;">
+      <button class="icon-btn" id="bellBtn" onclick="toggleBellMenu(event)" title="Alerts">🔔<span class="bell-badge" id="bellBadge">4</span></button>
+    </div>
+    <div class="live-pill" id="syncPill" onclick="simulateSync()">
+      <span class="live-dot"></span> <span id="syncLabel">Last synced 06:12 PHT</span>
+    </div>
+    <div class="avatar" title="Gian, Paul — Admin">GP</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- OVERVIEW -->
+  <section class="view active" id="view-overview">
+    <div class="page-head">
+      <div>
+        <h1>Overview</h1>
+        <div class="desc">All owned entities · Remedy, Club Remedy, Dr. April Rivera — last 7 days vs. prior period</div>
+      </div>
+      <div class="filters">
+        <div class="chip on chip-dropdown" data-prefix="📅 " data-options="Last 7 days|Last 30 days|Last 90 days|Custom range…">📅 Last 7 days</div>
+        <div class="chip chip-dropdown" data-options="All sources|Google only|Social only|News only">All sources</div>
+        <div class="chip chip-dropdown" data-options="All entities|Remedy only|Club Remedy only|April Rivera only">All entities</div>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="card clarity-card">
+        <div class="eyebrow">Clarity Index</div>
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 172 100" width="172" height="100">
+            <defs>
+              <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#FF5A3C"/>
+                <stop offset="50%" stop-color="#F5A623"/>
+                <stop offset="100%" stop-color="#16A863"/>
+              </linearGradient>
+            </defs>
+            <path d="M 11,95 A 75,75 0 0 1 161,95" fill="none" stroke="#F0EADE" stroke-width="14" stroke-linecap="round"/>
+            <path id="gaugeValuePath" d="M 11,95 A 75,75 0 0 1 161,95" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+                  stroke-dasharray="235.6" stroke-dashoffset="235.6"/>
+          </svg>
+          <div class="gauge-score">
+            <div class="num" id="clarityNum">75</div>
+            <div class="lbl">of 100</div>
+          </div>
+        </div>
+        <div class="clarity-note">▲ 6 pts vs. last week</div>
+      </div>
+
+      <div class="card kpi">
+        <div class="eyebrow">Total Mentions</div>
+        <div class="value" id="kpiTotalMentionsValue">342</div>
+        <div class="delta up">▲ 18% · 291 last week</div>
+      </div>
+
+      <div class="card kpi">
+        <div class="eyebrow">Net Sentiment</div>
+        <div class="value" id="kpiNetSentimentValue">+62</div>
+        <div class="delta up">▲ 4 pts</div>
+      </div>
+
+      <div class="card kpi">
+        <div class="eyebrow">Avg. Google Rating</div>
+        <div class="value">5.0 ★</div>
+        <div class="delta flat">— steady, 128 reviews</div>
+      </div>
+
+      <div class="card kpi" id="kpiActiveAlerts">
+        <div class="eyebrow">Active Alerts</div>
+        <div class="value" id="kpiActiveAlertsValue" style="color:var(--coral-text)">4</div>
+        <div class="delta down" id="kpiActiveAlertsDelta">1 crisis, 3 digest</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div>
+          <h3>✨ This Week, Summarized</h3>
+          <div class="card-sub">Auto-generated exec narrative — preview of the planned AI weekly summary feature</div>
+        </div>
+        <button class="btn-mini" onclick="regenerateSummary()">Regenerate</button>
+      </div>
+      <div id="aiSummaryText" style="font-size:12.5px; color:var(--ink-dim); line-height:1.65;">
+        Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Sentiment Trend</h3>
+            <div class="card-sub">Net sentiment score, owned entities, last 14 days</div>
+          </div>
+          <div class="chart-legend">
+            <span><i class="swatch" style="background:var(--gold)"></i>Net score</span>
+          </div>
+        </div>
+        <svg viewBox="0 0 820 180" width="100%" height="170">
+          <line x1="0" y1="90" x2="820" y2="90" stroke="#E9E1D3" stroke-width="1" stroke-dasharray="3 4"/>
+          <polyline points="20,118 80,113.3 140,125 200,108.7 260,104 320,113.3 380,99.3 440,90 500,94.7 560,85.3 620,92.3 680,80 740,76 800,73.3"
+                    fill="none" stroke="#F5A623" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <polygon points="20,118 80,113.3 140,125 200,108.7 260,104 320,113.3 380,99.3 440,90 500,94.7 560,85.3 620,92.3 680,80 740,76 800,73.3 800,180 20,180"
+                   fill="url(#areaFade)" opacity="0.30"/>
+          <defs>
+            <linearGradient id="areaFade" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#F5A623"/>
+              <stop offset="100%" stop-color="#F5A623" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <circle cx="800" cy="73.3" r="4" fill="#F5A623"/>
+          <text x="20" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif">Jun 18</text>
+          <text x="410" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="middle">Jun 24</text>
+          <text x="800" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="end">Jul 1</text>
+        </svg>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Live Alerts</h3>
+            <div class="card-sub">Crisis items trigger immediately; the rest roll into the daily digest</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="tag coral" id="alertOpenTag">4 open</span>
+            <button class="icon-btn" style="width:26px;height:26px;font-size:12px;" onclick="openAlertRulesModal()" title="How alerts are classified">ℹ️</button>
+          </div>
+        </div>
+
+        <div class="alert-item alert-crisis" data-alert-id="0">
+          <div class="alert-dot high"></div>
+          <div class="alert-body">
+            <div class="alert-title" style="color:var(--coral-text);">🚨 Journalist inquiry re: patient complaint — Manila Bulletin</div>
+            <div class="alert-meta">News desk · 12 min ago · Crisis Alert — send immediately</div>
+            <div class="alert-actions">
+              <button class="btn-mini primary btn-assign" onclick="handleAssign(this)">Assign</button>
+              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
+              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-item" data-alert-id="1">
+          <div class="alert-dot med"></div>
+          <div class="alert-body">
+            <div class="alert-title">2★ Google review — Remedy BGC</div>
+            <div class="alert-meta">Google · 41 min ago · Daily Digest — isolated, no traction</div>
+            <div class="alert-actions">
+              <button class="btn-mini primary btn-assign" onclick="handleAssign(this)">Assign</button>
+              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
+              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-item" data-alert-id="2">
+          <div class="alert-dot low"></div>
+          <div class="alert-body">
+            <div class="alert-title">Sentiment dip in Reddit thread</div>
+            <div class="alert-meta">r/PhilippinesSkincare · 3 hrs ago · Daily Digest — neutral discussion</div>
+            <div class="alert-actions">
+              <button class="btn-mini btn-assign" onclick="handleAssign(this)">Assign</button>
+              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
+              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-item" data-alert-id="3">
+          <div class="alert-dot low"></div>
+          <div class="alert-body">
+            <div class="alert-title">Aivee mention volume +40% this week</div>
+            <div class="alert-meta">Competitor spike · Instagram, X · Daily Digest — competitive intel</div>
+            <div class="alert-actions">
+              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
+              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPETITORS -->
+  <section class="view" id="view-competitors">
+    <div class="page-head">
+      <div>
+        <h1>Competitors</h1>
+        <div class="desc">Share of voice, channel mix, and top voices vs. the tracked competitive set</div>
+      </div>
+      <div class="filters">
+        <div class="chip on chip-dropdown" data-prefix="📅 " data-options="Last 7 days|Last 30 days|Last 90 days|Custom range…">📅 Last 7 days</div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Share of Voice</h3>
+            <div class="card-sub">Mention volume vs. competitive set, last 7 days</div>
+          </div>
+        </div>
+        <div class="pie-wrap">
+          <div class="pie-chart" data-center="Remedy 14%" style="background:conic-gradient(#A99C89 0% 40%, #F5A623 40% 67%, #FF5A3C 67% 81%, #2F8FE0 81% 89%, #16A863 89% 94%, #8B7EC8 94% 98%, #D9C9A3 98% 100%);"></div>
+          <div class="pie-legend">
+            <div class="src-row"><div class="src-icon" style="background:#A99C89"></div><div class="src-name">Belo</div><div class="src-pct">40%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#F5A623"></div><div class="src-name" title="Includes Aivee Skin Spa, Foleon by Aivee">Aivee <span class="spike-badge">▲ spike</span></div><div class="src-pct">27%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#FF5A3C"></div><div class="src-name" style="font-weight:600; color:var(--coral-text);" title="Also matches: Remedy Skin Solutions, Remedy Skin, Remedy BGC, Remedy clinic, Remedy GH, Remedy Greenhills, Remedy Vertis, Remedy Vertis North, Skin Bar by Remedy">Remedy</div><div class="src-pct" style="color:var(--coral-text);">14%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#2F8FE0"></div><div class="src-name">SkinStation</div><div class="src-pct">8%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#16A863"></div><div class="src-name">DermHQ</div><div class="src-pct">5%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#8B7EC8"></div><div class="src-name">Luminisce</div><div class="src-pct">4%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#D9C9A3"></div><div class="src-name" title="Includes Kamiseta Skin, Kamiseta Skin Clinic">Kamiseta <span class="tag gold" style="font-size:9px; padding:1px 5px;">New</span></div><div class="src-pct">2%</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Source Breakdown</h3>
+            <div class="card-sub">Owned entity mentions by channel</div>
+          </div>
+        </div>
+        <div class="pie-wrap">
+          <div class="pie-chart" data-center="342 mentions" style="background:conic-gradient(#16A863 0% 34%, #2F8FE0 34% 54%, #FF5A3C 54% 71%, #A99C89 71% 85%, #4A4038 85% 92%, #F5A623 92% 97%, #8B7EC8 97% 100%);"></div>
+          <div class="pie-legend">
+            <div class="src-row"><div class="src-icon" style="background:#16A863"></div><div class="src-name">Google Reviews</div><div class="src-pct">34%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#2F8FE0"></div><div class="src-name">Facebook</div><div class="src-pct">20%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#FF5A3C"></div><div class="src-name">Instagram</div><div class="src-pct">17%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#A99C89"></div><div class="src-name">Reddit</div><div class="src-pct">14%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#4A4038"></div><div class="src-name">X</div><div class="src-pct">7%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#F5A623"></div><div class="src-name">News / PR</div><div class="src-pct">5%</div></div>
+            <div class="src-row"><div class="src-icon" style="background:#8B7EC8"></div><div class="src-name">TikTok <span class="tag gold" style="font-size:9px; padding:1px 5px;">New</span></div><div class="src-pct">3%</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Top Voices</h3>
+          <div class="card-sub">Highest-reach accounts talking about the category this week — supports the KOL identification feature in §10 of the spec</div>
+        </div>
+      </div>
+      <div class="src-row"><div class="src-icon" style="background:var(--coral-tint); color:var(--coral-text)">IG</div><div class="src-name">@glowwithsab · ~4.8K reach</div><span class="tag sage">Remedy advocate</span></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">R</div><div class="src-name">u/skinseeker_mnl · ~1.2K reach</div><span class="tag gold">Comparing brands</span></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--coral-tint); color:var(--coral-text)">IG</div><div class="src-name">@beauty.trends.ph · ~12K reach</div><span class="tag neutral">Category — no lean</span></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">TT</div><div class="src-name">@glowgetterph · ~28K reach</div><span class="tag neutral">Aivee advocate</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Category Watch — Hair</h3>
+          <div class="card-sub">New tracked entities per Marketing's §18 update — not yet reflected in Share of Voice above</div>
+        </div>
+      </div>
+      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">H</div><div class="src-name">Clinique de Paris</div><span class="tag neutral">Boolean query pending</span></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">H</div><div class="src-name">Foleon by Aivee <span style="color:var(--ink-faint);">(also under Aivee)</span></div><span class="tag neutral">Boolean query pending</span></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">H</div><div class="src-name">Svenson</div><span class="tag neutral">Boolean query pending</span></div>
+    </div>
+  </section>
+
+  <!-- MENTIONS -->
+  <section class="view" id="view-mentions">
+    <div class="page-head">
+      <div>
+        <h1>Mentions</h1>
+        <div class="desc">Most recent, all owned entities</div>
+      </div>
+      <div class="filters">
+        <div class="chip on chip-toggle" id="liveToggle" data-alt="Paused">Live</div>
+        <input type="text" id="mentionSearch" placeholder="Search mentions…" oninput="filterMentions(this.value)">
+        <div class="chip" id="mentionPlatformFilter" onclick="toggleMentionFilterMenu(event, this, 'platform')">Platform: All</div>
+        <div class="chip" id="mentionDateFilter" onclick="toggleMentionFilterMenu(event, this, 'date')">📅 All time</div>
+        <div class="chip" onclick="simulateIncomingMention()">+ Simulate mention</div>
+        <div class="chip" onclick="exportMentionsCSV()">⭳ Export CSV</div>
+      </div>
+    </div>
+    <div class="card" id="mentionsFeedCard">
+      <div class="feed-item" data-platform="Google" data-date="2026-07-01">
+        <div class="feed-avatar">🟢</div>
+        <div class="feed-body">
+          <div class="feed-top"><span class="feed-author">Google Review · anonymous patient</span><span class="feed-source">Remedy BGC · 41 min ago</span></div>
+          <div class="feed-text">"Second time booking Rejuran with Dra. April's team, still waiting on a follow-up call back — service used to be faster."</div>
+          <div class="feed-meta"><span class="stars">★★</span><span>Sentiment: Negative</span><span>Reach: —</span><a class="source-link" onclick="viewSource('Google Review', 'Remedy BGC')">View source ↗</a></div>
+        </div>
+      </div>
+      <div class="feed-item" data-platform="Reddit" data-date="2026-07-01">
+        <div class="feed-avatar">💬</div>
+        <div class="feed-body">
+          <div class="feed-top"><span class="feed-author">u/skinseeker_mnl</span><span class="feed-source">r/PhilippinesSkincare · 3 hrs ago</span></div>
+          <div class="feed-text">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy's reviews look consistent but Aivee has more posts."</div>
+          <div class="feed-meta"><span>Sentiment: Neutral</span><span>Reach: ~1,200</span><a class="source-link" onclick="viewSource('r/PhilippinesSkincare', 'Remedy vs Aivee Rejuran')">View source ↗</a></div>
+        </div>
+      </div>
+      <div class="feed-item" data-platform="Instagram" data-date="2026-07-01">
+        <div class="feed-avatar">📸</div>
+        <div class="feed-body">
+          <div class="feed-top"><span class="feed-author">@glowwithsab</span><span class="feed-source">Instagram comment on @remedy.ph · 6 hrs ago</span></div>
+          <div class="feed-text">"Best facial I've had in BGC, the clinic feels so clean and the staff actually explain what they're doing 🤍"</div>
+          <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~4,800</span><a class="source-link" onclick="viewSource('Instagram', '@remedy.ph glowwithsab')">View source ↗</a></div>
+        </div>
+      </div>
+      <div class="feed-item" data-platform="News" data-date="2026-06-30">
+        <div class="feed-avatar">📰</div>
+        <div class="feed-body">
+          <div class="feed-top"><span class="feed-author">PeopleAsia editorial</span><span class="feed-source">Online News · yesterday</span></div>
+          <div class="feed-text">Feature on SkinPen treatments includes commentary from Dr. April Geraldez-Rivera on emerging PH skincare trends.</div>
+          <div class="feed-meta"><span>Sentiment: Positive</span><span class="mono" style="color:var(--gold-text)">EMV ₱290,000</span><a class="source-link" onclick="viewSource('PeopleAsia', 'SkinPen feature April Geraldez-Rivera')">View source ↗</a></div>
+        </div>
+      </div>
+      <div class="feed-item" data-platform="Facebook" data-date="2026-06-29">
+        <div class="feed-avatar">💛</div>
+        <div class="feed-body">
+          <div class="feed-top"><span class="feed-author">Facebook comment · patient</span><span class="feed-source">facebook.com/remedyph · 2 days ago</span></div>
+          <div class="feed-text">"Club Remedy's wellness room is such a nice touch after a facial, did not expect that at a derma clinic."</div>
+          <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~1,900</span><a class="source-link" onclick="viewSource('Facebook', 'facebook.com/remedyph Club Remedy wellness')">View source ↗</a></div>
+        </div>
+      </div>
+      <div class="feed-item" data-platform="TikTok" data-date="2026-06-28">
+        <div class="feed-avatar">🎵</div>
+        <div class="feed-body">
+          <div class="feed-top"><span class="feed-author">TikTok comment · patient</span><span class="feed-source">@remedy.ph on TikTok · 3 days ago</span></div>
+          <div class="feed-text">"The skin routine video was so helpful, saving this before my next Pico laser session."</div>
+          <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~2,600</span><a class="source-link" onclick="viewSource('TikTok', '@remedy.ph skin routine')">View source ↗</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVIEWS -->
+  <section class="view" id="view-reviews">
+    <div class="page-head">
+      <div>
+        <h1>Reviews</h1>
+        <div class="desc">Review management by branch listing</div>
+      </div>
+      <div class="filters">
+        <div class="chip" onclick="exportReviewsCSV()">⭳ Export CSV</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-scroll"><table>
+        <thead><tr><th>Listing</th><th>Rating</th><th>Reviews</th><th>Trend (30d)</th><th>Response rate</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr data-listing="Remedy — BGC (One Uptown Residence)">
+            <td>Remedy — BGC (One Uptown Residence)</td>
+            <td><span class="stars">★★★★★</span> 5.0</td>
+            <td>128</td>
+            <td class="mono" style="color:var(--sage-text)">▲ steady</td>
+            <td class="resp-rate">100%</td>
+            <td><span class="tag sage">All clear</span></td>
+          </tr>
+          <tr data-listing="Club Remedy — BGC">
+            <td>Club Remedy — BGC</td>
+            <td><span class="stars">★★★★★</span> 4.9</td>
+            <td>34</td>
+            <td class="mono" style="color:var(--sage-text)">▲ +0.1</td>
+            <td class="resp-rate">88%</td>
+            <td><span class="tag gold clickable" onclick="openReplyModal(this)">1 pending reply</span></td>
+          </tr>
+          <tr data-listing="Remedy — Vertis North">
+            <td title="Also matches: Remedy Vertis, Remedy Vertis North">Remedy — Vertis North</td>
+            <td><span class="stars">★★★★★</span> 4.8</td>
+            <td>52</td>
+            <td class="mono" style="color:var(--sage-text)">▲ +0.2</td>
+            <td class="resp-rate">95%</td>
+            <td><span class="tag sage">All clear</span></td>
+          </tr>
+          <tr data-listing="Skin Bar by Remedy — Greenhills Mall">
+            <td title="Also matches: Remedy GH, Remedy Greenhills, Skin Bar by Remedy">Skin Bar by Remedy — Greenhills Mall</td>
+            <td><span class="stars">★★★★☆</span> 4.6</td>
+            <td>19</td>
+            <td class="mono" style="color:var(--gold-text)">▲ new branch</td>
+            <td class="resp-rate">80%</td>
+            <td><span class="tag gold clickable" onclick="openReplyModal(this)">2 pending replies</span></td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- TOPICS -->
+  <section class="view" id="view-topics">
+    <div class="page-head">
+      <div>
+        <h1>Topics</h1>
+        <div class="desc">Auto-grouped conversation themes with sentiment, all owned entities, last 7 days</div>
+      </div>
+    </div>
+    <div class="topic-legend" style="margin-bottom:16px;">
+      <span><i class="dot" style="background:var(--sage)"></i>Positive</span>
+      <span><i class="dot" style="background:var(--ink-faint)"></i>Neutral</span>
+      <span><i class="dot" style="background:var(--coral)"></i>Negative</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div><h3>Facial Results & Glow</h3><div class="card-sub">138 mentions this week</div></div>
+        <span class="tag sage">Trending</span>
+      </div>
+      <div class="sentiment-bar"><div class="seg pos" style="width:82%"></div><div class="seg neu" style="width:14%"></div><div class="seg neg" style="width:4%"></div></div>
+      <div class="topic-quote">"Best facial I've had in BGC, the clinic feels so clean and the staff actually explain what they're doing."</div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div><h3>Staff & Service Experience</h3><div class="card-sub">71 mentions this week</div></div>
+        <span class="tag sage">Trending</span>
+      </div>
+      <div class="sentiment-bar"><div class="seg pos" style="width:76%"></div><div class="seg neu" style="width:18%"></div><div class="seg neg" style="width:6%"></div></div>
+      <div class="topic-quote">"Club Remedy's wellness room is such a nice touch after a facial, did not expect that at a derma clinic."</div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div><h3>Rejuran Specifically</h3><div class="card-sub">49 mentions this week</div></div>
+        <span class="tag gold">Watch</span>
+      </div>
+      <div class="sentiment-bar"><div class="seg pos" style="width:45%"></div><div class="seg neu" style="width:40%"></div><div class="seg neg" style="width:15%"></div></div>
+      <div class="topic-quote">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy's reviews look consistent but Aivee has more posts."</div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div><h3>Pricing & Packages</h3><div class="card-sub">38 mentions this week</div></div>
+        <span class="tag gold">Watch</span>
+      </div>
+      <div class="sentiment-bar"><div class="seg pos" style="width:38%"></div><div class="seg neu" style="width:47%"></div><div class="seg neg" style="width:15%"></div></div>
+      <div class="topic-quote">"Anyone know if Remedy has package deals for Pico laser? Price isn't listed on their page."</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Booking & Follow-up Response</h3><div class="card-sub">46 mentions this week</div></div>
+        <span class="tag coral">Needs attention</span>
+      </div>
+      <div class="sentiment-bar"><div class="seg pos" style="width:20%"></div><div class="seg neu" style="width:35%"></div><div class="seg neg" style="width:45%"></div></div>
+      <div class="topic-quote">"Second time booking Rejuran with Dra. April's team, still waiting on a follow-up call back — service used to be faster."</div>
+    </div>
+  </section>
+
+  <!-- EMV -->
+  <section class="view" id="view-emv">
+    <div class="page-head">
+      <div>
+        <h1>Earned Media Value</h1>
+        <div class="desc">This month, all owned entities · rate card updated to Media Meter's published card per Gian's §6.3 note · click a row for the calculation</div>
+      </div>
+      <div class="filters">
+        <span class="tag gold" id="emvGrossTag">Gross ₱2,366,000</span>
+        <span class="tag sage" id="emvNetTag">Net Favorable ₱2,809,000</span>
+        <div class="chip" id="emvOutletFilter" onclick="toggleEmvFilterMenu(event, this, 'outlet')">Outlet: All</div>
+        <div class="chip" id="emvDateFilter" onclick="toggleEmvFilterMenu(event, this, 'date')">📅 All time</div>
+        <div class="chip" onclick="exportEmvCSV()">⭳ Export CSV</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div><h3>Rate Card</h3><div class="card-sub">Base AVE per placement, from the Media Meter card Gian attached to §6.3</div></div>
+      </div>
+      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">N</div><div class="src-name">National Newspapers <span style="color:var(--ink-faint);">(incl. websites)</span></div><div class="src-pct">₱200,000 / article</div></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--gold-tint); color:var(--gold-text)">M</div><div class="src-name">Lifestyle Magazines <span style="color:var(--ink-faint);">(incl. websites)</span></div><div class="src-pct">₱250,000 / article</div></div>
+      <div class="src-row"><div class="src-icon" style="background:var(--sky-tint); color:var(--sky-text)">TV</div><div class="src-name">Broadcast TV <span style="color:var(--ink-faint);">(online capture only)</span></div><div class="src-pct">₱200,000 / 30s</div></div>
+    </div>
+    <div class="card">
+      <div class="table-scroll"><table>
+        <thead><tr><th>Outlet</th><th>Article</th><th>Tier</th><th>Sentiment</th><th>Gross EMV</th><th>Net Favorable EMV</th><th></th></tr></thead>
+        <tbody id="emvTableBody">
+          <tr class="emv-row" data-outlet="Rappler" data-date="2026-06-29" onclick="toggleEmvDetail(this)">
+            <td><span class="chevron">▸</span>Rappler</td>
+            <td>Remedy BGC clinic review</td>
+            <td>National News</td>
+            <td><span class="tag sage">Positive</span></td>
+            <td class="emv-val">₱585,000</td>
+            <td class="emv-val">₱702,000</td>
+            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('Rappler', 'Remedy BGC clinic review')">View ↗</a></td>
+          </tr>
+          <tr class="emv-detail" style="display:none;">
+            <td colspan="7">Base AVE (National Newspaper) ₱200,000 → Prominence ×1.5 (headline) → AVE ₱300,000 → PubScore 0.65 → PR_Credibility ×3.0 → Gross EMV ≈ ₱585,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱702,000</td>
+          </tr>
+          <tr class="emv-row" data-outlet="Philippine Star" data-date="2026-06-15" onclick="toggleEmvDetail(this)">
+            <td><span class="chevron">▸</span>Philippine Star</td>
+            <td>April Rivera techpreneur profile</td>
+            <td>National News</td>
+            <td><span class="tag sage">Positive</span></td>
+            <td class="emv-val">₱360,000</td>
+            <td class="emv-val">₱432,000</td>
+            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('Philippine Star', 'April Rivera techpreneur profile')">View ↗</a></td>
+          </tr>
+          <tr class="emv-detail" style="display:none;">
+            <td colspan="7">Base AVE (National Newspaper) ₱200,000 → Prominence ×1.0 (substantial) → PubScore 0.60 → PR_Credibility ×3.0 → Gross EMV ≈ ₱360,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱432,000</td>
+          </tr>
+          <tr class="emv-row" data-outlet="PeopleAsia" data-date="2026-06-05" onclick="toggleEmvDetail(this)">
+            <td><span class="chevron">▸</span>PeopleAsia</td>
+            <td>SkinPen feature, panel commentary</td>
+            <td>Lifestyle Mag</td>
+            <td><span class="tag sage">Positive</span></td>
+            <td class="emv-val">₱536,000</td>
+            <td class="emv-val">₱643,000</td>
+            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('PeopleAsia', 'SkinPen feature April Geraldez-Rivera')">View ↗</a></td>
+          </tr>
+          <tr class="emv-detail" style="display:none;">
+            <td colspan="7">Base AVE (Lifestyle Magazine) ₱250,000 → Prominence ×1.3 (headline-adjacent) → AVE ₱325,000 → PubScore 0.55 → PR_Credibility ×3.0 → Gross EMV ≈ ₱536,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱643,000. Note: this replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base (₱120,000) — flag to Gian/Marketing to confirm the new figure.</td>
+          </tr>
+          <tr class="emv-row" data-outlet="When In Manila" data-date="2026-05-20" onclick="toggleEmvDetail(this)">
+            <td><span class="chevron">▸</span>When In Manila</td>
+            <td>Club Remedy wellness soft-launch feature</td>
+            <td>Lifestyle Mag</td>
+            <td><span class="tag sage">Positive</span></td>
+            <td class="emv-val">₱375,000</td>
+            <td class="emv-val">₱450,000</td>
+            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('When In Manila', 'Club Remedy wellness soft-launch feature')">View ↗</a></td>
+          </tr>
+          <tr class="emv-detail" style="display:none;">
+            <td colspan="7">Base AVE (Lifestyle Magazine) ₱250,000 → Prominence ×1.0 (substantial) → PubScore 0.50 → PR_Credibility ×3.0 → Gross EMV ≈ ₱375,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱450,000</td>
+          </tr>
+          <tr class="emv-row" data-outlet="Manila Bulletin" data-date="2026-05-02" onclick="toggleEmvDetail(this)">
+            <td><span class="chevron">▸</span>Manila Bulletin</td>
+            <td>Acne treatment trends roundup, brief mention</td>
+            <td>National News</td>
+            <td><span class="tag sky">Neutral</span></td>
+            <td class="emv-val">₱150,000</td>
+            <td class="emv-val">₱150,000</td>
+            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('Manila Bulletin', 'acne treatment trends roundup')">View ↗</a></td>
+          </tr>
+          <tr class="emv-detail" style="display:none;">
+            <td colspan="7">Base AVE (National Newspaper) ₱200,000 → Prominence ×0.5 (passing mention) → AVE ₱100,000 → PubScore 0.50 → PR_Credibility ×3.0 → Gross EMV ≈ ₱150,000 → Sentiment ×1.0 (neutral) → Net Favorable EMV ≈ ₱150,000</td>
+          </tr>
+          <tr class="emv-row" data-outlet="ANC" data-date="2026-04-10" onclick="toggleEmvDetail(this)">
+            <td><span class="chevron">▸</span>ANC</td>
+            <td>Dermatology segment, 30s brand mention</td>
+            <td>Broadcast TV</td>
+            <td><span class="tag sage">Positive</span></td>
+            <td class="emv-val">₱360,000</td>
+            <td class="emv-val">₱432,000</td>
+            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('ANC', 'dermatology segment brand mention')">View ↗</a></td>
+          </tr>
+          <tr class="emv-detail" style="display:none;">
+            <td colspan="7">Base AVE (Broadcast TV, per 30s) ₱200,000 → Prominence ×1.0 (substantial) → PubScore 0.60 → PR_Credibility ×3.0 → Gross EMV ≈ ₱360,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱432,000. Online capture only, per §5.5 — this is the first TV placement in the tracker.</td>
+          </tr>
+          <tr id="emvEmptyRow" style="display:none;"><td colspan="7" style="text-align:center; color:var(--ink-faint); padding:20px 10px;">No coverage matches these filters (demo)</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="note">
+  <span>Remedy Pulse — mock-up build · sample data for review, not live · actions below are simulated for demo purposes</span>
+  <span>Spec ref: RemedyPulseSpec_1 · v0.1 draft</span>
+</footer>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---------- Tab navigation ----------
+  const links = document.querySelectorAll('#tabNav a');
+  const views = document.querySelectorAll('.view');
+  function switchTab(name){
+    links.forEach(l => l.classList.toggle('active', l.dataset.view === name));
+    views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  links.forEach(link => link.addEventListener('click', () => switchTab(link.dataset.view)));
+
+  // ---------- Toast ----------
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  // ---------- Modal ----------
+  function openModal(html){
+    document.getElementById('modalBox').innerHTML = html;
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+  function closeModal(){
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+
+  // ---------- Filter chip dropdowns ----------
+  function closeAllChipMenus(){
+    document.querySelectorAll('.chip-menu').forEach(m => m.remove());
+  }
+  document.querySelectorAll('.chip-dropdown').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const already = chip.querySelector('.chip-menu');
+      closeAllChipMenus();
+      if (already) return;
+      const options = chip.dataset.options.split('|');
+      const prefix = chip.dataset.prefix || '';
+      const menu = document.createElement('div');
+      menu.className = 'chip-menu';
+      options.forEach(opt => {
+        const item = document.createElement('div');
+        item.className = 'chip-menu-item';
+        item.textContent = opt;
+        item.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          menu.remove();
+          if (opt.indexOf('Custom range') === 0){
+            openCustomDateModal((from, to) => {
+              chip.childNodes[0].textContent = prefix + formatDateRange(from, to);
+              chip.classList.add('on');
+              showToast('Custom range applied — sample data unchanged in demo mode');
+            });
+            return;
+          }
+          chip.childNodes[0].textContent = prefix + opt;
+          chip.classList.add('on');
+        });
+        menu.appendChild(item);
+      });
+      chip.appendChild(menu);
+    });
+  });
+  document.addEventListener('click', closeAllChipMenus);
+
+  // ---------- Custom date range modal (shared) ----------
+  const DEMO_TODAY = new Date('2026-07-01T00:00:00');
+  let customDateCallback = null;
+  function openCustomDateModal(onApply, presetFrom, presetTo){
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>Custom date range</h4>' +
+      '<div class="date-range-row" style="display:flex; gap:10px; margin:14px 0;">' +
+      '<div style="flex:1;"><div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;">From</div>' +
+      '<input type="date" id="customDateFrom" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;" value="' + (presetFrom || '2026-06-01') + '"></div>' +
+      '<div style="flex:1;"><div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;">To</div>' +
+      '<input type="date" id="customDateTo" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;" value="' + (presetTo || '2026-06-30') + '"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="btn-mini primary" onclick="applyCustomDateModal()">Apply</button>' +
+      '<button class="btn-mini" onclick="closeModal()">Cancel</button>' +
+      '</div>'
+    );
+    customDateCallback = onApply;
+  }
+  function applyCustomDateModal(){
+    const from = document.getElementById('customDateFrom').value;
+    const to = document.getElementById('customDateTo').value;
+    if (!from || !to){ showToast('Pick both dates (demo)'); return; }
+    closeModal();
+    if (customDateCallback) customDateCallback(from, to);
+  }
+  function formatDateRange(from, to){
+    const opts = { month: 'short', day: 'numeric' };
+    const f = new Date(from + 'T00:00:00').toLocaleDateString('en-US', opts);
+    const t = new Date(to + 'T00:00:00').toLocaleDateString('en-US', opts);
+    return f + ' – ' + t;
+  }
+  function inDateRange(dateStr, fromStr, toStr){
+    const d = new Date(dateStr + 'T00:00:00');
+    return d >= new Date(fromStr + 'T00:00:00') && d <= new Date(toStr + 'T00:00:00');
+  }
+  function cutoffDate(days){
+    const d = new Date(DEMO_TODAY);
+    d.setDate(d.getDate() - days);
+    return d;
+  }
+
+  // ---------- Source links ----------
+  function viewSource(outlet, query){
+    const url = 'https://www.google.com/search?q=' + encodeURIComponent(outlet + ' ' + query);
+    window.open(url, '_blank', 'noopener');
+    showToast('Opening search for the live source (demo — production deep-links to the ingested URL)');
+  }
+
+  // ---------- Chip toggle (Live / Paused) ----------
+  document.querySelectorAll('.chip-toggle').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const alt = chip.dataset.alt;
+      const current = chip.textContent;
+      chip.dataset.alt = current;
+      chip.textContent = alt;
+      chip.classList.toggle('on');
+    });
+  });
+
+  // ---------- Alerts: assign / view / resolve ----------
+  const alertDetails = {
+    '0': {
+      title: '🚨 Journalist inquiry re: patient complaint — Manila Bulletin',
+      meta: 'News desk · 12 min ago · Crisis Alert — send immediately',
+      body: '<p style="margin-bottom:10px;">A Manila Bulletin reporter has reached out requesting comment on a patient complaint alleging a treatment complication. This matches two Crisis Alert conditions: Mainstream Media Exposure and Founder/Doctor Reputation Risk.</p><p style="font-size:12px;color:var(--ink-faint);">Recommended: loop in Gian and Dr. Rivera before any reply goes out. Do not respond to the reporter directly without sign-off.</p>'
+    },
+    '1': {
+      title: '2★ Google review — Remedy BGC',
+      meta: 'Google · 41 min ago · unresponded',
+      body: '<p style="margin-bottom:10px;">"Second time booking Rejuran with Dra. April\u2019s team, still waiting on a follow-up call back — service used to be faster."</p><p style="font-size:12px;color:var(--ink-faint);">Reviewer: anonymous patient · Branch: Remedy BGC (One Uptown Residence) · Classified: Daily Digest (isolated complaint, no traction)</p>'
+    },
+    '2': {
+      title: 'Sentiment dip in Reddit thread',
+      meta: 'r/PhilippinesSkincare · 3 hrs ago',
+      body: '<p style="margin-bottom:10px;">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy\u2019s reviews look consistent but Aivee has more posts."</p><p style="font-size:12px;color:var(--ink-faint);">Thread sentiment shifted neutral → slightly negative over 6 replies · Estimated reach ~1,200 · Classified: Daily Digest (neutral discussion)</p>'
+    },
+    '3': {
+      title: 'Aivee mention volume +40% this week',
+      meta: 'Competitor spike · Instagram, X',
+      body: '<p style="margin-bottom:10px;">Aivee Clinic mention volume is up sharply this week, driven mostly by Instagram (+52%) and X (+28%).</p><p style="font-size:12px;color:var(--ink-faint);">No direct owned-entity impact detected yet · Classified: Daily Digest (competitive intelligence)</p>'
+    }
+  };
+
+  function openAlertRulesModal(){
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>Alert Classification Rules</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Per Gian\u2019s update to §9.2 — routes each item to a Crisis Alert (immediate) or the Daily Digest</div>' +
+      '<div style="font-size:12.5px;color:var(--ink);font-weight:600;margin-bottom:6px;">🚨 Crisis Alert — send immediately if any apply</div>' +
+      '<ul style="margin:0 0 16px 18px; color:var(--ink-dim); font-size:12px; line-height:1.7;">' +
+      '<li>Patient safety or medical risk — injury, malpractice, viral complication, misinformation</li>' +
+      '<li>High-velocity negative sentiment — rapid engagement, a 10K+ follower critic, a pile-on thread</li>' +
+      '<li>Mainstream media exposure — negative or investigative coverage</li>' +
+      '<li>Founder or doctor reputation risk — personal attacks, misquotes</li>' +
+      '<li>Legal or regulatory escalation — FDA, DOH, PRC, DTI, legal threats</li>' +
+      '</ul>' +
+      '<div style="font-size:12.5px;color:var(--ink);font-weight:600;margin-bottom:6px;">📋 Daily Digest — no immediate action</div>' +
+      '<ul style="margin:0; color:var(--ink-dim); font-size:12px; line-height:1.7;">' +
+      '<li>Positive coverage, features, awards, event mentions</li>' +
+      '<li>Routine reviews, organic mentions, pricing questions</li>' +
+      '<li>Competitive intelligence — launches, promos, competitor press</li>' +
+      '<li>Trend monitoring and emerging conversations</li>' +
+      '<li>Low-level negative feedback without traction</li>' +
+      '</ul>'
+    );
+  }
+
+  function handleAssign(btn){
+    const select = document.createElement('select');
+    select.className = 'assign-select';
+    select.innerHTML = '<option value="">Assign to…</option><option>Gian</option><option>Paul</option><option>Boom</option><option>Mixi</option>';
+    select.addEventListener('change', function(){
+      if (!this.value) return;
+      const label = document.createElement('span');
+      label.className = 'tag sage assigned-label';
+      label.textContent = 'Assigned: ' + this.value;
+      this.replaceWith(label);
+      showToast('Assigned to ' + this.value + ' (demo)');
+    });
+    btn.replaceWith(select);
+  }
+
+  function openAlertModal(btn){
+    const item = btn.closest('.alert-item');
+    const id = item.dataset.alertId;
+    const d = alertDetails[id];
+    if (!d) return;
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>' + d.title + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + d.meta + '</div>' +
+      d.body +
+      '<div style="display:flex;gap:8px;margin-top:18px;">' +
+      '<button class="btn-mini primary" onclick="resolveAlertById(\'' + id + '\')">Mark resolved</button>' +
+      '<button class="btn-mini" onclick="closeModal()">Close</button>' +
+      '</div>'
+    );
+  }
+
+  function resolveAlertById(id){
+    const item = document.querySelector('.alert-item[data-alert-id="' + id + '"]');
+    if (item) resolveAlertItem(item);
+    closeModal();
+  }
+
+  function resolveAlert(btn){
+    const item = btn.closest('.alert-item');
+    resolveAlertItem(item);
+  }
+
+  function resolveAlertItem(item){
+    if (!item) return;
+    item.style.transition = 'opacity .3s ease, max-height .3s ease, margin .3s ease, padding .3s ease';
+    item.style.maxHeight = item.offsetHeight + 'px';
+    item.style.opacity = '1';
+    requestAnimationFrame(() => {
+      item.style.opacity = '0';
+      item.style.maxHeight = '0px';
+      item.style.marginTop = '0';
+      item.style.paddingTop = '0';
+      item.style.paddingBottom = '0';
+      item.style.overflow = 'hidden';
+    });
+    setTimeout(() => {
+      item.remove();
+      updateAlertCounts();
+    }, 320);
+    showToast('Alert resolved (demo)');
+  }
+
+  function resolveAllAlerts(){
+    const items = [...document.querySelectorAll('#view-overview .alert-item')];
+    if (!items.length){ showToast('No open alerts (demo)'); return; }
+    items.forEach(it => it.remove());
+    updateAlertCounts();
+    showToast('All alerts resolved (demo)');
+  }
+
+  function updateAlertCounts(){
+    const remaining = document.querySelectorAll('#view-overview .alert-item').length;
+    const tag = document.getElementById('alertOpenTag');
+    const kpiValue = document.getElementById('kpiActiveAlertsValue');
+    const kpiDelta = document.getElementById('kpiActiveAlertsDelta');
+    const bellBadge = document.getElementById('bellBadge');
+    if (tag){
+      tag.textContent = remaining + ' open';
+      tag.className = remaining === 0 ? 'tag sage' : 'tag coral';
+    }
+    if (kpiValue){
+      kpiValue.textContent = remaining;
+      kpiValue.style.color = remaining === 0 ? 'var(--sage-text)' : 'var(--coral-text)';
+    }
+    if (kpiDelta){
+      kpiDelta.textContent = remaining === 0 ? 'All caught up' : remaining + ' awaiting action';
+      kpiDelta.className = remaining === 0 ? 'delta flat' : 'delta down';
+    }
+    if (bellBadge){
+      bellBadge.textContent = remaining;
+      bellBadge.style.display = remaining === 0 ? 'none' : 'flex';
+    }
+    if (remaining === 0 && tag && !document.getElementById('alertsEmptyState')){
+      const card = tag.closest('.card');
+      if (card){
+        const empty = document.createElement('div');
+        empty.id = 'alertsEmptyState';
+        empty.className = 'alerts-empty';
+        empty.textContent = '✓ All caught up — nothing needs attention right now';
+        card.appendChild(empty);
+      }
+    } else if (remaining > 0){
+      const empty = document.getElementById('alertsEmptyState');
+      if (empty) empty.remove();
+    }
+  }
+
+  // ---------- Notification bell ----------
+  function toggleBellMenu(e){
+    e.stopPropagation();
+    const existing = document.getElementById('bellMenu');
+    if (existing){ existing.remove(); return; }
+    closeAllChipMenus();
+    const wrap = e.currentTarget.parentElement;
+    const menu = document.createElement('div');
+    menu.className = 'chip-menu';
+    menu.id = 'bellMenu';
+    menu.style.right = '0';
+    menu.style.left = 'auto';
+    menu.style.minWidth = '230px';
+    const items = [...document.querySelectorAll('#view-overview .alert-item')];
+    if (!items.length){
+      const empty = document.createElement('div');
+      empty.className = 'chip-menu-item';
+      empty.textContent = 'No active alerts';
+      menu.appendChild(empty);
+    } else {
+      items.forEach(it => {
+        const title = it.querySelector('.alert-title').textContent;
+        const row = document.createElement('div');
+        row.className = 'chip-menu-item';
+        row.textContent = title;
+        row.addEventListener('click', () => {
+          menu.remove();
+          switchTab('overview');
+          const viewBtn = it.querySelector('.btn-view');
+          if (viewBtn) openAlertModal(viewBtn);
+        });
+        menu.appendChild(row);
+      });
+    }
+    wrap.appendChild(menu);
+  }
+
+  // ---------- Command palette ----------
+  const commands = [
+    { label: 'Go to Overview', run: () => switchTab('overview') },
+    { label: 'Go to Competitors', run: () => switchTab('competitors') },
+    { label: 'Go to Mentions', run: () => switchTab('mentions') },
+    { label: 'Go to Reviews', run: () => switchTab('reviews') },
+    { label: 'Go to Topics', run: () => switchTab('topics') },
+    { label: 'Go to EMV', run: () => switchTab('emv') },
+    { label: 'Resolve all alerts', run: () => resolveAllAlerts() },
+    { label: 'View alert classification rules', run: () => { switchTab('overview'); openAlertRulesModal(); } },
+    { label: 'Simulate incoming mention', run: () => { switchTab('mentions'); simulateIncomingMention(); } },
+    { label: 'Regenerate AI weekly summary', run: () => { switchTab('overview'); regenerateSummary(); } },
+    { label: 'Export Mentions to CSV', run: () => { switchTab('mentions'); exportMentionsCSV(); } },
+    { label: 'Export EMV to CSV', run: () => { switchTab('emv'); exportEmvCSV(); } },
+    { label: 'Export Reviews to CSV', run: () => { switchTab('reviews'); exportReviewsCSV(); } }
+  ];
+
+  function renderCommandList(filter){
+    const list = document.getElementById('cmdList');
+    if (!list) return;
+    list.innerHTML = '';
+    const f = filter.trim().toLowerCase();
+    const matches = commands.filter(c => c.label.toLowerCase().includes(f));
+    if (!matches.length){
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:14px;color:var(--ink-faint);font-size:12.5px;';
+      empty.textContent = 'No matching commands.';
+      list.appendChild(empty);
+      return;
+    }
+    matches.forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'chip-menu-item';
+      item.style.padding = '9px 10px';
+      item.style.fontSize = '13px';
+      item.style.borderRadius = '7px';
+      item.textContent = c.label;
+      item.addEventListener('click', () => { closeModal(); c.run(); });
+      list.appendChild(item);
+    });
+  }
+
+  function openCommandPalette(){
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>Quick actions</h4>' +
+      '<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:10px 0;">' +
+      '<span style="color:var(--ink-faint);font-size:13px;">🔎</span>' +
+      '<input id="cmdInput" type="text" placeholder="Type a command or jump to a tab…">' +
+      '</div>' +
+      '<div id="cmdList" style="max-height:280px;overflow:auto;"></div>'
+    );
+    renderCommandList('');
+    setTimeout(() => {
+      const inp = document.getElementById('cmdInput');
+      if (inp){
+        inp.focus();
+        inp.addEventListener('input', () => renderCommandList(inp.value));
+      }
+    }, 0);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){
+      e.preventDefault();
+      openCommandPalette();
+    } else if (e.key === 'Escape'){
+      closeModal();
+    }
+  });
+
+  // ---------- Reviews: reply workflow ----------
+  let currentReplyTag = null;
+  function openReplyModal(tagEl){
+    const tr = tagEl.closest('tr');
+    const listing = tr ? tr.dataset.listing : 'this listing';
+    const ratingCell = tr ? tr.children[1].textContent.trim() : '';
+    currentReplyTag = tagEl;
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>Reply to review — ' + listing + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + ratingCell + ' · pending reply</div>' +
+      '<textarea id="replyText" placeholder="Write a reply…"></textarea>' +
+      '<div style="display:flex;gap:8px;margin-top:14px;">' +
+      '<button class="btn-mini primary" onclick="sendReply()">Send reply</button>' +
+      '<button class="btn-mini" onclick="closeModal()">Cancel</button>' +
+      '</div>'
+    );
+  }
+
+  function sendReply(){
+    closeModal();
+    const tag = currentReplyTag;
+    if (tag){
+      tag.className = 'tag sage';
+      tag.textContent = 'All clear';
+      tag.removeAttribute('onclick');
+      tag.style.cursor = 'default';
+      const tr = tag.closest('tr');
+      const rateCell = tr ? tr.querySelector('.resp-rate') : null;
+      if (rateCell) rateCell.textContent = '100%';
+    }
+    currentReplyTag = null;
+    showToast('Reply sent (demo)');
+  }
+
+  function exportReviewsCSV(){
+    const rows = [['Listing','Rating','Reviews','Trend','Response rate','Status']];
+    document.querySelectorAll('#view-reviews table tbody tr').forEach(tr => {
+      const cells = [...tr.children].map(td => td.textContent.trim().replace(/\s+/g, ' '));
+      rows.push(cells);
+    });
+    downloadCSV('remedy-pulse-reviews.csv', rows);
+  }
+
+  // ---------- Mentions: search, platform, date, simulate, export ----------
+  let mentionSearchQuery = '';
+  let mentionPlatform = 'All';
+  let mentionDateMode = 'all';
+  let mentionDateFrom = null;
+  let mentionDateTo = null;
+
+  function filterMentions(q){
+    mentionSearchQuery = q;
+    applyMentionFilters();
+  }
+
+  function toggleMentionFilterMenu(evt, chip, type){
+    evt.stopPropagation();
+    const already = chip.querySelector('.chip-menu');
+    closeAllChipMenus();
+    if (already) return;
+    const options = type === 'platform'
+      ? ['All', 'Google', 'Reddit', 'Instagram', 'Facebook', 'News', 'TikTok', 'X']
+      : ['All time', 'Last 7 days', 'Last 30 days', 'Last 90 days', 'Custom range…'];
+    const menu = document.createElement('div');
+    menu.className = 'chip-menu';
+    options.forEach(opt => {
+      const item = document.createElement('div');
+      item.className = 'chip-menu-item';
+      item.textContent = opt;
+      item.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        menu.remove();
+        if (type === 'platform'){
+          mentionPlatform = opt;
+          chip.textContent = 'Platform: ' + opt;
+          chip.classList.toggle('on', opt !== 'All');
+          applyMentionFilters();
+        } else {
+          if (opt === 'Custom range…'){
+            openCustomDateModal((from, to) => {
+              mentionDateMode = 'custom';
+              mentionDateFrom = from;
+              mentionDateTo = to;
+              chip.textContent = '📅 ' + formatDateRange(from, to);
+              chip.classList.add('on');
+              applyMentionFilters();
+            });
+            return;
+          }
+          mentionDateMode = opt;
+          chip.textContent = '📅 ' + opt;
+          chip.classList.toggle('on', opt !== 'All time');
+          applyMentionFilters();
+        }
+      });
+      menu.appendChild(item);
+    });
+    chip.appendChild(menu);
+  }
+
+  function applyMentionFilters(){
+    const card = document.getElementById('mentionsFeedCard');
+    if (!card) return;
+    const needle = mentionSearchQuery.trim().toLowerCase();
+    [...card.querySelectorAll('.feed-item')].forEach(it => {
+      const text = it.textContent.toLowerCase();
+      const matchesSearch = !needle || text.includes(needle);
+      const matchesPlatform = mentionPlatform === 'All' || it.dataset.platform === mentionPlatform;
+      let matchesDate = true;
+      const itemDate = it.dataset.date;
+      if (itemDate){
+        if (mentionDateMode === 'Last 7 days') matchesDate = new Date(itemDate + 'T00:00:00') >= cutoffDate(7);
+        else if (mentionDateMode === 'Last 30 days') matchesDate = new Date(itemDate + 'T00:00:00') >= cutoffDate(30);
+        else if (mentionDateMode === 'Last 90 days') matchesDate = new Date(itemDate + 'T00:00:00') >= cutoffDate(90);
+        else if (mentionDateMode === 'custom') matchesDate = inDateRange(itemDate, mentionDateFrom, mentionDateTo);
+      }
+      it.style.display = (matchesSearch && matchesPlatform && matchesDate) ? '' : 'none';
+    });
+  }
+
+  let simulatePoolIndex = -1;
+  let currentTotalMentions = 342;
+
+  function incrementTotalMentions(){
+    currentTotalMentions += 1;
+    const el = document.getElementById('kpiTotalMentionsValue');
+    if (el) el.textContent = currentTotalMentions;
+  }
+
+  function simulateIncomingMention(){
+    const liveChip = document.getElementById('liveToggle');
+    if (liveChip && liveChip.textContent.trim() === 'Paused'){
+      showToast('Feed paused — resume Live to see new mentions (demo)');
+      return;
+    }
+    const pool = [
+      { avatar: '📘', platform: 'Facebook', author: 'Facebook comment · patient', source: 'facebook.com/remedyph · just now', text: 'Booked our first Club Remedy wellness session today, the space feels calming compared to a regular clinic.', sentiment: 'Positive', reach: '~2,100' },
+      { avatar: '🐦', platform: 'X', author: '@skincareph_deals', source: 'X · just now', text: 'Pico laser results at Remedy BGC are honestly underrated, healed faster than expected.', sentiment: 'Positive', reach: '~3,400' },
+      { avatar: '🟢', platform: 'Google', author: 'Google Review · verified patient', source: 'Club Remedy BGC · just now', text: '5 stars, the wellness plus derma combo is such a smart idea. Will be back monthly.', sentiment: 'Positive', reach: '—' }
+    ];
+    simulatePoolIndex = (simulatePoolIndex + 1) % pool.length;
+    const m = pool[simulatePoolIndex];
+    const card = document.getElementById('mentionsFeedCard');
+    if (!card) return;
+    const todayStr = DEMO_TODAY.toISOString().slice(0, 10);
+    const item = document.createElement('div');
+    item.className = 'feed-item new-flash';
+    item.dataset.platform = m.platform;
+    item.dataset.date = todayStr;
+    item.innerHTML =
+      '<div class="feed-avatar">' + m.avatar + '</div>' +
+      '<div class="feed-body">' +
+      '<div class="feed-top"><span class="feed-author">' + m.author + '</span><span class="feed-source">' + m.source + '</span></div>' +
+      '<div class="feed-text">' + m.text + '</div>' +
+      '<div class="feed-meta"><span>Sentiment: ' + m.sentiment + '</span><span>Reach: ' + m.reach + '</span><a class="source-link" onclick="viewSource(\'' + m.platform + '\', \'' + m.author.replace(/'/g, '') + '\')">View source ↗</a></div>' +
+      '</div>';
+    card.insertBefore(item, card.firstChild);
+    setTimeout(() => item.classList.remove('new-flash'), 1800);
+    incrementTotalMentions();
+    applyMentionFilters();
+    if (item.style.display === 'none'){
+      showToast('New mention added but hidden by current filters (demo)');
+    } else {
+      showToast('New mention detected (demo)');
+    }
+  }
+
+  function exportMentionsCSV(){
+    const card = document.getElementById('mentionsFeedCard');
+    const items = [...card.querySelectorAll('.feed-item')].filter(it => it.style.display !== 'none');
+    const rows = [['Author','Source','Text','Sentiment','Reach']];
+    items.forEach(it => {
+      const author = (it.querySelector('.feed-author') || {}).textContent || '';
+      const source = (it.querySelector('.feed-source') || {}).textContent || '';
+      const text = (it.querySelector('.feed-text') || {}).textContent || '';
+      const metaSpans = [...it.querySelectorAll('.feed-meta span')].map(s => s.textContent.trim());
+      const sentiment = metaSpans.find(s => s.toLowerCase().indexOf('sentiment') !== -1) || '';
+      const reach = metaSpans.find(s => s.toLowerCase().indexOf('reach') !== -1) || '';
+      rows.push([author.trim(), source.trim(), text.trim(), sentiment, reach]);
+    });
+    downloadCSV('remedy-pulse-mentions.csv', rows);
+  }
+
+  function exportEmvCSV(){
+    const rows = [['Outlet','Article','Tier','Sentiment','Gross EMV','Net Favorable EMV']];
+    document.querySelectorAll('#view-emv table tbody tr.emv-row').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      const cells = [...tr.children].slice(0, 6).map(td => td.textContent.trim().replace(/\s+/g, ' '));
+      rows.push(cells);
+    });
+    downloadCSV('remedy-pulse-emv.csv', rows);
+  }
+
+  // ---------- EMV: outlet + date filtering with live totals ----------
+  let emvOutlet = 'All';
+  let emvDateMode = 'all';
+  let emvDateFrom = null;
+  let emvDateTo = null;
+
+  function toggleEmvFilterMenu(evt, chip, type){
+    evt.stopPropagation();
+    const already = chip.querySelector('.chip-menu');
+    closeAllChipMenus();
+    if (already) return;
+    const options = type === 'outlet'
+      ? ['All', 'Rappler', 'Philippine Star', 'PeopleAsia', 'When In Manila', 'Manila Bulletin', 'ANC']
+      : ['All time', 'Last 7 days', 'Last 30 days', 'Last 90 days', 'Custom range…'];
+    const menu = document.createElement('div');
+    menu.className = 'chip-menu';
+    options.forEach(opt => {
+      const item = document.createElement('div');
+      item.className = 'chip-menu-item';
+      item.textContent = opt;
+      item.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        menu.remove();
+        if (type === 'outlet'){
+          emvOutlet = opt;
+          chip.textContent = 'Outlet: ' + opt;
+          chip.classList.toggle('on', opt !== 'All');
+          applyEmvFilters();
+        } else {
+          if (opt === 'Custom range…'){
+            openCustomDateModal((from, to) => {
+              emvDateMode = 'custom';
+              emvDateFrom = from;
+              emvDateTo = to;
+              chip.textContent = '📅 ' + formatDateRange(from, to);
+              chip.classList.add('on');
+              applyEmvFilters();
+            });
+            return;
+          }
+          emvDateMode = opt;
+          chip.textContent = '📅 ' + opt;
+          chip.classList.toggle('on', opt !== 'All time');
+          applyEmvFilters();
+        }
+      });
+      menu.appendChild(item);
+    });
+    chip.appendChild(menu);
+  }
+
+  function applyEmvFilters(){
+    let anyVisible = false;
+    document.querySelectorAll('#emvTableBody tr.emv-row').forEach(row => {
+      const matchesOutlet = emvOutlet === 'All' || row.dataset.outlet === emvOutlet;
+      let matchesDate = true;
+      const rowDate = row.dataset.date;
+      if (rowDate){
+        if (emvDateMode === 'Last 7 days') matchesDate = new Date(rowDate + 'T00:00:00') >= cutoffDate(7);
+        else if (emvDateMode === 'Last 30 days') matchesDate = new Date(rowDate + 'T00:00:00') >= cutoffDate(30);
+        else if (emvDateMode === 'Last 90 days') matchesDate = new Date(rowDate + 'T00:00:00') >= cutoffDate(90);
+        else if (emvDateMode === 'custom') matchesDate = inDateRange(rowDate, emvDateFrom, emvDateTo);
+      }
+      const visible = matchesOutlet && matchesDate;
+      row.style.display = visible ? '' : 'none';
+      const detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('emv-detail')) detail.style.display = 'none';
+      const chevron = row.querySelector('.chevron');
+      if (chevron) chevron.textContent = '▸';
+      if (visible) anyVisible = true;
+    });
+    const emptyRow = document.getElementById('emvEmptyRow');
+    if (emptyRow) emptyRow.style.display = anyVisible ? 'none' : '';
+    recomputeEmvTotals();
+  }
+
+  function recomputeEmvTotals(){
+    let grossSum = 0, netSum = 0;
+    document.querySelectorAll('#emvTableBody tr.emv-row').forEach(row => {
+      if (row.style.display === 'none') return;
+      const vals = row.querySelectorAll('td.emv-val');
+      if (vals.length < 2) return;
+      grossSum += parseInt(vals[0].textContent.replace(/[^0-9]/g, ''), 10) || 0;
+      netSum += parseInt(vals[1].textContent.replace(/[^0-9]/g, ''), 10) || 0;
+    });
+    const filtered = emvOutlet !== 'All' || emvDateMode !== 'all';
+    const grossTag = document.getElementById('emvGrossTag');
+    const netTag = document.getElementById('emvNetTag');
+    if (grossTag) grossTag.textContent = (filtered ? 'Filtered Gross ₱' : 'Gross ₱') + grossSum.toLocaleString('en-US');
+    if (netTag) netTag.textContent = (filtered ? 'Filtered Net ₱' : 'Net Favorable ₱') + netSum.toLocaleString('en-US');
+  }
+
+  function downloadCSV(filename, rows){
+    const csv = rows.map(r => r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Downloaded ' + filename);
+  }
+
+  // ---------- EMV row expand ----------
+  function toggleEmvDetail(row){
+    const detail = row.nextElementSibling;
+    if (!detail) return;
+    const isOpen = detail.style.display === 'table-row';
+    document.querySelectorAll('.emv-detail').forEach(d => d.style.display = 'none');
+    document.querySelectorAll('.emv-row .chevron').forEach(c => c.textContent = '▸');
+    if (!isOpen){
+      detail.style.display = 'table-row';
+      row.querySelector('.chevron').textContent = '▾';
+    }
+  }
+
+  // ---------- AI weekly summary ----------
+  const summaries = [
+    'Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.',
+    'Net sentiment held steady at plus 62 this week despite a slower than usual follow-up call flagged in a Google review. Facial results and staff experience remain the most discussed topics, both strongly positive. Worth watching: a Reddit thread comparing Remedy to Aivee on Rejuran pricing is quietly gaining traction.',
+    'Earned media had a strong week. Rappler and Philippine Star coverage alone add up to more than 1.2 million pesos in gross EMV. Club Remedy wellness coverage is starting to show up in lifestyle press. There is no new negative coverage in news or PR; the only open item is a single unresolved Google review.'
+  ];
+  let summaryIndex = 0;
+  function regenerateSummary(){
+    const el = document.getElementById('aiSummaryText');
+    if (!el) return;
+    el.style.transition = 'opacity .25s ease';
+    el.style.opacity = '0.3';
+    setTimeout(() => {
+      summaryIndex = (summaryIndex + 1) % summaries.length;
+      el.textContent = summaries[summaryIndex];
+      el.style.opacity = '1';
+    }, 550);
+  }
+
+  // ---------- Header sync simulation ----------
+  function simulateSync(){
+    const pill = document.getElementById('syncPill');
+    const label = document.getElementById('syncLabel');
+    if (pill.classList.contains('syncing')) return;
+    pill.classList.add('syncing');
+    document.body.classList.add('syncing-data');
+    label.textContent = 'Syncing…';
+    setTimeout(() => {
+      const now = new Date();
+      let h = now.getHours().toString().padStart(2, '0');
+      let m = now.getMinutes().toString().padStart(2, '0');
+      label.textContent = 'Last synced ' + h + ':' + m + ' PHT';
+      pill.classList.remove('syncing');
+      document.body.classList.remove('syncing-data');
+      showToast('Data refreshed (demo)');
+    }, 900);
+  }
+
+  // ---------- Count-up animation on load ----------
+  function countUp(id, target, opts){
+    opts = opts || {};
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prefix = opts.prefix || '';
+    const duration = opts.duration || 900;
+    const start = performance.now();
+    function frame(now){
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const val = Math.round(target * eased);
+      el.textContent = prefix + val;
+      if (p < 1) requestAnimationFrame(frame);
+      else el.textContent = prefix + target;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- One-time demo notice + load animations ----------
+  window.addEventListener('load', () => {
+    // Sweep the Clarity gauge arc to 75/100 (dashoffset 58.9 of 235.6),
+    // synced with the number counting up beside it.
+    const gaugePath = document.getElementById('gaugeValuePath');
+    if (gaugePath) requestAnimationFrame(() => { gaugePath.style.strokeDashoffset = '58.9'; });
+    countUp('clarityNum', 75, { duration: 1000 });
+    countUp('kpiTotalMentionsValue', 342, { duration: 1000 });
+    countUp('kpiNetSentimentValue', 62, { prefix: '+', duration: 1000 });
+    countUp('kpiActiveAlertsValue', 4, { duration: 700 });
+    setTimeout(() => showToast('Demo mode — sample data, actions are simulated. Press ⌘K for quick actions.'), 700);
+  });
+</script>
+
+</body>
+</html>
