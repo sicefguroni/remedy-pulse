@@ -1,10 +1,10 @@
-# Google Reviews Connector — Setup Guide
+# Backend Connectors — Setup Guide
 
-Pulls real review data for Remedy's own listings, plus public rating
-benchmarks for competitors, and writes it out as JSON that is the *input*
-for `remedy-pulse-mockup.html`'s Reviews tab table — not a byte-for-byte
-match of it. See "What you get" below for exactly what is and isn't
-covered.
+Pulls real review data for Remedy's own listings, public rating
+benchmarks for competitors, and news/press coverage, and writes each out
+as JSON that is the *input* for the corresponding tab in
+`remedy-pulse-mockup.html` — not a byte-for-byte match of any of them.
+See "What you get" below for exactly what is and isn't covered.
 
 ## Before you start: the one real blocker
 
@@ -50,6 +50,12 @@ ratings via Places API) works without waiting on Google's approval.
 10. **Find competitor place IDs**: use Google's Place ID Finder
     (linked in `config.py`) to look up Belo, Aivee, Kamiseta, etc., then
     run `python fetch_competitor_ratings.py`.
+11. **News/press coverage (separate from Google entirely)**: sign up for
+    a free GNews API key at https://gnews.io (self-serve, no approval
+    wait), paste it into `.env` as `GNEWS_API_KEY`, then run
+    `python fetch_news_articles.py`. See
+    `docs/decisions/news-press-ingestion-path.md` for why GNews was
+    picked as the first option to evaluate.
 
 ## What you get
 
@@ -88,11 +94,27 @@ there was nothing for the UI to display before.
   don't own). Each row carries a `status`: `"ok"`, `"not_found"` (API
   responded but not with a usable result for that place_id), or
   `"error"` (request failed even after retries).
+- **`news_articles.json`** — `{"fetchedAt": ..., "articles": [...]}`, raw
+  article metadata (outlet, headline, url, publishedAt, description) from
+  GNews. **This is normalized wire data, not EMV.** The EMV tab's dollar
+  figures come from a formula (Base AVE × Prominence × PubScore ×
+  PR_Credibility × Sentiment) that needs editorial judgment inputs no news
+  API provides — this script doesn't invent them. Each article carries:
+  - `tier`: the Rate Card tier (`"National News"` / `"Lifestyle Mag"` /
+    `"Broadcast TV"`), but **only** for the six outlets already in
+    `config.OUTLET_TIER_MAP` (seeded from the mockup's sample EMV rows).
+    Any other outlet gets `tier: null` and `status: "unmapped_outlet"` —
+    add it to the map once Marketing confirms which Rate Card row it
+    belongs in, rather than guessing.
+  - `sentiment`: always `null`. Sentiment classification is Phase 6's
+    job, applied consistently across every source — not invented ad hoc
+    inside this one connector.
 
 ## Retry behavior
 
-Every outbound `GET` in `fetch_owned_reviews.py` and
-`fetch_competitor_ratings.py` goes through `http_utils.get_with_retry`,
+Every outbound `GET` in `fetch_owned_reviews.py`,
+`fetch_competitor_ratings.py`, and `fetch_news_articles.py` goes through
+`http_utils.get_with_retry`,
 which retries transient failures (429, 500, 502, 503, 504) with
 exponential backoff and jitter — honoring a `Retry-After` header on 429
 when the server sends one. A run that exhausts its retries raises clearly
