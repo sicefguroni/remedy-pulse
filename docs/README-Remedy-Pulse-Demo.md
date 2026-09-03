@@ -8,7 +8,7 @@ Think of it as a **model of the house before construction starts** — you can w
 
 ## How to open it
 
-Double-click the file `remedy-pulse-mockup.html`. It opens in your web browser (Chrome, Safari, etc.) — no installation, no login, no internet connection required.
+Double-click the file `remedy-pulse-mockup.html`. It opens in your web browser (Chrome, Safari, etc.) — no installation and no login required. It also works fully offline: the page falls back to built-in system fonts if it can't reach the internet, so it stays readable and functional, just with slightly different typography than intended. When you are online, it additionally pulls its intended Google Fonts (Space Grotesk, Inter, IBM Plex Mono) for the polished look shown in this guide.
 
 ## What's real vs. what's sample
 

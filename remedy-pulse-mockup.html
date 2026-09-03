@@ -112,6 +112,7 @@
   }
   .chip:hover{ border-color:#D8CCB4; }
   .chip.on{ color:var(--ink); border-color:#D8CCB4; background:var(--surface-2); font-weight:500; }
+  .chip.disabled{ opacity:0.45; cursor:not-allowed; pointer-events:none; }
   .chip-menu{
     position:absolute; top:calc(100% + 6px); left:0; background:var(--surface); border:1px solid var(--line);
     border-radius:8px; box-shadow:var(--shadow); z-index:20; min-width:150px; padding:4px;
@@ -274,10 +275,11 @@
 
   /* ---------- UI polish ---------- */
   .card{ transition: transform .18s ease, box-shadow .18s ease; }
-  .card.kpi:hover, .clarity-card:hover{
+  .card.kpi:hover, .clarity-card:hover, .card.topic-card:hover{
     transform: translateY(-2px);
     box-shadow: 0 2px 4px rgba(32,26,20,0.05), 0 14px 30px -12px rgba(32,26,20,0.15);
   }
+  .card.topic-card{ cursor:pointer; }
 
   @keyframes viewIn{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:none; } }
   .view.active{ animation: viewIn .28s ease; }
@@ -390,7 +392,7 @@
       <button class="icon-btn" id="bellBtn" onclick="toggleBellMenu(event)" title="Alerts">🔔<span class="bell-badge" id="bellBadge">4</span></button>
     </div>
     <div class="live-pill" id="syncPill" onclick="simulateSync()">
-      <span class="live-dot"></span> <span id="syncLabel">Last synced 06:12 PHT</span>
+      <span class="live-dot"></span> <span id="syncLabel">Last synced —:— PHT</span>
     </div>
     <div class="avatar" title="Gian, Paul — Admin">GP</div>
   </div>
@@ -516,11 +518,11 @@
           </div>
         </div>
 
-        <div class="alert-item alert-crisis" data-alert-id="0">
+        <div class="alert-item alert-crisis" data-alert-id="0" data-datetime="2026-07-01T09:03:00">
           <div class="alert-dot high"></div>
           <div class="alert-body">
             <div class="alert-title" style="color:var(--coral-text);">🚨 Journalist inquiry re: patient complaint — Manila Bulletin</div>
-            <div class="alert-meta">News desk · 12 min ago · Crisis Alert — send immediately</div>
+            <div class="alert-meta">News desk · <span class="alert-time">12 min ago</span> · Crisis Alert — send immediately</div>
             <div class="alert-actions">
               <button class="btn-mini primary btn-assign" onclick="handleAssign(this)">Assign</button>
               <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
@@ -529,11 +531,11 @@
           </div>
         </div>
 
-        <div class="alert-item" data-alert-id="1">
+        <div class="alert-item" data-alert-id="1" data-datetime="2026-07-01T08:34:00">
           <div class="alert-dot med"></div>
           <div class="alert-body">
             <div class="alert-title">2★ Google review — Remedy BGC</div>
-            <div class="alert-meta">Google · 41 min ago · Daily Digest — isolated, no traction</div>
+            <div class="alert-meta">Google · <span class="alert-time">41 min ago</span> · Daily Digest — isolated, no traction</div>
             <div class="alert-actions">
               <button class="btn-mini primary btn-assign" onclick="handleAssign(this)">Assign</button>
               <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
@@ -542,11 +544,11 @@
           </div>
         </div>
 
-        <div class="alert-item" data-alert-id="2">
+        <div class="alert-item" data-alert-id="2" data-datetime="2026-07-01T06:15:00">
           <div class="alert-dot low"></div>
           <div class="alert-body">
             <div class="alert-title">Sentiment dip in Reddit thread</div>
-            <div class="alert-meta">r/PhilippinesSkincare · 3 hrs ago · Daily Digest — neutral discussion</div>
+            <div class="alert-meta">r/PhilippinesSkincare · <span class="alert-time">3 hrs ago</span> · Daily Digest — neutral discussion</div>
             <div class="alert-actions">
               <button class="btn-mini btn-assign" onclick="handleAssign(this)">Assign</button>
               <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
@@ -625,6 +627,42 @@
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-head">
+        <div>
+          <h3>Competitor Sentiment</h3>
+          <div class="card-sub">Positive / neutral / negative split of mention volume vs. the competitive set, last 7 days (sample)</div>
+        </div>
+      </div>
+      <div class="topic-legend" style="margin-bottom:12px;">
+        <span><i class="dot" style="background:var(--sage)"></i>Positive</span>
+        <span><i class="dot" style="background:var(--ink-faint)"></i>Neutral</span>
+        <span><i class="dot" style="background:var(--coral)"></i>Negative</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <div class="sov-name us" style="margin-bottom:6px;">Remedy</div>
+          <div class="sentiment-bar"><div class="seg pos" style="width:71%"></div><div class="seg neu" style="width:22%"></div><div class="seg neg" style="width:7%"></div></div>
+        </div>
+        <div>
+          <div class="sov-name" style="margin-bottom:6px;">Belo</div>
+          <div class="sentiment-bar"><div class="seg pos" style="width:58%"></div><div class="seg neu" style="width:30%"></div><div class="seg neg" style="width:12%"></div></div>
+        </div>
+        <div>
+          <div class="sov-name" style="margin-bottom:6px;">Aivee <span class="spike-badge">▲ spike</span></div>
+          <div class="sentiment-bar"><div class="seg pos" style="width:49%"></div><div class="seg neu" style="width:28%"></div><div class="seg neg" style="width:23%"></div></div>
+        </div>
+        <div>
+          <div class="sov-name" style="margin-bottom:6px;">SkinStation</div>
+          <div class="sentiment-bar"><div class="seg pos" style="width:63%"></div><div class="seg neu" style="width:29%"></div><div class="seg neg" style="width:8%"></div></div>
+        </div>
+        <div>
+          <div class="sov-name" style="margin-bottom:6px;">DermHQ</div>
+          <div class="sentiment-bar"><div class="seg pos" style="width:66%"></div><div class="seg neu" style="width:26%"></div><div class="seg neg" style="width:8%"></div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-head">
         <div>
@@ -662,56 +700,57 @@
         <div class="chip on chip-toggle" id="liveToggle" data-alt="Paused">Live</div>
         <input type="text" id="mentionSearch" placeholder="Search mentions…" oninput="filterMentions(this.value)">
         <div class="chip" id="mentionPlatformFilter" onclick="toggleMentionFilterMenu(event, this, 'platform')">Platform: All</div>
+        <div class="chip" id="mentionSentimentFilter" onclick="toggleMentionFilterMenu(event, this, 'sentiment')">Sentiment: All</div>
         <div class="chip" id="mentionDateFilter" onclick="toggleMentionFilterMenu(event, this, 'date')">📅 All time</div>
-        <div class="chip" onclick="simulateIncomingMention()">+ Simulate mention</div>
+        <div class="chip" id="simulateMentionChip" onclick="simulateIncomingMention()">+ Simulate mention</div>
         <div class="chip" onclick="exportMentionsCSV()">⭳ Export CSV</div>
       </div>
     </div>
     <div class="card" id="mentionsFeedCard">
-      <div class="feed-item" data-platform="Google" data-date="2026-07-01">
+      <div class="feed-item" data-platform="Google" data-date="2026-07-01" data-datetime="2026-07-01T08:34:00" data-sentiment="Negative">
         <div class="feed-avatar">🟢</div>
         <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">Google Review · anonymous patient</span><span class="feed-source">Remedy BGC · 41 min ago</span></div>
+          <div class="feed-top"><span class="feed-author">Google Review · anonymous patient</span><span class="feed-source">Remedy BGC · <span class="feed-time">41 min ago</span></span></div>
           <div class="feed-text">"Second time booking Rejuran with Dra. April's team, still waiting on a follow-up call back — service used to be faster."</div>
           <div class="feed-meta"><span class="stars">★★</span><span>Sentiment: Negative</span><span>Reach: —</span><a class="source-link" onclick="viewSource('Google Review', 'Remedy BGC')">View source ↗</a></div>
         </div>
       </div>
-      <div class="feed-item" data-platform="Reddit" data-date="2026-07-01">
+      <div class="feed-item" data-platform="Reddit" data-date="2026-07-01" data-datetime="2026-07-01T06:15:00" data-sentiment="Neutral">
         <div class="feed-avatar">💬</div>
         <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">u/skinseeker_mnl</span><span class="feed-source">r/PhilippinesSkincare · 3 hrs ago</span></div>
+          <div class="feed-top"><span class="feed-author">u/skinseeker_mnl</span><span class="feed-source">r/PhilippinesSkincare · <span class="feed-time">3 hrs ago</span></span></div>
           <div class="feed-text">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy's reviews look consistent but Aivee has more posts."</div>
           <div class="feed-meta"><span>Sentiment: Neutral</span><span>Reach: ~1,200</span><a class="source-link" onclick="viewSource('r/PhilippinesSkincare', 'Remedy vs Aivee Rejuran')">View source ↗</a></div>
         </div>
       </div>
-      <div class="feed-item" data-platform="Instagram" data-date="2026-07-01">
+      <div class="feed-item" data-platform="Instagram" data-date="2026-07-01" data-datetime="2026-07-01T03:15:00" data-sentiment="Positive">
         <div class="feed-avatar">📸</div>
         <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">@glowwithsab</span><span class="feed-source">Instagram comment on @remedy.ph · 6 hrs ago</span></div>
+          <div class="feed-top"><span class="feed-author">@glowwithsab</span><span class="feed-source">Instagram comment on @remedy.ph · <span class="feed-time">6 hrs ago</span></span></div>
           <div class="feed-text">"Best facial I've had in BGC, the clinic feels so clean and the staff actually explain what they're doing 🤍"</div>
           <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~4,800</span><a class="source-link" onclick="viewSource('Instagram', '@remedy.ph glowwithsab')">View source ↗</a></div>
         </div>
       </div>
-      <div class="feed-item" data-platform="News" data-date="2026-06-30">
+      <div class="feed-item" data-platform="News" data-date="2026-06-30" data-datetime="2026-06-30T09:15:00" data-sentiment="Positive">
         <div class="feed-avatar">📰</div>
         <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">PeopleAsia editorial</span><span class="feed-source">Online News · yesterday</span></div>
+          <div class="feed-top"><span class="feed-author">PeopleAsia editorial</span><span class="feed-source">Online News · <span class="feed-time">yesterday</span></span></div>
           <div class="feed-text">Feature on SkinPen treatments includes commentary from Dr. April Geraldez-Rivera on emerging PH skincare trends.</div>
           <div class="feed-meta"><span>Sentiment: Positive</span><span class="mono" style="color:var(--gold-text)">EMV ₱290,000</span><a class="source-link" onclick="viewSource('PeopleAsia', 'SkinPen feature April Geraldez-Rivera')">View source ↗</a></div>
         </div>
       </div>
-      <div class="feed-item" data-platform="Facebook" data-date="2026-06-29">
+      <div class="feed-item" data-platform="Facebook" data-date="2026-06-29" data-datetime="2026-06-29T09:15:00" data-sentiment="Positive">
         <div class="feed-avatar">💛</div>
         <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">Facebook comment · patient</span><span class="feed-source">facebook.com/remedyph · 2 days ago</span></div>
+          <div class="feed-top"><span class="feed-author">Facebook comment · patient</span><span class="feed-source">facebook.com/remedyph · <span class="feed-time">2 days ago</span></span></div>
           <div class="feed-text">"Club Remedy's wellness room is such a nice touch after a facial, did not expect that at a derma clinic."</div>
           <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~1,900</span><a class="source-link" onclick="viewSource('Facebook', 'facebook.com/remedyph Club Remedy wellness')">View source ↗</a></div>
         </div>
       </div>
-      <div class="feed-item" data-platform="TikTok" data-date="2026-06-28">
+      <div class="feed-item" data-platform="TikTok" data-date="2026-06-28" data-datetime="2026-06-28T09:15:00" data-sentiment="Positive">
         <div class="feed-avatar">🎵</div>
         <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">TikTok comment · patient</span><span class="feed-source">@remedy.ph on TikTok · 3 days ago</span></div>
+          <div class="feed-top"><span class="feed-author">TikTok comment · patient</span><span class="feed-source">@remedy.ph on TikTok · <span class="feed-time">3 days ago</span></span></div>
           <div class="feed-text">"The skin routine video was so helpful, saving this before my next Pico laser session."</div>
           <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~2,600</span><a class="source-link" onclick="viewSource('TikTok', '@remedy.ph skin routine')">View source ↗</a></div>
         </div>
@@ -742,7 +781,7 @@
             <td class="resp-rate">100%</td>
             <td><span class="tag sage">All clear</span></td>
           </tr>
-          <tr data-listing="Club Remedy — BGC">
+          <tr data-listing="Club Remedy — BGC" data-pending-total="1" data-response-rate-base="88">
             <td>Club Remedy — BGC</td>
             <td><span class="stars">★★★★★</span> 4.9</td>
             <td>34</td>
@@ -758,7 +797,7 @@
             <td class="resp-rate">95%</td>
             <td><span class="tag sage">All clear</span></td>
           </tr>
-          <tr data-listing="Skin Bar by Remedy — Greenhills Mall">
+          <tr data-listing="Skin Bar by Remedy — Greenhills Mall" data-pending-total="2" data-response-rate-base="80">
             <td title="Also matches: Remedy GH, Remedy Greenhills, Skin Bar by Remedy">Skin Bar by Remedy — Greenhills Mall</td>
             <td><span class="stars">★★★★☆</span> 4.6</td>
             <td>19</td>
@@ -785,7 +824,7 @@
       <span><i class="dot" style="background:var(--coral)"></i>Negative</span>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
+    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('facial-results')" title="Click to see constituent mentions">
       <div class="card-head">
         <div><h3>Facial Results & Glow</h3><div class="card-sub">138 mentions this week</div></div>
         <span class="tag sage">Trending</span>
@@ -794,7 +833,7 @@
       <div class="topic-quote">"Best facial I've had in BGC, the clinic feels so clean and the staff actually explain what they're doing."</div>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
+    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('staff-service')" title="Click to see constituent mentions">
       <div class="card-head">
         <div><h3>Staff & Service Experience</h3><div class="card-sub">71 mentions this week</div></div>
         <span class="tag sage">Trending</span>
@@ -803,7 +842,7 @@
       <div class="topic-quote">"Club Remedy's wellness room is such a nice touch after a facial, did not expect that at a derma clinic."</div>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
+    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('rejuran')" title="Click to see constituent mentions">
       <div class="card-head">
         <div><h3>Rejuran Specifically</h3><div class="card-sub">49 mentions this week</div></div>
         <span class="tag gold">Watch</span>
@@ -812,7 +851,7 @@
       <div class="topic-quote">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy's reviews look consistent but Aivee has more posts."</div>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
+    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('pricing')" title="Click to see constituent mentions">
       <div class="card-head">
         <div><h3>Pricing & Packages</h3><div class="card-sub">38 mentions this week</div></div>
         <span class="tag gold">Watch</span>
@@ -821,7 +860,7 @@
       <div class="topic-quote">"Anyone know if Remedy has package deals for Pico laser? Price isn't listed on their page."</div>
     </div>
 
-    <div class="card">
+    <div class="card topic-card" onclick="openTopicModal('booking')" title="Click to see constituent mentions">
       <div class="card-head">
         <div><h3>Booking & Follow-up Response</h3><div class="card-sub">46 mentions this week</div></div>
         <span class="tag coral">Needs attention</span>
@@ -977,6 +1016,16 @@
     document.getElementById('modalOverlay').classList.remove('open');
   }
 
+  // ---------- Escaping ----------
+  // Shared helper for anywhere a data field (author name, mention/review text, source name,
+  // branch/listing name, etc.) is interpolated into an HTML string via openModal()'s innerHTML,
+  // or into an HTML attribute built by concatenation. Static template fragments with no
+  // interpolated data are left as plain innerHTML strings.
+  const ESCAPE_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escapeHtml(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ESCAPE_HTML_MAP[ch]);
+  }
+
   // ---------- Filter chip dropdowns ----------
   function closeAllChipMenus(){
     document.querySelectorAll('.chip-menu').forEach(m => m.remove());
@@ -1018,16 +1067,70 @@
 
   // ---------- Custom date range modal (shared) ----------
   const DEMO_TODAY = new Date('2026-07-01T00:00:00');
+  // The demo's fixed "current moment" — every hardcoded "X min/hrs ago" string in the sample
+  // data (feed items, alerts) is expressed as an offset from this instant, so relative-time
+  // text can be computed from a real data-datetime instead of being baked into the markup.
+  const DEMO_NOW = new Date('2026-07-01T09:15:00');
   let customDateCallback = null;
+
+  // ---------- Relative time (implements 0.16 — derive display text from real timestamps) ----------
+  function formatRelativeTime(isoString, now){
+    if (!isoString) return '';
+    const then = new Date(isoString);
+    if (isNaN(then.getTime())) return '';
+    now = now || new Date();
+    const diffMs = now - then;
+    if (diffMs < 0) return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return diffMin + ' min ago';
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return diffHr + ' hr' + (diffHr === 1 ? '' : 's') + ' ago';
+    const diffDay = Math.round(diffHr / 24);
+    if (diffDay === 1) return 'yesterday';
+    if (diffDay < 7) return diffDay + ' days ago';
+    const sameYear = then.getFullYear() === now.getFullYear();
+    return then.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // Applies formatRelativeTime() to every feed/alert item carrying a data-datetime, replacing
+  // the placeholder text in its .feed-time / .alert-time span. Called on load, and safe to
+  // re-run any time new timestamped items are inserted.
+  function applyRelativeTimestamps(){
+    document.querySelectorAll('.feed-item[data-datetime]').forEach(it => {
+      const span = it.querySelector('.feed-time');
+      if (span) span.textContent = formatRelativeTime(it.dataset.datetime, DEMO_NOW);
+    });
+    document.querySelectorAll('.alert-item[data-datetime]').forEach(it => {
+      const span = it.querySelector('.alert-time');
+      if (span) span.textContent = formatRelativeTime(it.dataset.datetime, DEMO_NOW);
+    });
+  }
+  applyRelativeTimestamps();
+
+  // ---------- Philippine time (implements 0.12 — timezone-correct, not the viewer's local clock) ----------
+  function formatPHTime(date){
+    date = date || new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(date);
+    const h = (parts.find(p => p.type === 'hour') || {}).value || '00';
+    const m = (parts.find(p => p.type === 'minute') || {}).value || '00';
+    return h + ':' + m + ' PHT';
+  }
+  (function initSyncLabel(){
+    const label = document.getElementById('syncLabel');
+    if (label) label.textContent = 'Last synced ' + formatPHTime();
+  })();
   function openCustomDateModal(onApply, presetFrom, presetTo){
     openModal(
       '<button class="modal-close" onclick="closeModal()">×</button>' +
       '<h4>Custom date range</h4>' +
       '<div class="date-range-row" style="display:flex; gap:10px; margin:14px 0;">' +
       '<div style="flex:1;"><div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;">From</div>' +
-      '<input type="date" id="customDateFrom" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;" value="' + (presetFrom || '2026-06-01') + '"></div>' +
+      '<input type="date" id="customDateFrom" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;" value="' + escapeHtml(presetFrom || '2026-06-01') + '"></div>' +
       '<div style="flex:1;"><div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;">To</div>' +
-      '<input type="date" id="customDateTo" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;" value="' + (presetTo || '2026-06-30') + '"></div>' +
+      '<input type="date" id="customDateTo" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;" value="' + escapeHtml(presetTo || '2026-06-30') + '"></div>' +
       '</div>' +
       '<div style="display:flex;gap:8px;">' +
       '<button class="btn-mini primary" onclick="applyCustomDateModal()">Apply</button>' +
@@ -1074,24 +1177,44 @@
       chip.dataset.alt = current;
       chip.textContent = alt;
       chip.classList.toggle('on');
+      if (chip.id === 'liveToggle') updateSimulateMentionChipState();
     });
   });
 
+  // ---------- Simulate-mention gate (P1-3: must be blocked while live data is "flowing") ----------
+  function isMentionsFeedLive(){
+    const liveChip = document.getElementById('liveToggle');
+    // The toggle's resting/default state is "Live"; simulation is only demo-safe once the
+    // marketer has explicitly switched it to "Paused".
+    return !liveChip || liveChip.textContent.trim() !== 'Paused';
+  }
+  function updateSimulateMentionChipState(){
+    const simChip = document.getElementById('simulateMentionChip');
+    if (!simChip) return;
+    const blocked = isMentionsFeedLive();
+    simChip.classList.toggle('disabled', blocked);
+    simChip.title = blocked ? 'Feed is Live — switch to Paused to simulate a mention (demo-safe state only)' : '';
+  }
+  updateSimulateMentionChipState();
+
   // ---------- Alerts: assign / view / resolve ----------
+  // 'meta' is a fixed string; 'metaPrefix' + 'datetime' + 'metaSuffix' is used instead wherever
+  // the meta line carries a relative-time component, so that text is derived from the same
+  // data-datetime driving the on-page .alert-time span (implements 0.16) rather than duplicated.
   const alertDetails = {
     '0': {
       title: '🚨 Journalist inquiry re: patient complaint — Manila Bulletin',
-      meta: 'News desk · 12 min ago · Crisis Alert — send immediately',
+      metaPrefix: 'News desk', datetime: '2026-07-01T09:03:00', metaSuffix: 'Crisis Alert — send immediately',
       body: '<p style="margin-bottom:10px;">A Manila Bulletin reporter has reached out requesting comment on a patient complaint alleging a treatment complication. This matches two Crisis Alert conditions: Mainstream Media Exposure and Founder/Doctor Reputation Risk.</p><p style="font-size:12px;color:var(--ink-faint);">Recommended: loop in Gian and Dr. Rivera before any reply goes out. Do not respond to the reporter directly without sign-off.</p>'
     },
     '1': {
       title: '2★ Google review — Remedy BGC',
-      meta: 'Google · 41 min ago · unresponded',
+      metaPrefix: 'Google', datetime: '2026-07-01T08:34:00', metaSuffix: 'unresponded',
       body: '<p style="margin-bottom:10px;">"Second time booking Rejuran with Dra. April\u2019s team, still waiting on a follow-up call back — service used to be faster."</p><p style="font-size:12px;color:var(--ink-faint);">Reviewer: anonymous patient · Branch: Remedy BGC (One Uptown Residence) · Classified: Daily Digest (isolated complaint, no traction)</p>'
     },
     '2': {
       title: 'Sentiment dip in Reddit thread',
-      meta: 'r/PhilippinesSkincare · 3 hrs ago',
+      metaPrefix: 'r/PhilippinesSkincare', datetime: '2026-07-01T06:15:00', metaSuffix: '',
       body: '<p style="margin-bottom:10px;">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy\u2019s reviews look consistent but Aivee has more posts."</p><p style="font-size:12px;color:var(--ink-faint);">Thread sentiment shifted neutral → slightly negative over 6 replies · Estimated reach ~1,200 · Classified: Daily Digest (neutral discussion)</p>'
     },
     '3': {
@@ -1100,6 +1223,13 @@
       body: '<p style="margin-bottom:10px;">Aivee Clinic mention volume is up sharply this week, driven mostly by Instagram (+52%) and X (+28%).</p><p style="font-size:12px;color:var(--ink-faint);">No direct owned-entity impact detected yet · Classified: Daily Digest (competitive intelligence)</p>'
     }
   };
+
+  function alertMetaText(d){
+    if (d.meta) return d.meta;
+    const parts = [d.metaPrefix, formatRelativeTime(d.datetime, DEMO_NOW)];
+    if (d.metaSuffix) parts.push(d.metaSuffix);
+    return parts.join(' · ');
+  }
 
   function openAlertRulesModal(){
     openModal(
@@ -1147,8 +1277,8 @@
     if (!d) return;
     openModal(
       '<button class="modal-close" onclick="closeModal()">×</button>' +
-      '<h4>' + d.title + '</h4>' +
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + d.meta + '</div>' +
+      '<h4>' + escapeHtml(d.title) + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + escapeHtml(alertMetaText(d)) + '</div>' +
       d.body +
       '<div style="display:flex;gap:8px;margin-top:18px;">' +
       '<button class="btn-mini primary" onclick="resolveAlertById(\'' + id + '\')">Mark resolved</button>' +
@@ -1350,8 +1480,8 @@
     currentReplyTag = tagEl;
     openModal(
       '<button class="modal-close" onclick="closeModal()">×</button>' +
-      '<h4>Reply to review — ' + listing + '</h4>' +
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + ratingCell + ' · pending reply</div>' +
+      '<h4>Reply to review — ' + escapeHtml(listing) + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + escapeHtml(ratingCell) + ' · pending reply</div>' +
       '<textarea id="replyText" placeholder="Write a reply…"></textarea>' +
       '<div style="display:flex;gap:8px;margin-top:14px;">' +
       '<button class="btn-mini primary" onclick="sendReply()">Send reply</button>' +
@@ -1364,13 +1494,41 @@
     closeModal();
     const tag = currentReplyTag;
     if (tag){
-      tag.className = 'tag sage';
-      tag.textContent = 'All clear';
-      tag.removeAttribute('onclick');
-      tag.style.cursor = 'default';
       const tr = tag.closest('tr');
-      const rateCell = tr ? tr.querySelector('.resp-rate') : null;
-      if (rateCell) rateCell.textContent = '100%';
+      if (tr){
+        // Track pending-reply count per branch and only clear the tag once it hits zero
+        // (implements 0.14 — previously a single reply cleared the branch regardless of
+        // how many replies were actually still pending).
+        const totalPending = parseInt(tr.dataset.pendingTotal, 10) || 1;
+        const baseRate = parseFloat(tr.dataset.responseRateBase);
+        let remaining = tr.dataset.pendingRemaining !== undefined
+          ? parseInt(tr.dataset.pendingRemaining, 10)
+          : totalPending;
+        remaining = Math.max(0, remaining - 1);
+        tr.dataset.pendingRemaining = String(remaining);
+
+        const rateCell = tr.querySelector('.resp-rate');
+        if (rateCell){
+          if (remaining === 0 || isNaN(baseRate)){
+            rateCell.textContent = '100%';
+          } else {
+            // Fill the gap to 100% proportionally across the branch's original pending count,
+            // so each reply sent nudges the response rate up instead of jumping straight to 100%.
+            const repliesSent = totalPending - remaining;
+            const newRate = Math.round(baseRate + ((100 - baseRate) / totalPending) * repliesSent);
+            rateCell.textContent = newRate + '%';
+          }
+        }
+
+        if (remaining === 0){
+          tag.className = 'tag sage';
+          tag.textContent = 'All clear';
+          tag.removeAttribute('onclick');
+          tag.style.cursor = 'default';
+        } else {
+          tag.textContent = remaining === 1 ? '1 pending reply' : remaining + ' pending replies';
+        }
+      }
     }
     currentReplyTag = null;
     showToast('Reply sent (demo)');
@@ -1388,6 +1546,7 @@
   // ---------- Mentions: search, platform, date, simulate, export ----------
   let mentionSearchQuery = '';
   let mentionPlatform = 'All';
+  let mentionSentiment = 'All';
   let mentionDateMode = 'all';
   let mentionDateFrom = null;
   let mentionDateTo = null;
@@ -1404,6 +1563,8 @@
     if (already) return;
     const options = type === 'platform'
       ? ['All', 'Google', 'Reddit', 'Instagram', 'Facebook', 'News', 'TikTok', 'X']
+      : type === 'sentiment'
+      ? ['All', 'Positive', 'Neutral', 'Negative']
       : ['All time', 'Last 7 days', 'Last 30 days', 'Last 90 days', 'Custom range…'];
     const menu = document.createElement('div');
     menu.className = 'chip-menu';
@@ -1417,6 +1578,11 @@
         if (type === 'platform'){
           mentionPlatform = opt;
           chip.textContent = 'Platform: ' + opt;
+          chip.classList.toggle('on', opt !== 'All');
+          applyMentionFilters();
+        } else if (type === 'sentiment'){
+          mentionSentiment = opt;
+          chip.textContent = 'Sentiment: ' + opt;
           chip.classList.toggle('on', opt !== 'All');
           applyMentionFilters();
         } else {
@@ -1450,6 +1616,7 @@
       const text = it.textContent.toLowerCase();
       const matchesSearch = !needle || text.includes(needle);
       const matchesPlatform = mentionPlatform === 'All' || it.dataset.platform === mentionPlatform;
+      const matchesSentiment = mentionSentiment === 'All' || it.dataset.sentiment === mentionSentiment;
       let matchesDate = true;
       const itemDate = it.dataset.date;
       if (itemDate){
@@ -1458,7 +1625,7 @@
         else if (mentionDateMode === 'Last 90 days') matchesDate = new Date(itemDate + 'T00:00:00') >= cutoffDate(90);
         else if (mentionDateMode === 'custom') matchesDate = inDateRange(itemDate, mentionDateFrom, mentionDateTo);
       }
-      it.style.display = (matchesSearch && matchesPlatform && matchesDate) ? '' : 'none';
+      it.style.display = (matchesSearch && matchesPlatform && matchesSentiment && matchesDate) ? '' : 'none';
     });
   }
 
@@ -1472,32 +1639,82 @@
   }
 
   function simulateIncomingMention(){
-    const liveChip = document.getElementById('liveToggle');
-    if (liveChip && liveChip.textContent.trim() === 'Paused'){
-      showToast('Feed paused — resume Live to see new mentions (demo)');
+    // Gate: simulation must be blocked while the toggle indicates real/live data is flowing,
+    // and only permitted in the paused/demo-safe state (implements 0.13 — this condition was
+    // previously inverted, refusing when Paused and allowing when Live).
+    if (isMentionsFeedLive()){
+      showToast('Live data is flowing — switch to Paused to simulate a mention (demo-safe gate)');
       return;
     }
     const pool = [
-      { avatar: '📘', platform: 'Facebook', author: 'Facebook comment · patient', source: 'facebook.com/remedyph · just now', text: 'Booked our first Club Remedy wellness session today, the space feels calming compared to a regular clinic.', sentiment: 'Positive', reach: '~2,100' },
-      { avatar: '🐦', platform: 'X', author: '@skincareph_deals', source: 'X · just now', text: 'Pico laser results at Remedy BGC are honestly underrated, healed faster than expected.', sentiment: 'Positive', reach: '~3,400' },
-      { avatar: '🟢', platform: 'Google', author: 'Google Review · verified patient', source: 'Club Remedy BGC · just now', text: '5 stars, the wellness plus derma combo is such a smart idea. Will be back monthly.', sentiment: 'Positive', reach: '—' }
+      { avatar: '📘', platform: 'Facebook', author: 'Facebook comment · patient', source: 'facebook.com/remedyph', text: 'Booked our first Club Remedy wellness session today, the space feels calming compared to a regular clinic.', sentiment: 'Positive', reach: '~2,100' },
+      { avatar: '🐦', platform: 'X', author: '@skincareph_deals', source: 'X', text: 'Pico laser results at Remedy BGC are honestly underrated, healed faster than expected.', sentiment: 'Positive', reach: '~3,400' },
+      { avatar: '🟢', platform: 'Google', author: 'Google Review · verified patient', source: 'Club Remedy BGC', text: '5 stars, the wellness plus derma combo is such a smart idea. Will be back monthly.', sentiment: 'Positive', reach: '—' }
     ];
     simulatePoolIndex = (simulatePoolIndex + 1) % pool.length;
     const m = pool[simulatePoolIndex];
     const card = document.getElementById('mentionsFeedCard');
     if (!card) return;
     const todayStr = DEMO_TODAY.toISOString().slice(0, 10);
+
+    // Built with createElement/textContent rather than innerHTML + string-concatenated onclick
+    // attributes, so mention content (author, source, text) can never be interpreted as markup
+    // or break out of an attribute — implements 0.11. This is also the code path that will
+    // carry real review/comment text once wired to live data.
     const item = document.createElement('div');
     item.className = 'feed-item new-flash';
     item.dataset.platform = m.platform;
     item.dataset.date = todayStr;
-    item.innerHTML =
-      '<div class="feed-avatar">' + m.avatar + '</div>' +
-      '<div class="feed-body">' +
-      '<div class="feed-top"><span class="feed-author">' + m.author + '</span><span class="feed-source">' + m.source + '</span></div>' +
-      '<div class="feed-text">' + m.text + '</div>' +
-      '<div class="feed-meta"><span>Sentiment: ' + m.sentiment + '</span><span>Reach: ' + m.reach + '</span><a class="source-link" onclick="viewSource(\'' + m.platform + '\', \'' + m.author.replace(/'/g, '') + '\')">View source ↗</a></div>' +
-      '</div>';
+    item.dataset.datetime = new Date().toISOString();
+    item.dataset.sentiment = m.sentiment;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'feed-avatar';
+    avatar.textContent = m.avatar;
+
+    const body = document.createElement('div');
+    body.className = 'feed-body';
+
+    const top = document.createElement('div');
+    top.className = 'feed-top';
+    const authorSpan = document.createElement('span');
+    authorSpan.className = 'feed-author';
+    authorSpan.textContent = m.author;
+    const sourceSpan = document.createElement('span');
+    sourceSpan.className = 'feed-source';
+    const sourceText = document.createTextNode(m.source + ' · ');
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'feed-time';
+    timeSpan.textContent = 'just now';
+    sourceSpan.appendChild(sourceText);
+    sourceSpan.appendChild(timeSpan);
+    top.appendChild(authorSpan);
+    top.appendChild(sourceSpan);
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'feed-text';
+    textDiv.textContent = m.text;
+
+    const meta = document.createElement('div');
+    meta.className = 'feed-meta';
+    const sentimentSpan = document.createElement('span');
+    sentimentSpan.textContent = 'Sentiment: ' + m.sentiment;
+    const reachSpan = document.createElement('span');
+    reachSpan.textContent = 'Reach: ' + m.reach;
+    const sourceLink = document.createElement('a');
+    sourceLink.className = 'source-link';
+    sourceLink.textContent = 'View source ↗';
+    sourceLink.addEventListener('click', () => viewSource(m.platform, m.author));
+    meta.appendChild(sentimentSpan);
+    meta.appendChild(reachSpan);
+    meta.appendChild(sourceLink);
+
+    body.appendChild(top);
+    body.appendChild(textDiv);
+    body.appendChild(meta);
+    item.appendChild(avatar);
+    item.appendChild(body);
+
     card.insertBefore(item, card.firstChild);
     setTimeout(() => item.classList.remove('new-flash'), 1800);
     incrementTotalMentions();
@@ -1537,7 +1754,11 @@
 
   // ---------- EMV: outlet + date filtering with live totals ----------
   let emvOutlet = 'All';
-  let emvDateMode = 'all';
+  // Canonical "no filter" sentinel is the literal menu option string 'All time' — the same
+  // value the date chip's menu assigns on selection — so the default and every comparison
+  // site agree (implements 0.15; previously the default was the lowercase 'all', which never
+  // matched the 'All time' the menu actually assigns, so the Filtered label stuck permanently).
+  let emvDateMode = 'All time';
   let emvDateFrom = null;
   let emvDateTo = null;
 
@@ -1620,7 +1841,7 @@
       grossSum += parseInt(vals[0].textContent.replace(/[^0-9]/g, ''), 10) || 0;
       netSum += parseInt(vals[1].textContent.replace(/[^0-9]/g, ''), 10) || 0;
     });
-    const filtered = emvOutlet !== 'All' || emvDateMode !== 'all';
+    const filtered = emvOutlet !== 'All' || emvDateMode !== 'All time';
     const grossTag = document.getElementById('emvGrossTag');
     const netTag = document.getElementById('emvNetTag');
     if (grossTag) grossTag.textContent = (filtered ? 'Filtered Gross ₱' : 'Gross ₱') + grossSum.toLocaleString('en-US');
@@ -1654,6 +1875,119 @@
     }
   }
 
+  // ---------- Topics: drill-down to constituent mentions (implements 0.19b) ----------
+  const topicMentions = {
+    'facial-results': {
+      label: 'Facial Results & Glow',
+      mentions: [
+        { author: '@glowwithsab', source: 'Instagram comment on @remedy.ph', sentiment: 'Positive', text: 'Best facial I’ve had in BGC, the clinic feels so clean and the staff actually explain what they’re doing 🤍' },
+        { author: 'Google Review · verified patient', source: 'Remedy — Vertis North', sentiment: 'Positive', text: 'Left with an actual glow, not just red skin. Booking again next month.' },
+        { author: 'TikTok comment · patient', source: '@remedy.ph on TikTok', sentiment: 'Positive', text: 'The skin routine video was so helpful, saving this before my next Pico laser session.' }
+      ]
+    },
+    'staff-service': {
+      label: 'Staff & Service Experience',
+      mentions: [
+        { author: 'Facebook comment · patient', source: 'facebook.com/remedyph', sentiment: 'Positive', text: 'Club Remedy’s wellness room is such a nice touch after a facial, did not expect that at a derma clinic.' },
+        { author: 'Google Review · verified patient', source: 'Remedy BGC', sentiment: 'Positive', text: 'Front desk remembered my name on my second visit, small thing but it matters.' }
+      ]
+    },
+    'rejuran': {
+      label: 'Rejuran Specifically',
+      mentions: [
+        { author: 'u/skinseeker_mnl', source: 'r/PhilippinesSkincare', sentiment: 'Neutral', text: 'Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy’s reviews look consistent but Aivee has more posts.' },
+        { author: 'Google Review · anonymous patient', source: 'Remedy BGC', sentiment: 'Negative', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.' }
+      ]
+    },
+    'pricing': {
+      label: 'Pricing & Packages',
+      mentions: [
+        { author: 'Facebook comment · prospective patient', source: 'facebook.com/remedyph', sentiment: 'Neutral', text: 'Anyone know if Remedy has package deals for Pico laser? Price isn’t listed on their page.' },
+        { author: 'Instagram DM excerpt · prospective patient', source: '@remedy.ph', sentiment: 'Neutral', text: 'Asked about Rejuran pricing, still waiting to hear back on package rates.' }
+      ]
+    },
+    'booking': {
+      label: 'Booking & Follow-up Response',
+      mentions: [
+        { author: 'Google Review · anonymous patient', source: 'Remedy BGC', sentiment: 'Negative', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.' },
+        { author: 'Facebook comment · patient', source: 'facebook.com/remedyph', sentiment: 'Negative', text: 'Called twice about rescheduling and never got a callback, had to just show up.' }
+      ]
+    }
+  };
+
+  function openTopicModal(topicKey){
+    const topic = topicMentions[topicKey];
+    if (!topic) return;
+    let html = '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>' + escapeHtml(topic.label) + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Sample mentions tagged with this topic (demo)</div>';
+    topic.mentions.forEach(m => {
+      html += '<div style="padding:10px 0;border-top:1px solid var(--line);">' +
+        '<div style="font-size:12.5px;font-weight:500;color:var(--ink);">' + escapeHtml(m.author) +
+        '<span style="color:var(--ink-faint);font-weight:400;"> · ' + escapeHtml(m.source) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">' + escapeHtml(m.text) + '</div>' +
+        '<div style="font-size:11px;color:var(--ink-faint);margin-top:4px;">Sentiment: ' + escapeHtml(m.sentiment) + '</div>' +
+        '</div>';
+    });
+    openModal(html);
+  }
+
+  // ---------- Clarity Index (implements 0.10 — see docs/decisions/clarity-index-formula.md) ----------
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  /**
+   * computeClarityIndex(inputs) -> integer 0-100
+   *
+   * Formula (full writeup: docs/decisions/clarity-index-formula.md):
+   *   ClarityIndex = round(
+   *     0.15 * ratingScore        +   // Avg. Google Rating, normalized: (rating / 5) * 100
+   *     0.40 * sentimentScore     +   // Net Sentiment KPI, clamped to 0-100 (a -100..100 scale)
+   *     0.20 * responseRateScore  +   // Average review response rate across branches (0-100)
+   *     0.25 * volumeTrendScore       // Mention-volume trend around a 50 baseline:
+   *                                   //   clamp(50 + weekOverWeekMentionChangePct, 0, 100)
+   *   )
+   *
+   * Weight rationale:
+   *   - Sentiment mix (40%, heaviest): the only input spanning every tracked platform (Google,
+   *     Reddit, Instagram, Facebook, News, TikTok), so it is the closest single number to
+   *     "what people are actually saying" — the thing the index exists to summarize.
+   *   - Mention-volume trend (25%): a swing in how much people are talking changes how much
+   *     the sentiment reading matters this week, so it earns real weight — but it's a volume
+   *     signal, not a quality signal, so it stays below sentiment and response rate.
+   *   - Review response rate (20%): the one input entirely inside the clinic's own control —
+   *     rewards actually closing the loop on reviews, the core workflow this tool exists to
+   *     drive (P0-6).
+   *   - Avg. Google Rating (15%, lightest): high-intent and public, but the narrowest channel
+   *     (Google only, and only patients who chose to leave a rating), so it does not dominate.
+   */
+  function computeClarityIndex(inputs){
+    const ratingScore = clamp((inputs.avgGoogleRating / 5) * 100, 0, 100);
+    const sentimentScore = clamp(inputs.netSentiment, 0, 100);
+    const responseRateScore = clamp(inputs.avgResponseRatePct, 0, 100);
+    const volumeTrendScore = clamp(50 + inputs.mentionVolumeTrendPct, 0, 100);
+    const score = (0.15 * ratingScore) + (0.40 * sentimentScore) + (0.20 * responseRateScore) + (0.25 * volumeTrendScore);
+    return Math.round(score);
+  }
+
+  // Pulls the raw inputs from the same sample data already rendered elsewhere on the page,
+  // rather than re-hardcoding a second copy of each number.
+  function getClarityIndexInputs(){
+    const responseRates = [...document.querySelectorAll('#view-reviews .resp-rate')]
+      .map(td => parseFloat(td.textContent))
+      .filter(n => !isNaN(n));
+    const avgResponseRatePct = responseRates.length
+      ? responseRates.reduce((a, b) => a + b, 0) / responseRates.length
+      : 0;
+    const totalMentionsNow = 342;   // matches the Total Mentions KPI
+    const totalMentionsPrior = 291; // matches the KPI's "291 last week" delta text
+    return {
+      avgGoogleRating: 5.0,   // matches the "Avg. Google Rating" KPI card
+      netSentiment: 62,       // matches the "Net Sentiment" KPI card (+62)
+      avgResponseRatePct: avgResponseRatePct,
+      mentionVolumeTrendPct: Math.round(((totalMentionsNow - totalMentionsPrior) / totalMentionsPrior) * 100)
+    };
+  }
+
   // ---------- AI weekly summary ----------
   const summaries = [
     'Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.',
@@ -1682,10 +2016,7 @@
     document.body.classList.add('syncing-data');
     label.textContent = 'Syncing…';
     setTimeout(() => {
-      const now = new Date();
-      let h = now.getHours().toString().padStart(2, '0');
-      let m = now.getMinutes().toString().padStart(2, '0');
-      label.textContent = 'Last synced ' + h + ':' + m + ' PHT';
+      label.textContent = 'Last synced ' + formatPHTime();
       pill.classList.remove('syncing');
       document.body.classList.remove('syncing-data');
       showToast('Data refreshed (demo)');
@@ -1713,11 +2044,14 @@
 
   // ---------- One-time demo notice + load animations ----------
   window.addEventListener('load', () => {
-    // Sweep the Clarity gauge arc to 75/100 (dashoffset 58.9 of 235.6),
-    // synced with the number counting up beside it.
+    // Compute the Clarity Index from the page's own sample data (implements 0.10) rather than
+    // rendering a bare hardcoded 75, then sweep the gauge arc to match — dashoffset scales
+    // linearly from 235.6 (0/100) to 0 (100/100), synced with the number counting up beside it.
+    const clarityScore = computeClarityIndex(getClarityIndexInputs());
     const gaugePath = document.getElementById('gaugeValuePath');
-    if (gaugePath) requestAnimationFrame(() => { gaugePath.style.strokeDashoffset = '58.9'; });
-    countUp('clarityNum', 75, { duration: 1000 });
+    const gaugeOffset = 235.6 * (1 - clarityScore / 100);
+    if (gaugePath) requestAnimationFrame(() => { gaugePath.style.strokeDashoffset = String(gaugeOffset); });
+    countUp('clarityNum', clarityScore, { duration: 1000 });
     countUp('kpiTotalMentionsValue', 342, { duration: 1000 });
     countUp('kpiNetSentimentValue', 62, { prefix: '+', duration: 1000 });
     countUp('kpiActiveAlertsValue', 4, { duration: 700 });
