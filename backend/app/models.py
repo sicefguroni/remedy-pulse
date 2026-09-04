@@ -208,6 +208,34 @@ class Mention(Base):
     assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # --- classification (Phase 6) ---
+    # `sentiment` (above) already exists from Phase 0/2 — these three
+    # columns are new, added ahead of Phase 6's classification pipeline
+    # landing (schema-readiness-first, same pattern as deleted_at/
+    # EventType.LOGIN before them), so the Phase 7 API layer being built
+    # in parallel has a stable contract from the start rather than a
+    # cross-agent dependency on schema that doesn't exist yet.
+    #
+    # sentiment_confidence: the classifier's own confidence for whatever
+    # `sentiment` currently holds, 0.0-1.0. Nullable — a review whose
+    # sentiment is still derived purely from its star rating (see 6.2)
+    # has no classifier confidence to report; don't invent one.
+    sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # classified_at: when a real classifier (not the star-rating
+    # shortcut) last set `sentiment`/`sentiment_confidence`. Nullable for
+    # the same reason as above, and lets a future reclassification pass
+    # find rows classified by an older model version.
+    classified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # alert_category: "crisis" | "digest" | null (6.3 — the routing
+    # rules already written and stakeholder-visible in the mockup's
+    # openAlertRulesModal()). Null means "not yet routed" — distinct
+    # from a row that was routed and found to match neither list, which
+    # this project's classifier should still record as "digest" (the
+    # rules' own digest list includes a catch-all "routine"/"low-level"
+    # tier), so null should only ever mean "classification hasn't run
+    # on this row yet."
+    alert_category: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"Mention(id={self.id!r}, source={self.source!r}, kind={self.kind!r}, external_id={self.external_id!r})"
 
