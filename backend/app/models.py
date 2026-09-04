@@ -50,6 +50,18 @@ Design notes — read before adding a field:
 - `ResponseTimeBaseline` (3.3) is schema-only: a place for a one-time
   manual pre-launch measurement to live, not a computed metric. See its
   own docstring.
+- `User` (5.5) exists now even though there is no HTTP API or web
+  framework anywhere in this repo yet (Phase 7 builds that, after Phase
+  5 in the checklist's own sequencing) — same "schema/logic readiness
+  ahead of the feature that consumes it" pattern as `Mention.deleted_at`
+  and `EventType.LOGIN` above, both built with nothing calling them yet
+  until the phase that needed them arrived. `app/auth.py` (5.5) is that
+  logic: password hashing/verification and a session-token concept Phase
+  7's API layer can call into the moment it exists, with nothing
+  wiring it to a route today. It is deliberately NOT tied to
+  `Mention.assigned_to` (still free text, matching the mockup's
+  Gian/Paul/Boom/Mixi dropdown) — connecting real user rows to that
+  column is a Phase 7 concern, not this one.
 """
 
 from __future__ import annotations
@@ -324,3 +336,55 @@ class ResponseTimeBaseline(Base):
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"ResponseTimeBaseline(id={self.id!r}, response_time_hours={self.response_time_hours!r})"
+
+
+class User(Base):
+    """A dashboard login (5.5). See the module docstring for why this
+    table exists now despite there being no HTTP API or web framework yet
+    for anything to authenticate into — it's schema readiness for Phase
+    7, the same pattern as `Mention.deleted_at`/`EventType.LOGIN`. All
+    the logic that reads and writes this table (`hash_password()`,
+    `authenticate()`, session tokens) lives in `app/auth.py`, not here —
+    see that module's docstring for the password-hashing and
+    session-token design decisions.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # The login identifier. Unique and required — app.auth.create_user()
+    # is what turns a duplicate-email DB constraint failure into a clear
+    # error, rather than this column allowing it and pushing that
+    # decision onto every caller.
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    # A bcrypt hash (see app.auth for why bcrypt), never a plaintext
+    # password — not even transiently longer than necessary. Never log
+    # this column's value.
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Matches the mockup's existing assignee names (Gian/Paul/Boom/Mixi)
+    # conceptually, though this table isn't required to seed those rows.
+    # Connecting a real User row to Mention.assigned_to's free-text
+    # values is a Phase 7 concern — see the module docstring — not
+    # something this table or app.auth attempts.
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # A way to disable an account without deleting its audit history
+    # (the Event rows an actor generated stay put either way — see
+    # models.Event's docstring on why that's a separate append-only log).
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # Updated on successful login by app.auth.authenticate(). This is NOT
+    # the same thing as Event.occurred_at for EventType.LOGIN rows, which
+    # stay the append-only audit trail per Phase 3's established design
+    # principle (every login, not just the latest) — this column is a
+    # query-convenience projection of "when did this user last succeed,"
+    # exactly like Mention.updated_at is a projection relative to the
+    # Event ledger, not a replacement for it. NULL means "never logged in
+    # since this account was created," a real, distinguishable state
+    # from "logged in at some unknown time" — not a value to backfill
+    # with a guess.
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug convenience only
+        return f"User(id={self.id!r}, email={self.email!r})"
