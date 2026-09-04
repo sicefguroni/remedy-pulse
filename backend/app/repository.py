@@ -27,7 +27,7 @@ from __future__ import annotations
 import statistics
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator
 
 from sqlalchemy import func, select
@@ -40,6 +40,7 @@ from app.models import (
     EventType,
     IngestionRun,
     Mention,
+    MentionKind,
     ResponseTimeBaseline,
     RunStatus,
     Sentiment,
@@ -380,6 +381,555 @@ def record_baseline_response_time(
     session.add(baseline)
     session.flush()
     return baseline
+
+
+# --- Phase 7 API read queries ---
+#
+# Everything below is new, appended for the app/api/ layer (7.1/7.4) per
+# that batch's file-ownership note ("append new READ-ONLY query functions
+# ... append only, do not modify any existing function in this file").
+# Nothing above this line was changed except the two import lines (adding
+# `timedelta` and `MentionKind`, both additive).
+#
+# These functions do the read-side aggregation docs/api-contract.md's
+# routes need; the route handlers themselves (app/api/routes/*.py) stay
+# thin wrappers that call these and shape the result into the contract's
+# exact JSON, rather than embedding SQLAlchemy queries inline.
+
+
+# Mention.source values actually written by the registered adapters
+# (app.jobs.JOBS) that count as "Google" for the Overview endpoint's
+# `source=google` filter. Kept as an explicit set (not "startswith
+# google_") because "google_places_competitor" rows are still Google's
+# data, just about a competitor, and belong in this bucket too.
+GOOGLE_SOURCES = {"google_reviews", "google_places_competitor"}
+
+
+def _pct(count: int, total: int) -> int:
+    """round(100 * count / total), or 0 when total is 0 - a percentage of
+    nothing is 0, not a ZeroDivisionError, and not fabricated as some
+    other sentinel."""
+    return round(100 * count / total) if total else 0
+
+
+def _sentiment_value(value: Any) -> Any:
+    """Mention.sentiment is a plain String(16) column (see models.Mention),
+    not a SQLAlchemy Enum type, so a freshly-loaded row's value is
+    ordinarily already a plain str - but a still-identity-mapped row from
+    earlier in the same session can hold the Sentiment enum member it was
+    assigned with. Normalizes either shape to the plain "Positive"/
+    "Neutral"/"Negative" string the API contract uses, mirroring
+    status_report.py's identical normalization for RunStatus."""
+    return getattr(value, "value", value)
+
+
+def _apply_source_category(conditions: list, source_category: str | None) -> list:
+    """Mutates and returns `conditions` in place - a helper, not a public
+    query itself. `source_category` matches the Overview endpoint's
+    `source` query param: "all" (default, no filter), "google", "news", or
+    "social". "social" is deliberately a catch-all (everything that is
+    neither Google nor a "news_"-prefixed source) rather than an
+    enumerated list of social platforms, so a newly registered adapter
+    source counts as "social" automatically - the same "register once in
+    app.jobs.JOBS, nothing else needs editing" ethos that module's own
+    docstring describes, applied here to source categorization instead of
+    job registration."""
+    if not source_category or source_category == "all":
+        return conditions
+    if source_category == "google":
+        conditions.append(Mention.source.in_(GOOGLE_SOURCES))
+    elif source_category == "news":
+        conditions.append(Mention.source.like("news\\_%", escape="\\"))
+    elif source_category == "social":
+        conditions.append(Mention.source.notin_(GOOGLE_SOURCES))
+        conditions.append(~Mention.source.like("news\\_%", escape="\\"))
+    return conditions
+
+
+def _apply_entity(conditions: list, entity: str | None) -> list:
+    """Mutates and returns `conditions` in place. `entity` matches the
+    Overview endpoint's `entity` query param: "all" (default, no filter)
+    or a specific owned listing/venue name, matched against Mention.venue
+    exactly (venue names are the same strings config.OWNED_LISTINGS and
+    the ingested Mention rows already use, e.g.
+    "Remedy — BGC (One Uptown Residence)")."""
+    if entity and entity != "all":
+        conditions.append(Mention.venue == entity)
+    return conditions
+
+
+@dataclass
+class MentionPage:
+    items: list[Mention]
+    next_cursor: int | None
+
+
+# Upper bound on how many candidate rows a topic-filtered query scans in
+# Python (see list_mentions_filtered()'s docstring) before giving up on
+# finding more matches for the current page. Generous relative to this
+# project's stated scale (same-day/next-day ingestion, per the PRD - not
+# a high-volume real-time firehose).
+_TOPIC_SCAN_LIMIT = 2000
+
+
+def list_mentions_filtered(
+    session: Session,
+    *,
+    keyword: str | None = None,
+    platform: str | None = None,
+    sentiment: str | None = None,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+    topic: str | None = None,
+    kind: MentionKind | None = MentionKind.MENTION,
+    limit: int = 50,
+    cursor: int | None = None,
+) -> tuple[list[Mention], int | None]:
+    """The read-only query backing GET /api/mentions, GET
+    /api/topics/{key}/mentions, and POST /api/exports/mentions_csv.
+
+    Keyset-paginated on Mention.id, descending (most recently ingested
+    first): `cursor` is the smallest id already handed to the caller: the
+    next call passes that same value back as `cursor` to get strictly
+    smaller ids. Returns (items, next_cursor); next_cursor is None when
+    the current page is the last one.
+
+    `kind` defaults to MentionKind.MENTION (the Mentions-tab feed) since
+    that's what GET /api/mentions is about; callers that want every kind
+    tagged with a topic (GET /api/topics/{key}/mentions - reviews and
+    articles carry topic tags too, not just feed mentions) pass
+    kind=None.
+
+    `topic` membership is checked in Python over up to _TOPIC_SCAN_LIMIT
+    candidate rows fetched via every other filter + the cursor, ordered by
+    id descending - not a SQL JSON-containment predicate. Mention.topics
+    is a plain JSON column (see models.Mention's docstring on why), and
+    SQLAlchemy has no single containment operator that's portable across
+    SQLite (tests) and Postgres (production) for that column type; a real
+    dialect-branched JSONB containment query would be the next step if
+    this project's data volume ever outgrows _TOPIC_SCAN_LIMIT."""
+    conditions: list = []
+    if kind is not None:
+        conditions.append(Mention.kind == kind)
+    if keyword:
+        conditions.append(Mention.text.ilike(f"%{keyword}%"))
+    if platform and platform != "all":
+        conditions.append(Mention.source == platform)
+    if sentiment and sentiment != "all":
+        conditions.append(Mention.sentiment == sentiment)
+    if from_dt is not None:
+        conditions.append(Mention.published_at >= from_dt)
+    if to_dt is not None:
+        conditions.append(Mention.published_at <= to_dt)
+    if cursor is not None:
+        conditions.append(Mention.id < cursor)
+
+    stmt = select(Mention).where(*conditions).order_by(Mention.id.desc())
+
+    if topic:
+        candidates = session.execute(stmt.limit(_TOPIC_SCAN_LIMIT)).scalars().all()
+        matched = [m for m in candidates if m.topics and topic in m.topics]
+        has_more = len(matched) > limit
+        page = matched[:limit]
+    else:
+        rows = session.execute(stmt.limit(limit + 1)).scalars().all()
+        has_more = len(rows) > limit
+        page = rows[:limit]
+
+    next_cursor = page[-1].id if (has_more and page) else None
+    return list(page), next_cursor
+
+
+@dataclass
+class OverviewStats:
+    total_mentions_now: int
+    total_mentions_prior: int
+    positive_count: int
+    neutral_count: int
+    negative_count: int
+    avg_google_rating: float
+    google_review_count: int
+    avg_response_rate_pct: float
+    active_alerts_total: int
+    active_alerts_crisis: int
+    active_alerts_digest: int
+
+
+def get_overview_stats(
+    session: Session,
+    *,
+    period_from: datetime,
+    period_to: datetime,
+    prior_from: datetime,
+    prior_to: datetime,
+    source_category: str = "all",
+    entity: str = "all",
+) -> OverviewStats:
+    """The read-only aggregation backing GET /api/overview. `period_from`/
+    `period_to` bound the "current" window (published_at range,
+    inclusive); `prior_from`/`prior_to` bound the immediately preceding
+    window of the same length, used for totalMentions.priorPeriodValue
+    and the Clarity Index's volume-trend term. `source_category`/`entity`
+    match the endpoint's own `source`/`entity` query params - see
+    _apply_source_category()/_apply_entity().
+
+    avg_google_rating/google_review_count come from kind="review",
+    source="google_reviews" rows only (Google is the only rated channel),
+    scoped to `entity` (a specific venue) but NOT `source_category` - the
+    rating figure is inherently Google-only regardless of what the
+    `source` filter says, matching the Clarity Index formula's own
+    "Avg. Google Rating" input.
+
+    active_alerts_* counts Mention rows with alert_category set and
+    resolved_at IS NULL (still open) within the current period/filters -
+    "active" meaning "routed and not yet resolved," not merely "ever
+    routed.\""""
+    base_conditions: list = []
+    _apply_source_category(base_conditions, source_category)
+    _apply_entity(base_conditions, entity)
+
+    now_conditions = base_conditions + [
+        Mention.published_at >= period_from,
+        Mention.published_at <= period_to,
+    ]
+    prior_conditions = base_conditions + [
+        Mention.published_at >= prior_from,
+        Mention.published_at < period_from,
+    ]
+
+    total_now = session.execute(
+        select(func.count()).select_from(Mention).where(*now_conditions)
+    ).scalar_one()
+    total_prior = session.execute(
+        select(func.count()).select_from(Mention).where(*prior_conditions)
+    ).scalar_one()
+
+    sentiment_rows = session.execute(
+        select(Mention.sentiment, func.count())
+        .where(*now_conditions, Mention.sentiment.isnot(None))
+        .group_by(Mention.sentiment)
+    ).all()
+    sentiment_counts = {"Positive": 0, "Neutral": 0, "Negative": 0}
+    for sentiment_value, count in sentiment_rows:
+        sentiment_counts[_sentiment_value(sentiment_value)] = count
+
+    google_conditions: list = [
+        Mention.kind == MentionKind.REVIEW,
+        Mention.source == "google_reviews",
+        Mention.published_at >= period_from,
+        Mention.published_at <= period_to,
+        Mention.rating.isnot(None),
+    ]
+    _apply_entity(google_conditions, entity)
+    avg_rating, review_count = session.execute(
+        select(func.avg(Mention.rating), func.count(Mention.rating)).where(*google_conditions)
+    ).one()
+
+    listings = get_reviews_listings(session)
+    response_rates = [listing.response_rate_pct for listing in listings if listing.review_count > 0]
+    avg_response_rate = sum(response_rates) / len(response_rates) if response_rates else 0.0
+
+    alert_conditions = now_conditions + [Mention.alert_category.isnot(None), Mention.resolved_at.is_(None)]
+    alert_rows = session.execute(
+        select(Mention.alert_category, func.count()).where(*alert_conditions).group_by(Mention.alert_category)
+    ).all()
+    alert_counts: dict[str, int] = {"crisis": 0, "digest": 0}
+    for category, count in alert_rows:
+        alert_counts[category] = alert_counts.get(category, 0) + count
+
+    return OverviewStats(
+        total_mentions_now=total_now,
+        total_mentions_prior=total_prior,
+        positive_count=sentiment_counts["Positive"],
+        neutral_count=sentiment_counts["Neutral"],
+        negative_count=sentiment_counts["Negative"],
+        avg_google_rating=round(avg_rating, 1) if avg_rating is not None else 0.0,
+        google_review_count=review_count or 0,
+        avg_response_rate_pct=avg_response_rate,
+        active_alerts_total=sum(alert_counts.values()),
+        active_alerts_crisis=alert_counts.get("crisis", 0),
+        active_alerts_digest=alert_counts.get("digest", 0),
+    )
+
+
+@dataclass
+class ReviewListing:
+    venue: str
+    rating: float | None
+    review_count: int
+    pending_replies: int
+    response_rate_pct: int
+    status: str
+
+
+def get_reviews_listings(session: Session) -> list[ReviewListing]:
+    """The read-only aggregation backing GET /api/reviews, POST
+    /api/reviews/{id}/reply's response, and POST /api/exports/reviews_csv:
+    one row per venue actually present among kind="review",
+    source="google_reviews" Mention rows, grouped by venue - per
+    docs/api-contract.md's own wording ("aggregated from Mention rows
+    where kind=review and source=google_reviews, grouped by venue").
+
+    pendingReplies/responseRatePct are computed from real per-row
+    has_reply values (never a single branch-wide flag) - the contract's
+    own explicit callout not to reintroduce the mockup's old "one reply
+    clears a whole branch" bug.
+
+    A venue with zero ingested reviews never appears here at all (there's
+    no row to group), so this function never returns status="no_reviews"
+    - the caller (app/api/routes/reviews.py) is what cross-references
+    config.OWNED_LISTINGS to add a "no_reviews" placeholder row for a
+    configured branch that has no data yet, since that needs the branch
+    roster this function deliberately doesn't depend on (repository.py
+    has no existing reason to import backend/config.py, and "aggregated
+    from Mention rows ... grouped by venue" is exactly what this function
+    does - see this phase's final report for the full reasoning)."""
+    rows = session.execute(
+        select(Mention.venue, Mention.rating, Mention.has_reply).where(
+            Mention.kind == MentionKind.REVIEW, Mention.source == "google_reviews"
+        )
+    ).all()
+
+    freshness = get_source_freshness(session, "google_reviews")
+    run_status = _sentiment_value(freshness.last_status)  # same enum-or-str normalization, any column
+
+    by_venue: dict[str, list[tuple[int | None, bool | None]]] = {}
+    for venue, rating, has_reply in rows:
+        by_venue.setdefault(venue or "(unspecified)", []).append((rating, has_reply))
+
+    listings = []
+    for venue, items in sorted(by_venue.items()):
+        count = len(items)
+        ratings = [r for r, _ in items if r is not None]
+        replied = sum(1 for _, hr in items if hr)
+        avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
+        status = "ok" if run_status not in ("access_denied", "error") else run_status
+        listings.append(
+            ReviewListing(
+                venue=venue,
+                rating=avg_rating,
+                review_count=count,
+                pending_replies=count - replied,
+                response_rate_pct=_pct(replied, count),
+                status=status,
+            )
+        )
+    return listings
+
+
+# The five fixed topic keys/labels this project ships with today (6.5's
+# taxonomy), matching remedy-pulse-mockup.html's existing topicMentions
+# object exactly - see docs/api-contract.md's Topics section.
+FIXED_TOPICS: list[tuple[str, str]] = [
+    ("facial-results", "Facial Results & Glow"),
+    ("staff-service", "Staff & Service Experience"),
+    ("rejuran", "Rejuran Specifically"),
+    ("pricing", "Pricing & Packages"),
+    ("booking", "Booking & Follow-up Response"),
+]
+
+
+@dataclass
+class TopicSummary:
+    key: str
+    label: str
+    mention_count_this_week: int
+    positive_pct: int
+    neutral_pct: int
+    negative_pct: int
+    sample_quote: str | None
+    tag: str | None
+
+
+def get_topics_summary(session: Session, *, now: datetime | None = None) -> list[TopicSummary]:
+    """The read-only aggregation backing GET /api/topics: one row per
+    FIXED_TOPICS entry. mentionCountThisWeek and sentimentSplit are both
+    scoped to the trailing 7 days ending at `now` (default: real now) -
+    the field is literally named "this week," and scoping sentimentSplit
+    to the same window keeps one card internally consistent rather than
+    silently mixing a this-week count with an all-time sentiment mix.
+
+    `tag` ("needs-attention" | "watch" | null) is this implementation's
+    own threshold on negativePct (>=30 -> needs-attention, >=15 -> watch,
+    else null) - docs/api-contract.md names the two values but no
+    threshold; docs/decisions/topic-tagging-approach.md (6.5, built in
+    parallel) may define a real one, in which case this should be
+    revisited. See this phase's final report for that caveat."""
+    now = now or datetime.now(timezone.utc)
+    week_start = now - timedelta(days=7)
+    this_week_rows = session.execute(
+        select(Mention.topics, Mention.sentiment, Mention.text)
+        .where(Mention.topics.isnot(None), Mention.published_at >= week_start, Mention.published_at <= now)
+        .order_by(Mention.id.desc())
+    ).all()
+    this_week = [(topics, _sentiment_value(sentiment), text) for topics, sentiment, text in this_week_rows]
+
+    # Fallback pool for sampleQuote when a topic had no activity this
+    # week: the most recent _TOPIC_SCAN_LIMIT all-time tagged rows (same
+    # scan-limit reasoning as list_mentions_filtered()'s topic filter -
+    # Mention.topics has no portable SQL containment check). Fetched once,
+    # outside the per-topic loop below, rather than once per topic.
+    fallback_rows = session.execute(
+        select(Mention.topics, Mention.text)
+        .where(Mention.topics.isnot(None), Mention.text.isnot(None))
+        .order_by(Mention.id.desc())
+        .limit(_TOPIC_SCAN_LIMIT)
+    ).all()
+
+    summaries = []
+    for key, label in FIXED_TOPICS:
+        tagged = [(sentiment, text) for topics, sentiment, text in this_week if topics and key in topics]
+        count = len(tagged)
+        sentiments = [s for s, _ in tagged if s is not None]
+        total_with_sentiment = len(sentiments)
+        positive_pct = _pct(sentiments.count("Positive"), total_with_sentiment)
+        neutral_pct = _pct(sentiments.count("Neutral"), total_with_sentiment)
+        negative_pct = _pct(sentiments.count("Negative"), total_with_sentiment)
+        sample_quote = next((text for _, text in tagged if text), None)
+        if sample_quote is None:
+            sample_quote = next(
+                (text for topics, text in fallback_rows if topics and key in topics), None
+            )
+        if negative_pct >= 30:
+            tag = "needs-attention"
+        elif negative_pct >= 15:
+            tag = "watch"
+        else:
+            tag = None
+        summaries.append(
+            TopicSummary(
+                key=key,
+                label=label,
+                mention_count_this_week=count,
+                positive_pct=positive_pct,
+                neutral_pct=neutral_pct,
+                negative_pct=negative_pct,
+                sample_quote=sample_quote,
+                tag=tag,
+            )
+        )
+    return summaries
+
+
+@dataclass
+class CompetitorsData:
+    share_of_voice: list[dict]
+    source_breakdown: list[dict]
+    competitor_sentiment: list[dict]
+
+
+def get_competitors_data(session: Session) -> CompetitorsData:
+    """The read-only aggregation backing GET /api/competitors, over the
+    full Mention table (this endpoint has no query params per
+    docs/api-contract.md).
+
+    Brand grouping (this implementation's own interpretation - the
+    contract doesn't spell this out further): "Remedy" is every Mention
+    row NOT from source="google_places_competitor" (i.e. every owned-
+    source row: google_reviews, reddit, instagram, facebook, news_gnews -
+    all channels tracking Remedy itself); each competitor is the
+    google_places_competitor rows for one venue (the competitor's name,
+    per fetch_competitor_ratings.py's own normalization - see 4.2).
+    shareOfVoice/competitorSentiment use this same grouping so the two
+    cards are internally consistent with each other."""
+    total = session.execute(select(func.count()).select_from(Mention)).scalar_one()
+    remedy_condition = Mention.source != "google_places_competitor"
+    remedy_count = session.execute(
+        select(func.count()).select_from(Mention).where(remedy_condition)
+    ).scalar_one()
+    competitor_rows = session.execute(
+        select(Mention.venue, func.count())
+        .where(Mention.source == "google_places_competitor")
+        .group_by(Mention.venue)
+    ).all()
+
+    share_of_voice = [{"name": "Remedy", "pct": _pct(remedy_count, total), "isOwn": True}]
+    for venue, count in competitor_rows:
+        share_of_voice.append({"name": venue or "(unknown)", "pct": _pct(count, total), "isOwn": False})
+
+    source_rows = session.execute(select(Mention.source, func.count()).group_by(Mention.source)).all()
+    source_breakdown = [{"platform": source, "pct": _pct(count, total)} for source, count in source_rows]
+
+    def _sentiment_mix(*conditions) -> dict:
+        rows = session.execute(
+            select(Mention.sentiment, func.count())
+            .where(*conditions, Mention.sentiment.isnot(None))
+            .group_by(Mention.sentiment)
+        ).all()
+        counts = {"Positive": 0, "Neutral": 0, "Negative": 0}
+        for sentiment_value, count in rows:
+            counts[_sentiment_value(sentiment_value)] = count
+        total_sentiment = sum(counts.values())
+        return {
+            "positivePct": _pct(counts["Positive"], total_sentiment),
+            "neutralPct": _pct(counts["Neutral"], total_sentiment),
+            "negativePct": _pct(counts["Negative"], total_sentiment),
+        }
+
+    competitor_sentiment = [{"name": "Remedy", "isOwn": True, **_sentiment_mix(remedy_condition)}]
+    for venue, _count in competitor_rows:
+        competitor_sentiment.append(
+            {
+                "name": venue or "(unknown)",
+                "isOwn": False,
+                **_sentiment_mix(Mention.source == "google_places_competitor", Mention.venue == venue),
+            }
+        )
+
+    return CompetitorsData(
+        share_of_voice=share_of_voice,
+        source_breakdown=source_breakdown,
+        competitor_sentiment=competitor_sentiment,
+    )
+
+
+@dataclass
+class EmvArticle:
+    id: int
+    outlet: str | None
+    headline: str | None
+    tier: str | None
+    sentiment: str | None
+    url: str | None
+    published_at: datetime | None
+
+
+def get_emv_articles(
+    session: Session,
+    *,
+    outlet: str = "all",
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+) -> list[EmvArticle]:
+    """The read-only query backing GET /api/emv and POST
+    /api/exports/emv_csv: kind="article" Mention rows, most recent first.
+    `outlet` matches Mention.venue exactly (the "where within the source"
+    field holds the publication name for kind="article" rows - see
+    models.Mention's docstring)."""
+    conditions: list = [Mention.kind == MentionKind.ARTICLE]
+    if outlet and outlet != "all":
+        conditions.append(Mention.venue == outlet)
+    if from_dt is not None:
+        conditions.append(Mention.published_at >= from_dt)
+    if to_dt is not None:
+        conditions.append(Mention.published_at <= to_dt)
+    rows = session.execute(
+        select(Mention)
+        .where(*conditions)
+        .order_by(Mention.published_at.desc().nulls_last(), Mention.id.desc())
+    ).scalars().all()
+    return [
+        EmvArticle(
+            id=m.id,
+            outlet=m.venue,
+            headline=m.headline,
+            tier=m.tier,
+            sentiment=_sentiment_value(m.sentiment),
+            url=m.url,
+            published_at=m.published_at,
+        )
+        for m in rows
+    ]
 
 
 def get_baseline_summary(session: Session) -> dict:
