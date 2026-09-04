@@ -1,0 +1,29 @@
+# Local development Postgres for backend/app (Phase 2 foundations).
+# Not a production deployment — see docs/decisions/persistence-choice.md
+# for the actual persistence decision and its reasoning. This just gives
+# an engineer `docker compose up` and a DATABASE_URL that works.
+#
+# Usage:
+#   cd backend
+#   docker compose up -d
+#   cp .env.example .env   # DATABASE_URL default already matches this file
+#   alembic upgrade head
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: remedy_pulse
+      POSTGRES_PASSWORD: remedy_pulse_dev
+      POSTGRES_DB: remedy_pulse
+    ports:
+      - "5434:5432"
+    volumes:
+      - remedy_pulse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U remedy_pulse -d remedy_pulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  remedy_pulse_pgdata:

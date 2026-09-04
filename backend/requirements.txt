@@ -2,3 +2,10 @@ google-auth==2.35.0
 google-auth-oauthlib==1.2.1
 requests==2.32.3
 python-dotenv==1.0.1
+
+# Phase 2 foundations (backend/app/) — schema, persistence, service config.
+# See docs/decisions/persistence-choice.md for why Postgres + SQLAlchemy + Alembic.
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+pydantic-settings==2.6.1
