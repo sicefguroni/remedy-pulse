@@ -1,0 +1,1321 @@
+<title>Remedy Pulse Path to Production</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#F2EFE9;
+  --surface:#FAF8F4;
+  --surface-2:#EBE6DD;
+  --ink:#2E2823;
+  --ink-dim:#6B6157;
+  --ink-faint:#9A9188;
+  --rule:#E2DCD1;
+  --rule-soft:#EBE6DD;
+  --accent:#B4472B;
+  --accent-soft:#F0DFD7;
+  --critical:#C0341C;
+  --high:#C97A16;
+  --medium:#5F8C6E;
+  --low:#8B8378;
+  --tint-warn:#FBF0E4;
+  --tint-call:#EDF0EA;
+  --tint-concept:#EEEAF2;
+  --edge-warn:#D89B4A;
+  --edge-call:#7B9B84;
+  --edge-concept:#8C7FA8;
+  --shadow:0 1px 2px rgba(46,40,35,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#191512;
+    --surface:#221D19;
+    --surface-2:#2B2521;
+    --ink:#EDE7DE;
+    --ink-dim:#B0A69A;
+    --ink-faint:#7E7468;
+    --rule:#352E27;
+    --rule-soft:#2B2521;
+    --accent:#E0785A;
+    --accent-soft:#3A2620;
+    --critical:#F0705A;
+    --high:#E8A33F;
+    --medium:#7FB894;
+    --low:#9A9188;
+    --tint-warn:#2C2318;
+    --tint-call:#1E2620;
+    --tint-concept:#241F2C;
+    --edge-warn:#A9762F;
+    --edge-call:#5C7A65;
+    --edge-concept:#6E6288;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#191512;
+  --surface:#221D19;
+  --surface-2:#2B2521;
+  --ink:#EDE7DE;
+  --ink-dim:#B0A69A;
+  --ink-faint:#7E7468;
+  --rule:#352E27;
+  --rule-soft:#2B2521;
+  --accent:#E0785A;
+  --accent-soft:#3A2620;
+  --critical:#F0705A;
+  --high:#E8A33F;
+  --medium:#7FB894;
+  --low:#9A9188;
+  --tint-warn:#2C2318;
+  --tint-call:#1E2620;
+  --tint-concept:#241F2C;
+  --edge-warn:#A9762F;
+  --edge-call:#5C7A65;
+  --edge-concept:#6E6288;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:'Source Sans 3','Segoe UI',system-ui,sans-serif;
+  font-size:15.5px;
+  line-height:1.6;
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent)}
+code,.mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+code{
+  font-size:.86em;
+  background:var(--surface-2);
+  padding:1px 4px;
+  border-radius:2px;
+  word-break:break-word;
+}
+h1,h2,h3,h4{font-family:'Archivo','Segoe UI',system-ui,sans-serif;text-wrap:balance;margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+/* ---------- shell ---------- */
+.shell{
+  max-width:1220px;
+  margin:0 auto;
+  padding:0 28px 96px;
+}
+.layout{
+  display:grid;
+  grid-template-columns:236px minmax(0,1fr);
+  gap:52px;
+  align-items:start;
+}
+
+/* ---------- masthead ---------- */
+.masthead{
+  padding:44px 0 26px;
+  border-bottom:2px solid var(--ink);
+  margin-bottom:0;
+}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.masthead h1{
+  font-size:clamp(30px,4.6vw,46px);
+  font-weight:700;
+  letter-spacing:-.022em;
+  line-height:1.06;
+  margin:10px 0 12px;
+}
+.masthead .standfirst{
+  color:var(--ink-dim);
+  max-width:62ch;
+  font-size:16.5px;
+  margin:0 0 22px;
+}
+.meta-strip{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px 18px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11.5px;
+  color:var(--ink-dim);
+}
+.sync-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  background:var(--surface);
+  border:1px solid var(--rule);
+  border-radius:999px;
+  padding:4px 11px 4px 9px;
+}
+.sync-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--medium);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--medium) 22%, transparent);
+}
+.countdown{color:var(--critical);font-weight:600}
+
+/* overall progress */
+.progress-band{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin-top:22px;
+}
+.bar{
+  flex:1;
+  height:5px;
+  background:var(--surface-2);
+  border-radius:999px;
+  overflow:hidden;
+}
+.bar > i{
+  display:block;
+  height:100%;
+  width:100%;
+  transform:scaleX(0);
+  transform-origin:left center;
+  background:var(--accent);
+  transition:transform .35s ease;
+}
+.progress-band .count{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  color:var(--ink-dim);
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+
+/* ---------- contents rail ---------- */
+.rail{
+  position:sticky;
+  top:22px;
+  max-height:calc(100vh - 44px);
+  overflow-y:auto;
+  padding:30px 0 20px;
+  font-size:13.5px;
+}
+.rail .rail-title{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+  margin-bottom:12px;
+}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.rail a{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:baseline;
+  text-decoration:none;
+  color:var(--ink-dim);
+  padding:5px 9px 5px 10px;
+  border-left:2px solid transparent;
+  border-radius:0 2px 2px 0;
+  line-height:1.3;
+}
+.rail a:hover{color:var(--ink);background:var(--surface)}
+.rail a.on{color:var(--ink);border-left-color:var(--accent);background:var(--surface);font-weight:600}
+.rail a .tally{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  color:var(--ink-faint);
+  font-variant-numeric:tabular-nums;
+}
+.rail a.done .tally{color:var(--medium);font-weight:600}
+.rail .sep{height:1px;background:var(--rule);margin:9px 10px}
+
+.rail-mobile{display:none}
+
+/* ---------- sections ---------- */
+main{padding-top:30px;min-width:0}
+section{scroll-margin-top:20px;margin-bottom:52px}
+.sec-head{margin-bottom:18px}
+.sec-head h2{
+  font-size:24px;
+  font-weight:600;
+  letter-spacing:-.015em;
+  margin:6px 0 0;
+}
+.sec-head .lede{color:var(--ink-dim);max-width:66ch;margin:10px 0 0}
+p{max-width:68ch}
+.phase-num{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  color:var(--accent);
+  font-weight:600;
+}
+.phase-progress{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  color:var(--ink-faint);
+  font-variant-numeric:tabular-nums;
+  margin-left:10px;
+  letter-spacing:0;
+  text-transform:none;
+}
+
+/* ---------- fact strip ---------- */
+.facts{
+  border:1px solid var(--rule);
+  background:var(--surface);
+  border-radius:3px;
+}
+.facts .row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);
+  gap:16px;
+  padding:9px 15px;
+  border-bottom:1px solid var(--rule-soft);
+  font-size:14px;
+}
+.facts .row:last-child{border-bottom:0}
+.facts .row .k{color:var(--ink-dim)}
+.facts .row .v{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12.5px;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.facts .row.hot .v{color:var(--critical);font-weight:600}
+
+/* ---------- generic table ---------- */
+.table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th,td{text-align:left;padding:8px 13px;border-bottom:1px solid var(--rule-soft);vertical-align:top}
+th{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--ink-faint);
+  font-weight:500;
+  background:var(--surface-2);
+  white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+td.id{font-family:'IBM Plex Mono',monospace;font-size:12px;white-space:nowrap;color:var(--ink-dim)}
+.no{color:var(--critical);font-weight:600}
+.part{color:var(--high)}
+.yes{color:var(--medium)}
+
+/* ---------- status blocks ---------- */
+.status-label{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  font-weight:600;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:10px;
+}
+.status-label.verified{color:var(--medium)}
+.status-label.unverified{color:var(--high)}
+.status-label i{width:7px;height:7px;border-radius:1px;background:currentColor;display:block}
+ul.plain{margin:0;padding-left:19px;max-width:68ch}
+ul.plain li{margin-bottom:8px}
+
+.callout-flat{
+  background:var(--surface);
+  border:1px solid var(--rule);
+  border-top:2px solid var(--medium);
+  border-radius:0 0 3px 3px;
+  padding:14px 16px;
+  font-size:14.5px;
+  color:var(--ink-dim);
+  max-width:68ch;
+}
+.callout-flat strong{color:var(--ink)}
+
+/* ---------- checklist items ---------- */
+.items{display:flex;flex-direction:column;gap:0;margin-top:6px}
+.item{
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr);
+  gap:12px;
+  padding:15px 2px 15px 0;
+  border-top:1px solid var(--rule);
+}
+.item:last-of-type{border-bottom:1px solid var(--rule)}
+.item input[type=checkbox]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:17px;height:17px;
+  margin:4px 0 0;
+  border:1.5px solid var(--ink-faint);
+  border-radius:2px;
+  background:var(--surface);
+  cursor:pointer;
+  position:relative;
+  flex:none;
+}
+.item input[type=checkbox]:hover{border-color:var(--ink-dim)}
+.item input[type=checkbox]:checked{background:var(--medium);border-color:var(--medium)}
+.item input[type=checkbox]:checked::after{
+  content:"";
+  position:absolute;
+  left:5px;top:1px;
+  width:4px;height:9px;
+  border:solid var(--surface);
+  border-width:0 2px 2px 0;
+  transform:rotate(42deg);
+}
+.item .head{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  gap:9px;
+  margin-bottom:5px;
+}
+.item .iid{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  font-weight:600;
+  color:var(--accent);
+  font-variant-numeric:tabular-nums;
+}
+.item .ititle{
+  font-family:'Archivo',system-ui,sans-serif;
+  font-size:16px;
+  font-weight:600;
+  letter-spacing:-.008em;
+  line-height:1.32;
+  color:var(--ink);
+}
+.item .body{color:var(--ink-dim);font-size:14.5px;max-width:70ch;margin:0}
+.item .body em{color:var(--ink);font-style:italic}
+.item.checked .ititle{color:var(--ink-faint);text-decoration:line-through;text-decoration-thickness:1px}
+.item.checked .body,.item.checked .iid{opacity:.5}
+
+.metaline{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px 16px;
+  margin-top:9px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  color:var(--ink-faint);
+}
+.metaline .m{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.metaline .m .lbl{letter-spacing:.09em;text-transform:uppercase;opacity:.75}
+.metaline .m .val{color:var(--ink-dim)}
+.metaline .risk{
+  display:inline-flex;
+  align-items:flex-start;
+  gap:7px;
+  white-space:normal;
+  max-width:56ch;
+  line-height:1.45;
+}
+.sev{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-weight:600;
+  letter-spacing:.07em;
+  white-space:nowrap;
+}
+.sev i{width:8px;height:8px;border-radius:1px;display:block;flex:none;position:relative;top:3px}
+.sev-critical{color:var(--critical)} .sev-critical i{background:var(--critical)}
+.sev-high{color:var(--high)} .sev-high i{background:var(--high)}
+.sev-medium{color:var(--medium)} .sev-medium i{background:var(--medium)}
+.sev-low{color:var(--low)} .sev-low i{background:var(--low)}
+
+/* ---------- teaching markers ---------- */
+.note{
+  margin:16px 0 18px;
+  padding:15px 18px 16px;
+  border-top:2px solid var(--edge-warn);
+  background:var(--tint-warn);
+  max-width:70ch;
+  border-radius:0 0 3px 3px;
+}
+.note.call{border-top-color:var(--edge-call);background:var(--tint-call)}
+.note.concept{border-top-color:var(--edge-concept);background:var(--tint-concept)}
+.note .marker{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-weight:600;
+  color:var(--edge-warn);
+  display:block;
+  margin-bottom:7px;
+}
+.note.call .marker{color:var(--edge-call)}
+.note.concept .marker{color:var(--edge-concept)}
+.note h4{
+  font-size:15.5px;
+  font-weight:600;
+  letter-spacing:-.008em;
+  margin:0 0 8px;
+  line-height:1.35;
+}
+.note p{margin:0 0 9px;font-size:14.5px;color:var(--ink-dim);max-width:none}
+.note p:last-child{margin-bottom:0}
+.note .opt{margin:0 0 7px;font-size:14.5px;color:var(--ink-dim)}
+.note .opt b{color:var(--ink);font-weight:600}
+.note .lean{color:var(--ink)}
+.note .lean b{color:var(--edge-call)}
+
+/* ---------- constraints ---------- */
+.constraints{
+  counter-reset:c;
+  list-style:none;
+  margin:0;padding:0;
+  display:flex;flex-direction:column;gap:0;
+  max-width:70ch;
+}
+.constraints li{
+  counter-increment:c;
+  display:grid;
+  grid-template-columns:30px 1fr;
+  gap:12px;
+  padding:12px 0;
+  border-bottom:1px solid var(--rule);
+  color:var(--ink-dim);
+  font-size:14.5px;
+}
+.constraints li:first-child{border-top:1px solid var(--rule)}
+.constraints li::before{
+  content:counter(c);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  font-weight:600;
+  color:var(--critical);
+  padding-top:2px;
+}
+.constraints strong{color:var(--ink)}
+
+.cutorder{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  font-family:'IBM Plex Mono',monospace;font-size:12px;
+  margin:14px 0 0;
+}
+.cutorder span{
+  background:var(--surface);border:1px solid var(--rule);
+  padding:4px 10px;border-radius:2px;color:var(--ink-dim);
+}
+.cutorder .arrow{border:0;background:none;color:var(--ink-faint);padding:0}
+
+.footnote{
+  margin-top:44px;padding-top:18px;border-top:1px solid var(--rule);
+  font-size:13px;color:var(--ink-faint);max-width:68ch;
+}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .rail{display:none}
+  .rail-mobile{display:block;margin:22px 0 0}
+  .rail-mobile summary{
+    cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);
+    padding:9px 0;border-bottom:1px solid var(--rule);
+  }
+  .rail-mobile .rail{display:block;position:static;max-height:none;padding:12px 0 0}
+  .shell{padding:0 20px 64px}
+  main{padding-top:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;animation:none !important;scroll-behavior:auto !important}
+}
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <div class="eyebrow">Remedy Pulse · Implementation Checklist</div>
+    <h1>From validated mockup to production</h1>
+    <p class="standfirst">Seventy-nine items between the demo that stakeholders signed off on and a tool the marketing team can trust with real patient reviews. Current state below was established by running the code, not by reading it.</p>
+    <div class="meta-strip">
+      <span class="sync-pill"><i class="sync-dot"></i>Ground truth verified 2026-09-03</span>
+      <span>Fresh run · no prior checklist</span>
+      <span class="countdown">27 days to target launch</span>
+    </div>
+    <div class="progress-band">
+      <div class="bar"><i id="overallBar"></i></div>
+      <div class="count" id="overallCount">0 / 79</div>
+    </div>
+  </header>
+
+  <details class="rail-mobile">
+    <summary>Contents</summary>
+    <nav class="rail" id="railMobile"></nav>
+  </details>
+
+  <div class="layout">
+    <nav class="rail" id="rail" aria-label="Contents">
+      <div class="rail-title">Contents</div>
+      <ol id="railList"></ol>
+    </nav>
+
+    <main>
+
+      <section id="how">
+        <div class="sec-head">
+          <h2>How to read this</h2>
+        </div>
+        <p>Before reading the answer under a <b>YOUR CALL</b>, predict the tradeoff yourself — what would you pick, and what would it cost you? The gap between your guess and the reasoning is where the learning is; skipping straight to the answer converts a decision into a fact you'll forget.</p>
+        <p>For every <b>HEADS-UP</b>, ask: <em>how would I have found this myself?</em> Some are findable by reading a vendor's docs carefully. Some are only findable by getting burned. Knowing which is which tells you where to be paranoid next time.</p>
+        <p><b>UNDERSTAND FIRST</b> blocks are concepts, not facts. If the surrounding items look arbitrary, the concept is the missing piece.</p>
+        <p>Record each YOUR CALL in <code>docs/decisions/</code> once decided — the decision, the options, the reasoning, and <em>what would change your mind</em>.</p>
+      </section>
+
+      <section id="timeline">
+        <div class="sec-head">
+          <h2>Timeline reality check</h2>
+          <p class="lede">Facts from the repository, not opinions about it.</p>
+        </div>
+        <div class="facts">
+          <div class="row"><div class="k">Last code commit</div><div class="v">2026-08-04 · <code>25eedf2</code>, <code>99985bc</code></div></div>
+          <div class="row"><div class="k">PRD kickoff date</div><div class="v">2026-08-14</div></div>
+          <div class="row"><div class="k">Today</div><div class="v">2026-09-03 · ~3 weeks after kickoff</div></div>
+          <div class="row hot"><div class="k">Code committed since kickoff</div><div class="v">none</div></div>
+          <div class="row hot"><div class="k">Target v1 launch</div><div class="v">2026-09-30 · 27 days away</div></div>
+          <div class="row"><div class="k">Roadmap's blocking item (vendor decision)</div><div class="v">still Blocked · no owner deadline</div></div>
+          <div class="row"><div class="k">PRD + roadmap themselves</div><div class="v">untracked in git</div></div>
+        </div>
+        <p style="margin-top:18px">The roadmap budgets 6.5 weeks. About three of those are spent and the "Now" column is not started. <b>This checklist is larger than 27 days of work for two people.</b> That is not a reason to shrink it — it is a reason to make the cut explicit. See <a href="#sequencing">Sequencing</a>; the roadmap already nominates Competitors as the first thing to drop, and the evidence here supports that.</p>
+      </section>
+
+      <section id="state">
+        <div class="sec-head">
+          <h2>Current state</h2>
+          <p class="lede">Everything marked verified was executed in this session. Everything marked unverified says why it could not be.</p>
+        </div>
+
+        <div class="status-label verified"><i></i>Verified — executed this run</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Check</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>Toolchain</td><td>Python 3.13.14, Node 24.13.1, git 2.53.0 — all present</td></tr>
+              <tr><td><code>python -m py_compile</code>, all 4 backend files</td><td>Clean, no syntax errors</td></tr>
+              <tr><td><code>pip install -r backend/requirements.txt</code>, fresh venv</td><td><b>Exit 0.</b> Resolves cleanly on Python 3.13 — 18 packages, no conflicts, no build failures</td></tr>
+              <tr><td><code>fetch_competitor_ratings.py</code> without credentials</td><td>Exit 1, <code>GOOGLE_PLACES_API_KEY is not set.</code> No files written</td></tr>
+              <tr><td><code>fetch_owned_reviews.py</code> without credentials</td><td>Exit 1, <code>No token file at './token.json'.</code> No files written</td></tr>
+              <tr><td><code>oauth_setup.py</code> without credentials</td><td>Exit 1, client-secrets-not-found, with the Cloud Console path in the message</td></tr>
+              <tr><td><code>node --check</code> on the mockup's 774-line script block</td><td>Clean, parses without error</td></tr>
+              <tr><td>Mockup structure</td><td>Single 1729-line file, one <code>&lt;style&gt;</code>, one <code>&lt;script&gt;</code>, no build step. Only external resources are three Google Fonts families</td></tr>
+              <tr><td>Test suite</td><td class="no">None exists — no tests, no CI, no lint or type config anywhere in the repo</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout-flat" style="margin-top:14px">
+          The three credential failures are <strong>correct behaviour, not defects</strong>. Each script refuses to start rather than half-running, and each error message names the exact file and console page to fix it. That is better than most scaffolding — recorded here as a verified positive, not a finding.
+        </div>
+
+        <div class="status-label unverified" style="margin-top:30px"><i></i>Unverified — and why</div>
+        <ul class="plain">
+          <li><b>No live API call was made</b> against Google Business Profile or Places — no credentials in this environment, and Business Profile access is gated behind an approval that may not have been granted yet.</li>
+          <li><b>The mockup's interactive behaviours were not exercised in a browser.</b> Every finding below about click handlers, filters and modals comes from reading the code, not from clicking. They are code-level facts with line numbers cited, but a browser pass may surface more.</li>
+          <li><b>The Reddit Data Access Request's status is unknown.</b> The PDF in <code>docs/</code> is the <em>submission</em>, not an approval.</li>
+          <li><b>Whether the vendor decision has been made</b> — the roadmap says Blocked; nothing in the repo says otherwise.</li>
+        </ul>
+      </section>
+
+      <section id="coverage">
+        <div class="sec-head">
+          <h2>Requirement coverage</h2>
+          <p class="lede">The PRD has no explicit requirement IDs. These are <b>inferred</b> from its Must-Have and Nice-to-Have sections and are not authoritative — if the team adopts different IDs, update this table first. <code>C-*</code> IDs are compliance commitments from the Reddit Data Access Request in <code>docs/</code>: promises made in writing to a third-party data provider, which appear nowhere in the PRD or roadmap. That absence is itself the finding.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Requirement</th><th>In mockup?</th><th>Backend?</th></tr></thead>
+            <tbody>
+              <tr><td class="id">P0-1</td><td>Cross-source chronological mentions feed</td><td>Yes (6 hardcoded items)</td><td class="part">Google reviews only</td></tr>
+              <tr><td class="id">P0-2</td><td>Filter by keyword, platform, <b>and sentiment</b></td><td class="no">Keyword + platform + date only — no sentiment filter</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-3</td><td>CSV export of the current filtered view</td><td>Yes (Mentions, Reviews, EMV)</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-4</td><td>Negative items auto-flagged + assignable</td><td class="part">4 hardcoded alerts; 1 of 4 has no Assign button</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-5</td><td>Mark resolved, counts update</td><td>Yes</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-6</td><td>Reviews per branch + pending-reply flow</td><td>Yes</td><td class="part">Read only, no reply</td></tr>
+              <tr><td class="id">P0-7</td><td>Composite health score + trend + attention summary</td><td>Yes ("Clarity Index")</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-8</td><td>Topics with sentiment <b>+ drill into constituent mentions</b></td><td class="no">Cards only — zero click handlers, no drill-down</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-9</td><td>EMV per article with expandable formula</td><td>Yes</td><td class="no">No</td></tr>
+              <tr><td class="id">P0-10</td><td>Competitor share of voice <b>and sentiment</b></td><td class="no">Share of voice only — "sentiment" appears 0 times on that tab</td><td class="part">Ratings only</td></tr>
+              <tr><td class="id">P0-11</td><td>"Last synced" on every tab</td><td>Header pill (global, so all tabs)</td><td class="no">No timestamp emitted by any connector</td></tr>
+              <tr><td class="id">P1-1</td><td>AI weekly summary + regenerate</td><td>Yes (cycles 3 canned strings)</td><td class="no">No</td></tr>
+              <tr><td class="id">P1-2</td><td>Command palette (⌘K)</td><td>Yes</td><td>n/a</td></tr>
+              <tr><td class="id">P1-3</td><td>Simulated injection, <b>gated from live data</b></td><td class="no">Present — the gate does the opposite (see 0.13)</td><td>n/a</td></tr>
+              <tr><td class="id">P1-4</td><td>Per-mention drill-down (thread / comment chain)</td><td class="no">No</td><td class="no">No</td></tr>
+              <tr><td class="id">C-1</td><td>Reddit access via PRAW + OAuth</td><td>n/a</td><td class="no">No Reddit code; PRAW not in requirements.txt</td></tr>
+              <tr><td class="id">C-2</td><td>Delete content + author data within 48h of deletion on Reddit</td><td>n/a</td><td class="no">No code, no schema field, no job</td></tr>
+              <tr><td class="id">C-3</td><td>Descriptive versioned User-Agent per Reddit's format</td><td>n/a</td><td class="no">No code</td></tr>
+              <tr><td class="id">C-4</td><td>No resale, redistribution, or model training on Reddit data</td><td>n/a</td><td class="part">Policy — needs a written control</td></tr>
+              <tr><td class="id">C-5</td><td>Public content only, keyword-driven, low-volume polling</td><td>n/a</td><td class="no">No code</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="font-size:16px;margin:26px 0 10px">Uncovered requirements</h3>
+        <p style="margin-top:0">Requirements with no implementation <em>and</em> no plan in either the PRD's build sections or the roadmap:</p>
+        <ul class="plain">
+          <li><b>C-1 through C-5</b> — every Reddit compliance commitment. The roadmap does not mention Reddit at all; the PRD lists it as a source but never as an obligation. → Phase 5.</li>
+          <li><b>P0-8 drill-down</b> and <b>P0-10 sentiment</b> — both have explicit PRD acceptance criteria and no design in the "already validated" mockup. → 0.19, Phase 8.</li>
+          <li><b>P0-2 sentiment filter</b> — same. → 0.19, item 8.2.</li>
+          <li><b>News/press ingestion</b> — P0-1 requires it and P0-9 (EMV, the largest peso figures in the product) is built entirely on it. The Reddit PDF names GNews as already in use; no GNews code, key, or config exists. The roadmap has no line item for news ingestion at all. → 1.5, 4.5.</li>
+          <li><b>Authentication</b> — the dashboard has none, and the PRD never mentions it. The success metrics assume "team login" events exist to count. → 5.5, 3.1.</li>
+        </ul>
+      </section>
+
+      <div id="phases"></div>
+
+      <section id="sequencing">
+        <div class="sec-head">
+          <h2>Sequencing</h2>
+          <p class="lede">Ordered by dependency and risk, not by category.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Work</th><th>Why it sits here</th></tr></thead>
+            <tbody>
+              <tr><td class="id">1</td><td><b>Phase 1</b> access requests</td><td>Pure calendar time you do not control. Every day of delay is a day the whole plan loses. Starts today, runs behind everything else.</td></tr>
+              <tr><td class="id">2</td><td><b>Phase 0</b> gap closure</td><td>Cheap, mostly small, and every item is a false claim someone is currently building on. Do it while Phase 1 is in the post.</td></tr>
+              <tr><td class="id">3</td><td><b>Phase 2</b> foundations</td><td>Nothing downstream can start without the schema and the store. 2.1 was never blocked on the vendor decision and still isn't.</td></tr>
+              <tr><td class="id">4</td><td><b>Phase 3</b> instrumentation</td><td>Before the features it measures, or there is no baseline at the 30-day review. Also constrains the Phase 2 schema, so it cannot come later.</td></tr>
+              <tr><td class="id">5</td><td><b>Phase 4</b> ingestion</td><td>Gated per-source on Phase 1 outcomes. Google first — the one source not blocked on the vendor decision.</td></tr>
+              <tr><td class="id">6</td><td><b>Phase 5</b> compliance</td><td>Immediately behind ingestion, never behind launch. See the hard constraints.</td></tr>
+              <tr><td class="id">7</td><td><b>Phase 6</b> classification</td><td>Needs real ingested text to tune the precision/recall bar against.</td></tr>
+              <tr><td class="id">8</td><td><b>Phase 7</b> API + refactor</td><td>Needs the schema and something real to render.</td></tr>
+              <tr><td class="id">9</td><td><b>Phase 8</b> the six tabs</td><td>Where the P0 acceptance criteria actually close.</td></tr>
+              <tr><td class="id">10</td><td><b>Phase 9</b> QA and cutover</td><td>Last, and the parallel-run period genuinely takes 30 days — count backwards from when MediaWatch's contract ends.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="font-size:16px;margin:30px 0 12px">Hard constraints that override the order</h3>
+        <ol class="constraints">
+          <li><span><strong>No production ingestion against real third-party data until Phase 5 completes</strong> — specifically 5.1 (Reddit deletion propagation), 5.3 (PII minimization across sources) and 5.5 (authentication). Not "before launch" — before the <em>first real ingestion run</em>. Once the data is in your store, the obligations are already live.</span></li>
+          <li><span><strong>8.7 (EMV) does not ship without written formula sign-off.</strong> The roadmap already says slip rather than ship; the mockup itself contains an unresolved question about the PeopleAsia figure.</span></li>
+          <li><span><strong>6.1 (the precision/recall bar) is decided before 6.3 (alert routing) is built.</strong> Routing tuned against an undefined accuracy target cannot be evaluated.</span></li>
+          <li><span><strong>3.3 (baseline) is captured before launch, not after.</strong> It is the only item here that becomes permanently impossible if skipped.</span></li>
+        </ol>
+
+        <h3 style="font-size:16px;margin:30px 0 8px">If the timeline forces a cut</h3>
+        <p style="margin-top:0">The roadmap nominates Competitors first, and the evidence supports that: it is the most vendor-dependent P0 (8.8), its only current data source has a documented 5-review sampling cap that makes competitor sentiment trends unreliable (see the 4.2 heads-up), it needs a design round that has not happened (0.19c), and it is the least connected to the stated core metric.</p>
+        <div class="cutorder">
+          <span>Competitors · P0-10</span><span class="arrow">→</span>
+          <span>Topics · P0-8</span><span class="arrow">→</span>
+          <span>EMV · P0-9</span><span class="arrow">→</span>
+          <span>AI summary + ⌘K · P1</span>
+        </div>
+        <p style="margin-top:16px">What must <em>not</em> be cut is the chain that produces the core v1 metric: ingestion → classification → alerts → assignment → resolution timestamps. That chain <b>is</b> v1. Everything else is what makes v1 pleasant.</p>
+      </section>
+
+      <section id="decisions">
+        <div class="sec-head">
+          <h2>Recommended: <code>docs/decisions/</code></h2>
+          <p class="lede">Create it, and record each YOUR CALL there once decided. Five are open in this document.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Decision</th><th>Item</th></tr></thead>
+            <tbody>
+              <tr><td>Fallback trigger dates for each access request</td><td class="id">1.6</td></tr>
+              <tr><td>Persistence engine</td><td class="id">2.2</td></tr>
+              <tr><td>Sentiment classification approach</td><td class="id">6.1</td></tr>
+              <tr><td>Refactor the mockup in place vs. rebuild</td><td class="id">7.2</td></tr>
+              <tr><td>Post review replies via API vs. deep-link out</td><td class="id">8.5</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:16px">For each: the decision, the options considered, the reasoning — and <b>what would change your mind.</b> That last line is what makes the document worth re-reading in a month, when the vendor decision lands or an access request gets rejected and half of these need revisiting.</p>
+
+        <div class="footnote">
+          Source of truth is <code>docs/implementation-checklist.md</code>. Ticks on this page are stored in your browser only, keyed by a hash of each item's text, and are not shared with anyone else viewing it. Re-running <code>/production-checklist</code> updates both documents in place rather than replacing them.
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+const PHASES = [
+{
+  n:"Phase 0", slug:"p0", title:"Close the gaps in what already exists",
+  lede:"Every item here is a place where the code, the docs, or a submitted document claims something that is not enforced. All were verified in this session; evidence is cited so you can re-check any of them yourself. Phase 0 comes before any new feature because building on a false claim propagates it, and that cost compounds.",
+  blocks:[
+    {t:"concept", marker:"Understand first", h:"A guarantee that nothing exercises is not a guarantee.",
+     p:["Docstrings, dependency lists, column names, and submitted compliance forms all express <em>intent</em>. Only executed code paths express <em>behaviour</em>. Most of this phase is the distance between those two — a retention promise that is a sentence in a PDF rather than a scheduled job, a \"matches the mockup exactly\" claim that does not, an access-denied path that returns an empty list.",
+         "When you read the items below, notice how many would pass a code review unremarked. That is exactly why they need to be written down."]},
+
+    {id:"0.1", title:"Rename <code>backend/env.example</code> to <code>backend/.env.example</code>",
+     body:"<code>backend/README.md:31</code>, <code>oauth_setup.py:12</code> and <code>fetch_competitor_ratings.py:80</code> all instruct the reader to copy <code>.env.example</code>. The file on disk is <code>env.example</code>. Following the README verbatim on a fresh clone fails.",
+     e:"S", r:"—", risk:"Every new machine hits a 10-minute dead end that the docs actively cause", sev:"low"},
+
+    {id:"0.2", title:"Make a 403 from the reviews endpoint fail loudly instead of writing empty results",
+     body:"<code>fetch_owned_reviews.py:96-103</code> catches HTTP 403, prints a note, and returns an empty list. <code>main()</code> then calls <code>build_aggregate()</code>, which happily produces <code>{\"rating\": null, \"reviewCount\": 0, \"pendingReplies\": 0}</code> and writes it to <code>reviews_aggregate.json</code>. A branch whose data was <em>denied</em> is indistinguishable on disk from a branch with genuinely no reviews. The PRD names this exact edge case: <em>\"if a data source is down or delayed, I want to see when the dashboard was last successfully synced so that I don't mistake stale data for 'no news.'\"</em>",
+     e:"M", r:"P0-11", risk:"Dashboard shows \"0 reviews · all clear\" for a branch whose data never loaded — the failure mode the PRD explicitly asked to avoid", sev:"high"},
+
+    {id:"0.3", title:"Emit a fetch timestamp and per-source status from every connector",
+     body:"No connector output carries a timestamp. <code>fetch_owned_reviews.py:35</code> imports <code>from datetime import datetime, timezone</code> and <b>never uses either</b> — the unused import is the only trace of the intended feature. P0-11 requires a \"last synced\" indicator on every tab; today there is nothing for it to display.",
+     e:"S", r:"P0-11", risk:"The freshness indicator has no data source, so it either lies or is omitted — and stale data reads as current", sev:"high"},
+
+    {id:"0.4", title:"Fix or retract the \"matches the mockup exactly\" claim on <code>reviews_aggregate.json</code>",
+     body:"<code>backend/README.md</code> says it <em>\"Matches the Reviews tab table exactly\"</em>; <code>fetch_owned_reviews.py:1-10</code> says <em>\"shaped to match remedy-pulse-mockup.html directly.\"</em> Verified false in three ways: the Reviews table has a <b>Trend (30d)</b> column <code>build_aggregate()</code> never produces; <code>responseRate</code> is a fraction (<code>0.88</code>) where the table renders <code>88%</code>; and there is no <code>status</code> field behind the \"All clear\" / \"N pending replies\" tag.",
+     e:"S", r:"P0-6", risk:"Whoever wires the tab trusts the claim, and finds the mismatch at render time instead of at read time", sev:"medium"},
+
+    {id:"0.5", title:"Drop <code>google-auth-httplib2</code> or switch to the official client library",
+     body:"Declared in <code>requirements.txt:3</code>, imported nowhere — verified: the only repo-wide hit for <code>httplib2|googleapiclient|discovery</code> is the manifest line itself. Both scripts call REST endpoints with <code>requests</code> and a hand-built Bearer header. Worth noting why this matters beyond tidiness: it means quota handling, retries and backoff are all hand-rolled, which is 0.6.",
+     e:"S", r:"—", risk:"Dead weight, and it hides that no adapter uses Google's own client", sev:"low"},
+
+    {id:"0.6", title:"Add retry, backoff and rate-limit handling to every outbound call",
+     body:"There is none. <code>resp.raise_for_status()</code> on every request; <code>time.sleep(0.2)</code> between review pages is the entire strategy. A single 429 or transient 500 aborts the run — and because the previous JSON is still on disk, the dashboard keeps serving it with no indication anything failed.",
+     e:"M", r:"P0-11", risk:"One transient network blip silently serves yesterday's data as today's", sev:"high"},
+
+    {id:"0.7", title:"Implement the Reddit 48-hour deletion propagation the access request promises",
+     body:"<code>docs/Remedy Pulse_Reddit Data Access_Use Case.pdf</code> states: <em>\"content and author-identifying data are removed within 48 hours of deletion on Reddit.\"</em> There is <b>no code, no schema field, no scheduled job, and no mention of this obligation in the PRD or the roadmap.</b> This is a term stated in writing to a data provider in a commercial access request.",
+     e:"L·risky", r:"C-2", risk:"Breach of the terms the Reddit Data API access was granted under — the provider can revoke access, which removes a P0 source entirely", sev:"critical"},
+
+    {t:"warn", marker:"Heads-up", h:"Deletion propagation is a <em>pull</em> problem, not a push problem.",
+     p:["Reddit does not call you when a post is deleted. Complying means keeping the source IDs of everything you stored and re-checking them on a schedule, then deleting your copy when the source 404s or returns <code>[deleted]</code>. That is a recurring job with its own failure modes and its own quota cost — not a <code>DELETE</code> handler. Design it as ingestion-in-reverse.",
+         "The reason this is easy to get wrong: the sentence in the PDF reads like a policy, and policies feel like documentation. This one is a cron job."]},
+
+    {id:"0.8", title:"Reconcile the Reddit integration claim with the absence of any Reddit code",
+     body:"The same PDF commits to PRAW with OAuth and <em>\"a descriptive, versioned User-Agent string … per Reddit's required format.\"</em> There is no PRAW in <code>requirements.txt</code> and no Reddit code in the repo — yet the mockup renders a Reddit mention (<code>r/PhilippinesSkincare</code>) as though the source is live, and the demo guide lists Reddit among the tracked channels.",
+     e:"M", r:"C-1, C-3", risk:"A source everyone believes is nearly done does not exist; the estimate for Mentions is wrong by a whole adapter", sev:"high"},
+
+    {id:"0.9", title:"Identify the news/press ingestion path — the EMV tab has none",
+     body:"The Reddit PDF names <em>\"news via GNews\"</em> as a channel already in use. No GNews code, key, or config exists anywhere in the repo. Meanwhile the EMV tab (₱2.37M gross across 6 articles) is built <b>entirely</b> on press coverage, and the roadmap has no line item for news ingestion at all.",
+     e:"S to decide, M to build", r:"P0-1, P0-9", risk:"The tab carrying the largest numbers leadership will quote has no identified data source", sev:"high"},
+
+    {id:"0.10", title:"Define and document the Clarity Index formula",
+     body:"The composite health score (<code>remedy-pulse-mockup.html:417</code>) is the landing view's headline number and the one figure leadership is most likely to repeat. Its formula is documented <b>nowhere</b> — verified: zero hits for \"clarity\" across every Markdown file in the repo. The EMV tab deliberately shows its math on every row; the score above it shows none.",
+     e:"S to define, M to implement", r:"P0-7", risk:"The number leadership acts on cannot be audited, reproduced, or defended when someone disagrees with it", sev:"medium"},
+
+    {t:"concept", marker:"Understand first", h:"A composite score without a published formula gets argued with instead of acted on.",
+     p:["EMV and the Clarity Index are the same kind of object: a single number standing in for a pile of judgement calls. The EMV tab handles this correctly — click any row and the chain of multipliers is right there, so a disagreement becomes \"I think Prominence should be ×1.0, not ×1.5,\" which is a productive conversation.",
+         "With no published formula, the Clarity Index can only be disagreed with as a whole (\"that number feels wrong\"), which is not actionable and quietly erodes trust in the whole dashboard. Publishing the formula is not a documentation task; it is what makes the metric usable."]},
+
+    {id:"0.11", title:"Settle escaping before the data-driven refactor, not after",
+     body:"The mockup renders through <code>innerHTML</code> in 4 places, and builds an <code>onclick</code> attribute by string concatenation from mention content (<code>simulateIncomingMention()</code>, ~line 1500). Today the content is a static pool. That same code path is the one that will carry real Google review text, Reddit comments and Instagram captions.",
+     e:"M", r:"P0-1", risk:"Stored XSS via any review or comment body, in a tool whose entire purpose is displaying text strangers wrote", sev:"high"},
+
+    {id:"0.12", title:"Make the sync timestamp timezone-correct instead of labelling local time \"PHT\"",
+     body:"<code>simulateSync()</code> (~line 1690) formats <code>new Date().getHours()</code> from the <b>browser's</b> clock and unconditionally appends <code>PHT</code>. The hardcoded header value <code>Last synced 06:12 PHT</code> has the same problem. Viewed from any non-Manila machine, the freshness pill is wrong and confidently labelled.",
+     e:"S", r:"P0-11", risk:"The one control meant to answer \"am I looking at stale data?\" gives a wrong answer to anyone outside PHT", sev:"medium"},
+
+    {id:"0.13", title:"Fix the simulated-mention gate — it currently does the opposite of what P1-3 asks",
+     body:"The PRD asks for simulated injection <em>\"gated so it can't run against live data by accident.\"</em> The implemented gate is the Live/Paused toggle: <code>simulateIncomingMention()</code> <b>refuses when paused and allows when live</b> — precisely inverted. The \"+ Simulate mention\" chip sits in the main Mentions toolbar with no environment check of any kind.",
+     e:"S", r:"P1-3", risk:"Fabricated mentions injected into a production feed that leadership reads and quotes", sev:"medium"},
+
+    {id:"0.14", title:"Fix <code>sendReply()</code> marking a branch \"All clear\" after one reply of two",
+     body:"<code>sendReply()</code> (~line 1364) unconditionally sets the row tag to \"All clear\" and the response rate to <code>100%</code>. The Greenhills row shows <b>\"2 pending replies\"</b> — replying once clears both. The demo overstates completion in the exact dimension the product exists to track.",
+     e:"S", r:"P0-6", risk:"A branch reads \"all clear\" with a review still unanswered — the failure the whole tool is meant to prevent", sev:"medium"},
+
+    {id:"0.15", title:"Fix the EMV \"Filtered\" label sticking on after \"All time\" is selected",
+     body:"<code>recomputeEmvTotals()</code> tests <code>emvDateMode !== 'all'</code>, but choosing \"All time\" from the menu assigns the <b>string</b> <code>'All time'</code>, not <code>'all'</code>. After any interaction with the date chip, the totals read \"Filtered Gross ₱…\" permanently, even with nothing filtered.",
+     e:"S", r:"P0-9", risk:"An unfiltered total gets screenshotted into a deck labelled \"filtered\", or vice versa", sev:"low"},
+
+    {id:"0.16", title:"Derive feed timestamps from data instead of hardcoded strings",
+     body:"Feed items carry both a <code>data-date</code> attribute (which the filters use) and a hardcoded relative string (\"41 min ago\", \"3 hrs ago\") in the markup (which the reader uses). Two sources of truth for the same fact, and only one of them is real.",
+     e:"S", r:"P0-1", risk:"Timestamps visibly wrong the moment data is live; needs a real relative-time formatter anyway", sev:"low"},
+
+    {id:"0.17", title:"Stand up tests, linting and CI — there are none",
+     body:"Verified: no test files, no <code>.github/</code>, no <code>pyproject.toml</code>, no lint or type config anywhere in the repo. Start small — the normalize and aggregate functions in <code>fetch_owned_reviews.py</code> are pure and testable today, before any of the harder work lands.",
+     e:"M", r:"—", risk:"Every regression is found by a human clicking, on a two-person team with 27 days", sev:"medium"},
+
+    {id:"0.18", title:"Commit the PRD and roadmap to git",
+     body:"<code>git status</code> shows <code>remedy-pulse-prd.md</code> and <code>remedy-pulse-roadmap.md</code> as untracked. Every requirement ID in this checklist cites a document that has no version history.",
+     e:"S", r:"—", risk:"Requirements change with no diff, no date, and no record of who changed them", sev:"medium"},
+
+    {id:"0.19", title:"Close the three P0 acceptance criteria the \"validated\" mockup does not cover",
+     body:"Verified gaps against the PRD's own acceptance criteria: <b>(a)</b> Mentions has no sentiment filter — only keyword, platform and date, where P0-2 requires sentiment; <b>(b)</b> topic cards have <b>zero click handlers</b> — there is no drill-down to constituent mentions, and P0-8's acceptance criterion is exactly that drill-down; <b>(c)</b> the Competitors tab contains the word \"sentiment\" <b>zero times</b>, where P0-10 requires side-by-side share-of-voice <em>and</em> sentiment.<br><br>What makes this more than a to-do list: the PRD claims <em>\"an interactive HTML mockup covering all six v1 sections has already been built and validated with stakeholders,\"</em> and tells engineering to <em>\"build against an already-agreed-upon UI.\"</em> For these three, there is no agreed-upon UI to build against. Design them and re-validate before they enter a sprint.",
+     e:"S to design, M to build", r:"P0-2, P0-8, P0-10", risk:"Three P0 acceptance criteria fail at launch review, with a design round still to do and no time to do it", sev:"high"},
+
+    {id:"0.20", title:"Correct the demo guide's \"no internet connection required\" claim",
+     body:"<code>docs/README-Remedy-Pulse-Demo.md</code> says the mockup needs <em>\"no installation, no login, no internet connection.\"</em> It loads three font families from <code>fonts.googleapis.com</code>. Fallbacks are declared so it degrades rather than breaks, but a stakeholder opening it offline sees a different-looking product than the one that was signed off.",
+     e:"S", r:"—", risk:"Design sign-off happens against a rendering the reviewer may not have actually seen", sev:"low"}
+  ]
+},
+{
+  n:"Phase 1", slug:"p1", title:"Long-lead external access",
+  lede:"None of this is engineering effort; all of it is calendar time you do not control. That is exactly why it goes first. Every item here can be in flight while Phase 2 is being built.",
+  blocks:[
+    {id:"1.1", title:"Submit or chase the Google Business Profile API access request",
+     body:"<code>backend/README.md</code> correctly identifies this as <em>\"the one real blocker\"</em> and <em>\"the long pole here, not the code.\"</em> Confirm whether it has actually been submitted, and get a status.",
+     e:"L·risky", r:"P0-6", risk:"No owned-review data at all — the Reviews tab cannot exist, and Google Reviews is the roadmap's designated \"guaranteed early progress\" source", sev:"critical"},
+
+    {t:"warn", marker:"Heads-up", h:"Business Profile API access has no SLA and is commonly rejected on the first submission.",
+     p:["It is a human review of a written justification, not a checkbox, and rejections are frequently about the <em>description of intended use</em> rather than anything technical. Write the justification as carefully as the Reddit one in <code>docs/</code> was written — that document is a good template.",
+         "Also: the quota, once granted, is per-project QPM, not per-account, so testing and production share a budget unless you split projects. You would find the approval gate by reading the prereqs page; you would only find the QPM sharing by hitting it."]},
+
+    {id:"1.2", title:"Confirm the status and outcome of the Reddit commercial Data Access Request",
+     body:"The PDF in <code>docs/</code> is the submission. Whether it was sent, and whether it was granted, is not observable from this repo. The answer determines whether Phase 5's compliance work is urgent or hypothetical.",
+     e:"S to check, L·risky to wait", r:"C-1, P0-1", risk:"Building Reddit ingestion against terms you have not been granted", sev:"high"},
+
+    {id:"1.3", title:"Start Meta app review for Instagram and Facebook comment/mention access",
+     body:"Both platforms are in the mockup's feed and its source-breakdown pie — 37% of mention volume combined.",
+     e:"L·risky", r:"P0-1", risk:"The two largest social channels in the product's own charts have no ingestion path", sev:"high"},
+
+    {t:"warn", marker:"Heads-up", h:"Instagram <em>mentions</em> and Instagram <em>comments</em> are different permissions, and both need the account connected as a Business asset first.",
+     p:["Reading comments on your own posts, reading comments where you were tagged, and reading mentions in other people's captions are three distinct scopes with three distinct review outcomes. Budget for the possibility that one is approved and another is not, and know now which of the mockup's feed items depend on which.",
+         "This is findable in the docs, but only if you go looking for the plural — the permission list reads as one feature until you need it to be three."]},
+
+    {id:"1.4", title:"Lock the vendor/build path with a named owner and a dated deadline",
+     body:"The roadmap's top risk, still <code>Blocked</code>, with <em>\"No owner-assigned deadline exists yet.\"</em> It recommended locking by Aug 21. Today is Sep 3.",
+     e:"M·risky", r:"— (blocks P0-1, P0-8, P0-10)", risk:"Mentions, Topics and Competitors cannot be scoped, let alone built", sev:"critical"},
+
+    {id:"1.5", title:"Decide the news/press ingestion path",
+     body:"GNews, as the Reddit PDF asserts is already in use? A vendor feed, if the vendor decision lands there? A licensed aggregator? See 0.9.",
+     e:"M", r:"P0-1, P0-9", risk:"EMV has no input", sev:"high"},
+
+    {id:"1.6", title:"Set a fallback trigger date for each access request above",
+     body:"For each of 1.1, 1.2 and 1.3: the date past which you stop waiting and switch to the licensed-aggregator fallback <code>backend/README.md</code> already names. Decide the dates now, while nobody is under pressure.",
+     e:"S", r:"—", risk:"The team waits on an approval that is never coming, and discovers it in the last week", sev:"high"},
+
+    {t:"call", marker:"Your call", h:"How long do you wait on each approval before triggering the fallback?",
+     opts:[["Wait it out.","Free, first-party, full data fidelity. Costs you the launch date if it doesn't land, and you find out late."],
+           ["Set a hard trigger date.","Pick a date per source, write it down, and switch to the licensed aggregator when it passes. Costs money and some fidelity — aggregators typically give you less granular review metadata and no reply-write capability. Buys you a launch date you can actually commit to."],
+           ["Build both paths behind the adapter interface.","Real work, but it makes the decision reversible and turns a blocking dependency into a config switch."]],
+     lean:"Hard trigger dates, set today, one per source. With 27 days to target, the cost of guessing wrong on \"it'll come through\" is the entire launch, and the aggregator fallback is already identified in <code>backend/README.md</code> — it is a decision, not a discovery.",
+     change:"A Google or Reddit rep giving a concrete date, or a fallback quote that turns out to be prohibitively expensive — in which case the honest move is to move the launch date, not to hope."}
+  ]
+},
+{
+  n:"Phase 2", slug:"p2", title:"Foundations",
+  lede:"",
+  blocks:[
+    {id:"2.1", title:"Define the vendor-agnostic mention / review / article schema",
+     body:"The roadmap's one \"Now\" item that was never blocked on the vendor decision, assigned to Ceferino, and still not started. Every adapter and every tab depends on it.",
+     e:"M", r:"P0-1", risk:"Each adapter invents its own shape; the UI refactor has nothing stable to render", sev:"high"},
+
+    {id:"2.2", title:"Choose and stand up persistence",
+     body:"JSON files on disk cannot carry assignment state, resolution timestamps, or the metrics in Phase 3.",
+     e:"M", r:"—", risk:"No place to store the workflow state the core v1 metric is computed from", sev:"high"},
+
+    {t:"call", marker:"Your call", h:"Where does the data live?",
+     opts:[["Postgres.","Real concurrency, real migrations, JSONB for the source payloads you'll want to keep, and the deletion/retention queries in Phase 5 are trivial. Costs you a service to run and a migration discipline to maintain."],
+           ["SQLite.","Zero ops, a single file, genuinely adequate for one clinic group's mention volume. Costs you concurrent-write headaches the moment ingestion and the API run at once, and a painful migration later if this becomes multi-brand (a stated P2)."],
+           ["Whatever the vendor gives you.","If the vendor decision lands on Awario Enterprise or Brand24, some of this may be hosted. Costs you the ability to implement C-2 deletion propagation on their data, and the ability to join their data with your Google reviews."]],
+     lean:"Postgres. The deciding factor is not scale — it is that Phase 5's deletion job and Phase 3's metrics are both \"query across everything by timestamp and source ID,\" and that is where SQLite's single-writer model starts hurting exactly when you have real data in it.",
+     change:"If the vendor decision lands somewhere that hosts the mention store <em>and</em> contractually handles Reddit deletion propagation, the calculus changes completely — then the only thing you own is Google reviews, and SQLite is plenty."},
+
+    {id:"2.3", title:"Service skeleton with proper config and secrets handling",
+     body:"Today: module-level <code>load_dotenv()</code> and <code>raise SystemExit</code> in scripts. Fine for a script, not for a service.",
+     e:"M", r:"—", risk:"Credentials handling gets improvised under deadline pressure", sev:"medium"},
+
+    {id:"2.4", title:"Build the ingestion run ledger",
+     body:"Per source: <code>last_attempt_at</code>, <code>last_success_at</code>, <code>status</code>, <code>error</code>, <code>items_ingested</code>. This is the single source of truth for P0-11 and the fix for 0.2, 0.3 and 0.6 all at once.",
+     e:"M", r:"P0-11", risk:"No honest answer to \"is this data current?\" anywhere in the system", sev:"high"},
+
+    {t:"concept", marker:"Understand first", h:"Freshness is a property of the pipeline, not of the page.",
+     p:["The instinct is to timestamp the page render, which is what the mockup does. But \"last synced 06:12\" is only meaningful if it means <em>the Google adapter last completed successfully at 06:12</em>. Those are different facts, and the gap between them is where 0.2's silent 403 lives: a run that failed still produces a page render.",
+         "The ledger inverts the relationship — the page <em>reads</em> freshness from the pipeline instead of asserting it. Once you have a per-source ledger, \"Reddit is 3 days stale but Google is current\" becomes expressible, which is the thing the marketing team actually needs to know."]},
+
+    {id:"2.5", title:"Idempotent upsert keyed on (source, external_id)",
+     body:"Polling adapters re-fetch the same items constantly.",
+     e:"S", r:"P0-1", risk:"Duplicate mentions inflate volume counts, share of voice, and the Clarity Index", sev:"medium"},
+
+    {id:"2.6", title:"Migrations from the first schema commit",
+     body:"",
+     e:"S", r:"—", risk:"Schema and code drift with no way to reconcile them", sev:"medium"}
+  ]
+},
+{
+  n:"Phase 3", slug:"p3", title:"Instrumentation, before the features it measures",
+  lede:"This phase sits here deliberately. A metric added after launch has no baseline, which makes it worthless at exactly the moment it is needed — the 30-day review the PRD's success metrics are written around.",
+  blocks:[
+    {id:"3.1", title:"Event log: login, item_ingested, item_assigned, item_resolved, export_downloaded",
+     body:"The PRD's measurement method says these come <em>\"from application logs (login events, alert timestamps, resolution timestamps).\"</em> Those logs do not exist, and neither does the login they assume.",
+     e:"M", r:"— (enables all Success Metrics)", risk:"No evidence for or against the launch at the 30-day review", sev:"high"},
+
+    {id:"3.2", title:"Query for the core metric: median time from negative mention appearing to assigned",
+     body:"The PRD names this <em>\"the core success focus for v1\"</em> with a target under 4 business hours. It needs an ingested-at timestamp and an assigned-at timestamp on the same row, which means it constrains the Phase 2 schema.",
+     e:"S", r:"—", risk:"The one metric v1 is judged on cannot be computed", sev:"high"},
+
+    {id:"3.3", title:"Capture a pre-launch baseline for response time",
+     body:"Even a rough manual sample of \"how long did the last 20 negative reviews take to get a reply, before this tool existed.\"",
+     e:"S", r:"—", risk:"\"Response time improved\" is unprovable — there is nothing to compare against", sev:"medium"},
+
+    {id:"3.4", title:"Instrument export usage",
+     body:"Target: at least one CSV export per week. Cheap to add now, impossible to backfill.",
+     e:"S", r:"P0-3", risk:"A stated success metric goes unmeasured", sev:"low"}
+  ]
+},
+{
+  n:"Phase 4", slug:"p4", title:"Ingestion adapters",
+  lede:"",
+  blocks:[
+    {id:"4.1", title:"Harden the Google owned-reviews connector into a scheduled job",
+     body:"Depends on 0.2, 0.3, 0.6 and 1.1. The normalize and aggregate logic is sound and reusable; the runner around it is not.",
+     e:"M", r:"P0-6, P0-1", risk:"No review data", sev:"high"},
+
+    {id:"4.2", title:"Google Places competitor-ratings adapter",
+     body:"",
+     e:"S", r:"P0-10", risk:"No competitor benchmark", sev:"medium"},
+
+    {t:"warn", marker:"Heads-up", h:"The Places <code>reviews</code> field returns at most 5 reviews, chosen by an undocumented rule that changes between calls.",
+     p:["<code>fetch_competitor_ratings.py</code> documents the cap honestly in its module docstring, which is more than most code does. What the docstring does not say is the consequence: <b>any trend you compute from <code>sampleReviews</code> is noise.</b> The <code>rating</code> and <code>user_ratings_total</code> fields are stable and trendable; the sample is not.",
+         "Do not let a competitor sentiment trend get built on that sample — which is directly relevant to P0-10, where \"competitor sentiment\" is a stated requirement and this is the only competitor data source you have. That tension needs resolving before 8.8, not during it."]},
+
+    {id:"4.3", title:"Reddit adapter — PRAW, OAuth, versioned User-Agent, source IDs retained for 5.1",
+     body:"",
+     e:"L", r:"C-1, C-3, C-5, P0-1", risk:"A P0 source is absent while the demo implies it works", sev:"high"},
+
+    {id:"4.4", title:"Meta (Instagram + Facebook) adapter",
+     body:"",
+     e:"L·risky", r:"P0-1", risk:"37% of the product's own charted mention volume has no source", sev:"high"},
+
+    {id:"4.5", title:"News/press adapter, per the 1.5 decision",
+     body:"",
+     e:"M", r:"P0-1, P0-9", risk:"EMV has no input", sev:"high"},
+
+    {id:"4.6", title:"Scheduler with per-source cadence",
+     body:"The PRD scopes v1 at same-day / next-day freshness, not real-time — so this can be simple. Say so in the code, or someone will over-build it.",
+     e:"M", r:"P0-1", risk:"Ingestion runs when someone remembers to run it", sev:"high"},
+
+    {id:"4.7", title:"Surface per-source failures in the UI, not just in logs",
+     body:"The other half of 0.2. A failed source must be visible to the marketing team, not only to whoever reads stderr.",
+     e:"M", r:"P0-11", risk:"Silent partial outages presented as complete data", sev:"high"}
+  ]
+},
+{
+  n:"Phase 5", slug:"p5", title:"Compliance, privacy and security",
+  lede:"Hard constraint: nothing in this phase may be deferred past the first production ingestion run against real data. Not past launch — past the first real run. Once third-party content is in your store, 5.1 is already overdue and 5.3 has already happened.",
+  blocks:[
+    {id:"5.1", title:"Reddit deletion-propagation worker",
+     body:"Scheduled re-check of stored source IDs; delete local copies of content deleted upstream, within 48 hours. Implements 0.7.",
+     e:"L·risky", r:"C-2", risk:"Breach of granted API terms; revocation removes a P0 source", sev:"critical"},
+
+    {id:"5.2", title:"Versioned descriptive User-Agent on every Reddit request",
+     body:"Reddit's required format, and the PDF commits to it explicitly.",
+     e:"S", r:"C-3", risk:"Rate-limited or blocked, and in visible breach of a stated term", sev:"high"},
+
+    {id:"5.3", title:"Extend PII minimization to every source",
+     body:"<code>mask_reviewer_name()</code> in <code>fetch_owned_reviews.py:113</code> masks Google reviewer names to first-name-plus-initial, citing the PH Data Privacy Act. Nothing equivalent exists for Reddit usernames, Instagram handles or Facebook commenters — and the mockup displays <code>@glowwithsab</code> and <code>u/skinseeker_mnl</code> in full.",
+     e:"M", r:"C-2, —", risk:"One source is privacy-minimized and four are not, under a law the code already cites", sev:"high"},
+
+    {id:"5.4", title:"PH Data Privacy Act review: retention period, data-subject requests, lawful basis",
+     body:"<code>mask_reviewer_name()</code> cites <em>\"spec §11.\"</em> That spec (<code>RemedyPulseSpec_1</code>, referenced in the mockup footer and in §§5.5, 6.3, 6.4, 9.2, 10, 18) <b>is not in this repo.</b> Get it into <code>docs/</code> — several code comments are traceable only to a document nobody working from this repo can read.",
+     e:"M·risky", r:"—", risk:"Legal exposure, and code decisions justified by a document that cannot be checked", sev:"critical"},
+
+    {id:"5.5", title:"Add authentication to the dashboard",
+     body:"There is none, and the PRD never mentions it. The success metrics assume login events exist to count (3.1).",
+     e:"M", r:"—", risk:"Competitor intelligence, unpublished press valuations and patient review content readable by anyone with the URL", sev:"critical"},
+
+    {id:"5.6", title:"Secrets at rest — <code>token.json</code> is a live refresh token",
+     body:"<code>oauth_setup.py:54</code> says so explicitly: <em>\"Keep this file out of version control — it's a live credential.\"</em> <code>.gitignore</code> covers it correctly today. Decide where it lives in production, because a file next to the code is not it.",
+     e:"M", r:"—", risk:"A long-lived Google credential with <code>business.manage</code> scope on a shared box", sev:"high"},
+
+    {id:"5.7", title:"Dependency audit in CI",
+     body:"<code>pip-audit</code> on the Python side; whatever the frontend build ends up being on the other.",
+     e:"S", r:"—", risk:"Known CVEs ship unnoticed", sev:"medium"},
+
+    {id:"5.8", title:"Write down the C-4 control: no resale, redistribution, or model training on Reddit data",
+     body:"The PDF commits to it. It needs to be a documented control someone can point at, not an intention — particularly relevant if any part of the AI weekly summary (P1-1) is ever fed raw mention text.",
+     e:"S", r:"C-4", risk:"An accidental breach through a feature nobody connected to the commitment", sev:"high"}
+  ]
+},
+{
+  n:"Phase 6", slug:"p6", title:"Sentiment classification and alert routing",
+  lede:"",
+  blocks:[
+    {id:"6.1", title:"Sentiment classifier, with the precision/recall bar decided first",
+     body:"The PRD's open question: <em>\"what precision/recall bar is acceptable before it's trusted to drive the alert workflow unsupervised?\"</em> Answer it before building, not after.",
+     e:"L·risky", r:"P0-4", risk:"Either the alert list is noise nobody reads, or it silently misses negatives — both destroy the core v1 metric", sev:"high"},
+
+    {t:"call", marker:"Your call", h:"How is sentiment classified?",
+     opts:[["Hosted LLM per item.","Best quality on Taglish, code-switching and the sarcasm that wrecks lexicon models — which matters a lot for PH social content. Costs per-item money and adds a latency and availability dependency to ingestion."],
+           ["Off-the-shelf multilingual model, self-hosted.","Free per item, predictable, offline-capable. Noticeably worse on mixed Tagalog/English, and on star-rating-free text like Reddit comments."],
+           ["Whatever the vendor provides.","Free if the vendor decision lands on Awario or Brand24, and one less thing to build. You inherit their definition of \"negative\" with no ability to tune it against your precision/recall bar — which is the exact thing the PRD says must be tuned."]],
+     lean:"Hosted LLM, batched, with the raw text and the label both stored so you can re-score later. The volume here is one clinic group — a few hundred items a week per the mockup's own numbers — so per-item cost is genuinely small, and Taglish handling is where the accuracy actually lives.",
+     change:"If the vendor decision lands somewhere with tunable sentiment <em>and</em> an exportable confidence score, take it — inheriting a tunable classifier beats building one."},
+
+    {id:"6.2", title:"Reconcile the two conflicting definitions of <code>sentiment</code>",
+     body:"<code>normalize_reviews()</code> derives it purely from stars (≥4 Positive, ≤2 Negative). The mockup's feed items carry a text-derived sentiment. Same field name, two incompatible meanings, and they will be mixed in one feed.",
+     e:"M", r:"P0-1, P0-2", risk:"A single feed where \"Negative\" means two different things, sorted and filtered as if it means one", sev:"medium"},
+
+    {id:"6.3", title:"Implement the Crisis Alert vs Daily Digest routing rules",
+     body:"The rules are already written and stakeholder-visible in the mockup's classification modal (<code>openAlertRulesModal()</code>, citing spec §9.2) — five crisis conditions, five digest conditions. This is a spec that already exists; implement it rather than reinventing it.",
+     e:"L", r:"P0-4", risk:"Every item routes the same way and the crisis path means nothing", sev:"high"},
+
+    {id:"6.4", title:"Assignment roster with an owner",
+     body:"PRD open question. The mockup hardcodes Gian, Paul, Boom and Mixi in <code>handleAssign()</code>.",
+     e:"S", r:"P0-4", risk:"Items get assigned to people who have left, or cannot be assigned at all", sev:"medium"},
+
+    {id:"6.5", title:"Topic clustering",
+     body:"The mockup shows five themes with per-topic sentiment splits.",
+     e:"L·risky", r:"P0-8", risk:"Topics tab has no content", sev:"medium"}
+  ]
+},
+{
+  n:"Phase 7", slug:"p7", title:"API and the data-driven UI refactor",
+  lede:"",
+  blocks:[
+    {id:"7.1", title:"Read API per tab",
+     body:"",
+     e:"L", r:"P0-1 … P0-11", risk:"No path from store to screen", sev:"high"},
+
+    {id:"7.2", title:"Refactor the mockup from hardcoded markup to render-from-data",
+     body:"This is the <em>\"Piece 2\"</em> refactor <code>fetch_owned_reviews.py:1-15</code> explicitly defers — <em>\"this script doesn't do that refactor itself, it just produces the input for it.\"</em> Six feed items, six EMV rows, four alerts, four review rows and five topic cards are all hand-written markup today.",
+     e:"L", r:"all P0", risk:"The validated UI cannot show real data", sev:"high"},
+
+    {t:"call", marker:"Your call", h:"Refactor the mockup in place, or rebuild the UI in a framework?",
+     opts:[["Refactor in place.","Keeps the exact design stakeholders already validated, keeps the zero-build-step simplicity, and every hour goes into behaviour rather than setup. Costs you: 774 lines of vanilla JS with global functions wired through inline onclick attributes, which gets unpleasant as state grows — and it already has real state (filters, assignment, resolution, reply status)."],
+           ["Rebuild in a framework.","Proper state management, component reuse, and an ecosystem for the table and chart work. Costs you a build pipeline, a re-validation risk on pixel differences, and days you may not have."]],
+     lean:"Refactor in place, but extract the six tabs' data into one module and render from it — the halfway point that fixes the actual problem (markup is the data) without buying a toolchain. With 27 days to target, a framework migration competes directly with the P0 acceptance criteria in Phase 8.",
+     change:"If the P2 multi-brand plan gets pulled forward, or if more than one person will be in this UI simultaneously, the framework's structure starts paying for itself and the in-place refactor becomes a second migration you'll pay for twice."},
+
+    {id:"7.3", title:"Escape all rendered content",
+     body:"<code>textContent</code> over <code>innerHTML</code>; no HTML built from mention text by concatenation; no <code>onclick</code> attributes carrying data. Implements 0.11.",
+     e:"M", r:"P0-1", risk:"Stored XSS", sev:"high"},
+
+    {id:"7.4", title:"Write API: assign, resolve, send reply — with timestamps for Phase 3",
+     body:"",
+     e:"M", r:"P0-4, P0-5, P0-6", risk:"Actions still reset on refresh, exactly as the demo guide says they do today", sev:"high"},
+
+    {id:"7.5", title:"Real relative-time rendering and a PHT-correct sync pill",
+     body:"Implements 0.12 and 0.16.",
+     e:"S", r:"P0-1, P0-11", risk:"Freshness and recency both misreported", sev:"medium"},
+
+    {id:"7.6", title:"Empty states and error states on every tab",
+     body:"Both are named PRD edge cases: <em>\"if there are zero new mentions in a period, I want a clear empty state rather than an ambiguous blank screen.\"</em> Only the alerts panel and the EMV table have one today.",
+     e:"M", r:"P0-1, P0-11", risk:"Blank screen reads as breakage; a failed source reads as quiet", sev:"medium"},
+
+    {id:"7.7", title:"Gate or remove every demo affordance before it faces real data",
+     body:"The \"Demo\" badge, \"+ Simulate mention\" (see 0.13), <code>simulateSync()</code> and the three canned AI summaries. Each needs an environment gate or removal — decided deliberately, not discovered at launch.",
+     e:"S", r:"P1-3", risk:"Simulated data indistinguishable from real data in a tool whose only job is being trusted", sev:"high"}
+  ]
+},
+{
+  n:"Phase 8", slug:"p8", title:"The six tabs against real data",
+  lede:"Each item closes a specific PRD acceptance criterion. This is the phase where \"it works\" becomes checkable rather than arguable.",
+  blocks:[
+    {id:"8.1", title:"Overview: Clarity Index, volume trend, attention summary, default landing",
+     body:"Implements 0.10.",
+     e:"L", r:"P0-7", risk:"No landing view", sev:"high"},
+
+    {id:"8.2", title:"Mentions: add the sentiment filter",
+     body:"From 0.19a.",
+     e:"S", r:"P0-2", risk:"A stated P0 acceptance criterion fails", sev:"medium"},
+
+    {id:"8.3", title:"CSV export from the server-side filtered set",
+     body:"P0-3's acceptance criterion is <em>\"exactly the filtered rows.\"</em> Today's client-side <code>style.display !== 'none'</code> check works only while every row is in the DOM — which stops being true the moment the feed is paginated.",
+     e:"M", r:"P0-3", risk:"Exports silently contain only the current page", sev:"medium"},
+
+    {id:"8.4", title:"Alerts and assignment, end to end, with real timestamps",
+     body:"",
+     e:"M", r:"P0-4, P0-5", risk:"The core v1 workflow, and the core v1 metric, do not exist", sev:"high"},
+
+    {id:"8.5", title:"Reviews: per-branch table, trend column and the reply flow",
+     body:"Implements 0.4 and 0.14.",
+     e:"L", r:"P0-6", risk:"Reviews tab cannot be populated", sev:"high"},
+
+    {t:"warn", marker:"Heads-up", h:"Replying to a Google review is a different API surface from reading one — \"pending reply\" is easy to read and hard to write.",
+     p:["The reply endpoint (<code>accounts/*/locations/*/reviews/*/reply</code>) sits behind the same gated Business Profile access as review reads, and posting a reply is an irreversible public action taken in the clinic's name.",
+         "Decide explicitly whether \"Send reply\" posts to Google or deep-links the user out to Business Profile to post it themselves. The mockup implies the former; the second is dramatically cheaper and lower-risk for v1, and the PRD's Non-Goals already establish the principle — <em>\"the tool surfaces and routes items for a human to act on.\"</em> Worth recording in <code>docs/decisions/</code> either way."]},
+
+    {id:"8.6", title:"Topics: drill-down to constituent mentions",
+     body:"P0-8's acceptance criterion is exactly this drill-down. Topic cards have no click handlers today. From 0.19b.",
+     e:"M", r:"P0-8", risk:"A P0 acceptance criterion fails; a volume spike cannot be traced to its cause, which is the tab's whole purpose", sev:"medium"},
+
+    {id:"8.7", title:"EMV engine, gated on formula sign-off",
+     body:"The roadmap is right that this should slip rather than ship unapproved. Two specifics from the mockup to resolve: the PeopleAsia row's detail text flags that it <em>\"replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base\"</em> and asks someone to confirm — an open question sitting inside the UI. And Net Favorable (₱2,809,000) exceeds Gross (₱2,366,000) because the positive multiplier is ×1.2; confirm that is intended before leadership asks.",
+     e:"L", r:"P0-9", risk:"Peso figures in a leadership deck that finance has not approved", sev:"high"},
+
+    {id:"8.8", title:"Competitors: share of voice and sentiment, plus alias matching",
+     body:"Includes the keyword-variant matching P0-10 requires — the mockup encodes brand aliases as HTML <code>title</code> tooltips (\"Also matches: Remedy Skin Solutions, Remedy Skin, Remedy BGC…\") and the Category Watch cards all read <em>\"Boolean query pending.\"</em> Those tooltips <em>are</em> the requirement, stored in the only place they could be at mockup stage. Move them into config. See the 4.2 heads-up before deciding where competitor sentiment comes from.",
+     e:"L·risky", r:"P0-10", risk:"The most vendor-dependent P0, and the roadmap's nominated first cut", sev:"medium"},
+
+    {id:"8.9", title:"\"Last synced\" on every tab, read from the 2.4 run ledger",
+     body:"",
+     e:"S", r:"P0-11", risk:"Stale data indistinguishable from current", sev:"high"}
+  ]
+},
+{
+  n:"Phase 9", slug:"p9", title:"QA, launch and cutover",
+  lede:"",
+  blocks:[
+    {id:"9.1", title:"One acceptance test per PRD acceptance criterion",
+     body:"The PRD writes them in Given/When/Then already — eleven P0 criteria, ready to transcribe.",
+     e:"L", r:"all P0", risk:"\"Done\" is a matter of opinion at the sign-off meeting", sev:"high"},
+
+    {id:"9.2", title:"Decide and implement the backfill window",
+     body:"PRD Non-Goals cap it at 90 days and start tracking from launch forward. Confirm that still holds — a dashboard that is empty on day one is a bad first impression for the leadership audience.",
+     e:"M", r:"—", risk:"Launch day shows an empty product", sev:"medium"},
+
+    {id:"9.3", title:"Stakeholder demo and sign-off against the real thing",
+     body:"",
+     e:"M", r:"—", risk:"Gaps found after the old tool is already switched off", sev:"high"},
+
+    {id:"9.4", title:"Runbook: what to do when a source fails",
+     body:"Who notices, how, and what they do. Directly serves the PRD's stale-data edge case.",
+     e:"M", r:"P0-11", risk:"A silent outage runs for days on a two-person team", sev:"high"},
+
+    {id:"9.5", title:"Backups with a documented, executed restore",
+     body:"A backup with no tested restore is a hope, not a backup.",
+     e:"M", r:"—", risk:"Unrecoverable loss of assignment and resolution history — the only record of the metric v1 is judged on", sev:"critical"},
+
+    {id:"9.6", title:"Run Remedy Pulse in parallel with Media Meter/MediaWatch for 30 days",
+     body:"The PRD's own success metric gates decommissioning on 30 days of stable use.",
+     e:"M", r:"—", risk:"Old tool switched off before the new one is trusted, with no fallback", sev:"high"},
+
+    {id:"9.7", title:"Formal MediaWatch decommission decision",
+     body:"",
+     e:"S", r:"—", risk:"Paying for both indefinitely; the stated goal never lands", sev:"medium"}
+  ]
+}
+];
+
+/* ---------- stable key from item text, not index ---------- */
+function hashKey(str){
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+  return 'rp-' + h.toString(36);
+}
+function store(){
+  try { return JSON.parse(localStorage.getItem('remedy-pulse-checklist') || '{}'); }
+  catch(e){ return {}; }
+}
+function save(state){
+  try { localStorage.setItem('remedy-pulse-checklist', JSON.stringify(state)); }
+  catch(e){ /* private mode, blocked storage — ticks just don't persist */ }
+}
+
+const state = store();
+const phasesRoot = document.getElementById('phases');
+
+function esc(s){ return s; } // content is authored here, not user input
+
+function renderNote(b){
+  const cls = b.t === 'call' ? 'note call' : b.t === 'concept' ? 'note concept' : 'note';
+  let inner = '<span class="marker">' + b.marker + '</span><h4>' + b.h + '</h4>';
+  if (b.p) inner += b.p.map(x => '<p>' + x + '</p>').join('');
+  if (b.opts){
+    inner += b.opts.map(o => '<p class="opt"><b>' + o[0] + '</b> ' + o[1] + '</p>').join('');
+    inner += '<p class="lean"><b>The lean:</b> ' + b.lean + '</p>';
+    inner += '<p><b>What would change my mind:</b> ' + b.change + '</p>';
+  }
+  return '<div class="' + cls + '">' + inner + '</div>';
+}
+
+function renderItem(b){
+  const key = hashKey(b.id + '|' + b.title);
+  const on = !!state[key];
+  const sevWord = b.sev.toUpperCase();
+  return '<div class="item' + (on ? ' checked' : '') + '" data-key="' + key + '">' +
+    '<input type="checkbox" id="' + key + '"' + (on ? ' checked' : '') +
+      ' aria-label="' + b.id + '">' +
+    '<div>' +
+      '<div class="head"><span class="iid">' + b.id + '</span>' +
+        '<label class="ititle" for="' + key + '">' + b.title + '</label></div>' +
+      (b.body ? '<p class="body">' + b.body + '</p>' : '') +
+      '<div class="metaline">' +
+        '<span class="m"><span class="lbl">Effort</span><span class="val">' + b.e + '</span></span>' +
+        '<span class="m"><span class="lbl">Req</span><span class="val">' + b.r + '</span></span>' +
+        '<span class="m risk"><span class="sev sev-' + b.sev + '"><i></i>' + sevWord + '</span>' +
+          '<span class="val">' + b.risk + '</span></span>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+let html = '';
+PHASES.forEach(ph => {
+  html += '<section id="' + ph.slug + '">' +
+    '<div class="sec-head">' +
+      '<div class="phase-num">' + ph.n + '<span class="phase-progress" id="pp-' + ph.slug + '"></span></div>' +
+      '<h2>' + ph.title + '</h2>' +
+      (ph.lede ? '<p class="lede">' + ph.lede + '</p>' : '') +
+    '</div><div class="items">';
+  ph.blocks.forEach(b => { html += b.t ? renderNote(b) : renderItem(b); });
+  html += '</div></section>';
+});
+phasesRoot.innerHTML = html;
+
+/* ---------- contents rail ---------- */
+const STATIC_LINKS = [
+  ['how','How to read this'], ['timeline','Timeline reality check'],
+  ['state','Current state'], ['coverage','Requirement coverage']
+];
+const TAIL_LINKS = [['sequencing','Sequencing'], ['decisions','Decisions to record']];
+
+function buildRail(el){
+  let r = '';
+  STATIC_LINKS.forEach(l => { r += '<li><a href="#' + l[0] + '" data-t="' + l[0] + '">' + l[1] + '</a></li>'; });
+  r += '<li class="sep"></li>';
+  PHASES.forEach(ph => {
+    r += '<li><a href="#' + ph.slug + '" data-t="' + ph.slug + '" id="rl-' + el + '-' + ph.slug + '">' +
+      '<span>' + ph.n.replace('Phase ','P') + ' · ' + ph.title + '</span>' +
+      '<span class="tally" data-tally="' + ph.slug + '"></span></a></li>';
+  });
+  r += '<li class="sep"></li>';
+  TAIL_LINKS.forEach(l => { r += '<li><a href="#' + l[0] + '" data-t="' + l[0] + '">' + l[1] + '</a></li>'; });
+  return r;
+}
+document.getElementById('railList').innerHTML = buildRail('d');
+document.getElementById('railMobile').innerHTML =
+  '<div class="rail-title">Contents</div><ol>' + buildRail('m') + '</ol>';
+
+/* ---------- progress ---------- */
+function updateProgress(){
+  let total = 0, done = 0;
+  PHASES.forEach(ph => {
+    let pt = 0, pd = 0;
+    ph.blocks.forEach(b => {
+      if (b.t) return;
+      pt++;
+      if (state[hashKey(b.id + '|' + b.title)]) pd++;
+    });
+    total += pt; done += pd;
+    const label = pd + '/' + pt;
+    const head = document.getElementById('pp-' + ph.slug);
+    if (head) head.textContent = '· ' + label + ' done';
+    document.querySelectorAll('[data-tally="' + ph.slug + '"]').forEach(t => {
+      t.textContent = label;
+      t.closest('a').classList.toggle('done', pd === pt && pt > 0);
+    });
+  });
+  document.getElementById('overallCount').textContent = done + ' / ' + total;
+  document.getElementById('overallBar').style.transform = 'scaleX(' + (total ? done / total : 0) + ')';
+}
+
+phasesRoot.addEventListener('change', e => {
+  const cb = e.target;
+  if (cb.type !== 'checkbox') return;
+  const row = cb.closest('.item');
+  const key = row.dataset.key;
+  if (cb.checked) state[key] = 1; else delete state[key];
+  row.classList.toggle('checked', cb.checked);
+  save(state);
+  updateProgress();
+});
+
+updateProgress();
+
+/* ---------- active-section tracking ---------- */
+const sections = [...document.querySelectorAll('section[id]')];
+const railLinks = [...document.querySelectorAll('.rail a')];
+function setActive(id){
+  railLinks.forEach(a => a.classList.toggle('on', a.dataset.t === id));
+}
+// The active section is the last one whose top has crossed the reading line.
+function syncActive(){
+  let cur = sections[0].id;
+  sections.forEach(s => { if (s.getBoundingClientRect().top <= 140) cur = s.id; });
+  setActive(cur);
+}
+if ('IntersectionObserver' in window){
+  const io = new IntersectionObserver(syncActive, { rootMargin: '-100px 0px -70% 0px', threshold: [0, 1] });
+  sections.forEach(s => io.observe(s));
+} else {
+  window.addEventListener('scroll', syncActive, { passive: true });
+}
+syncActive();
+</script>

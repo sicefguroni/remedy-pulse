@@ -1,5 +1,4 @@
-"""
-fetch_competitor_ratings.py — Pulls public rating benchmarks for tracked
+"""fetch_competitor_ratings.py — Pulls public rating benchmarks for tracked
 competitors via the Places API "Place Details" endpoint. No OAuth needed,
 just an API key — but note the real limitation below before treating this
 as equivalent to the owned-listing data.
@@ -11,18 +10,32 @@ chosen). This is fine for "how does Remedy's rating compare to Belo's
 rating" but not for building a full competitor review feed the way we can
 for Remedy's own listings.
 
+Output: competitor_ratings.json ->
+  {"fetchedAt": <ISO-8601 UTC>, "competitors": [...]}
+one row per competitor, each carrying a `status`:
+  "ok"        - Place Details returned data for this competitor.
+  "not_found" - the API responded but with a non-"OK" status for this
+                place_id (e.g. a bad/stale place_id).
+  "error"     - the request failed even after retries (see
+                http_utils.get_with_retry) — rating/counts are null,
+                distinct from a competitor that genuinely has none.
+Competitors still marked with a REPLACE_ME placeholder place_id in
+config.py are skipped entirely (not written as a row) since there is no
+ID to query yet.
+
 Usage:
     python fetch_competitor_ratings.py
 """
 
-import os
 import json
+import os
 import time
+from datetime import datetime, timezone
 
-import requests
 from dotenv import load_dotenv
 
 from config import COMPETITOR_PLACE_IDS
+from http_utils import RetryExhaustedError, get_with_retry
 
 load_dotenv()
 
@@ -38,7 +51,7 @@ def fetch_place_details(place_id):
         "fields": FIELDS,
         "key": API_KEY,
     }
-    resp = requests.get(PLACE_DETAILS_URL, params=params)
+    resp = get_with_retry(PLACE_DETAILS_URL, params=params)
     resp.raise_for_status()
     data = resp.json()
     if data.get("status") != "OK":
@@ -47,13 +60,15 @@ def fetch_place_details(place_id):
     return data.get("result")
 
 
-def normalize(competitor_name, result):
+def normalize(competitor_name, result, status="ok"):
     if not result:
         return {
             "competitor": competitor_name,
             "rating": None,
             "userRatingsTotal": 0,
             "sampleReviewCount": 0,
+            "sampleReviews": [],
+            "status": status,
         }
     reviews = result.get("reviews", [])
     return {
@@ -71,6 +86,7 @@ def normalize(competitor_name, result):
             }
             for r in reviews
         ],
+        "status": status,
     }
 
 
@@ -96,12 +112,20 @@ def main():
         if place_id.startswith("REPLACE_ME"):
             continue
         print(f"Fetching {name}...")
-        details = fetch_place_details(place_id)
-        results.append(normalize(name, details))
+        try:
+            details = fetch_place_details(place_id)
+        except RetryExhaustedError as exc:
+            print(f"ERROR: request failed (retries exhausted) fetching {name}: {exc}")
+            results.append(normalize(name, None, status="error"))
+            continue
+        status = "ok" if details else "not_found"
+        results.append(normalize(name, details, status=status))
         time.sleep(0.2)
 
+    fetched_at = datetime.now(timezone.utc).isoformat()
+
     with open("competitor_ratings.json", "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump({"fetchedAt": fetched_at, "competitors": results}, f, indent=2)
 
     print(f"\nWrote {len(results)} competitors to competitor_ratings.json")
 

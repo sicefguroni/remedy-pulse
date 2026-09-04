@@ -1,8 +1,10 @@
 # Google Reviews Connector — Setup Guide
 
 Pulls real review data for Remedy's own listings, plus public rating
-benchmarks for competitors, and writes it out as JSON shaped to match
-`remedy-pulse-mockup.html`'s data model directly.
+benchmarks for competitors, and writes it out as JSON that is the *input*
+for `remedy-pulse-mockup.html`'s Reviews tab table — not a byte-for-byte
+match of it. See "What you get" below for exactly what is and isn't
+covered.
 
 ## Before you start: the one real blocker
 
@@ -51,16 +53,52 @@ ratings via Places API) works without waiting on Google's approval.
 
 ## What you get
 
-- **`reviews_aggregate.json`** — one row per branch (rating, review count,
-  response rate, pending replies). Matches the Reviews tab table exactly.
-- **`reviews_raw.json`** — one row per individual review, with reviewer
-  names already masked to first-name-plus-initial per the PH Data Privacy
-  Act note in §11 of the spec. This is the input for the Mentions tab
-  once the mockup is refactored to render from data instead of hardcoded
-  markup — that refactor is separate work, not part of this script.
-- **`competitor_ratings.json`** — rating + review count per competitor,
-  plus a small capped sample of their reviews (Google doesn't give more
-  than that for listings you don't own).
+Every file below now starts with a top-level `"fetchedAt"` (ISO-8601 UTC
+timestamp) — this is the data the P0-11 "last synced" indicator needs;
+there was nothing for the UI to display before.
+
+- **`reviews_aggregate.json`** — `{"fetchedAt": ..., "listings": [...]}`,
+  one row per branch (rating, review count, response rate, pending
+  replies). **Not** an exact match of the Reviews tab table — three
+  differences to know before wiring a consumer to it:
+  - `responseRate` is a **fraction** (`0.88`), not a percentage — the
+    table renders `88%`, so the consumer must format it.
+  - There is **no `Trend (30d)` field**. Computing a real 30-day trend
+    needs historical snapshots this script doesn't keep (it only ever
+    sees the current live state); faking one from a single snapshot
+    would be worse than omitting it.
+  - Each row carries a `status`: `"ok"`, `"no_reviews"` (fetched fine,
+    genuinely zero reviews), `"access_denied"` (the reviews endpoint
+    returned 403 for this listing — rating/counts are all `null`, never
+    `0`, so it can't be mistaken for a real zero-review branch), or
+    `"error"` (request failed even after retries). Map `"ok"` with
+    `pendingReplies == 0` to the "All clear" tag, `"ok"` with
+    `pendingReplies > 0` to "N pending replies", and both
+    `"access_denied"` and `"error"` to a distinct "sync failed" state —
+    never to "All clear".
+- **`reviews_raw.json`** — `{"fetchedAt": ..., "reviews": [...]}`, one row
+  per individual review, with reviewer names already masked to
+  first-name-plus-initial per the PH Data Privacy Act note in §11 of the
+  spec. This is the input for the Mentions tab once the mockup is
+  refactored to render from data instead of hardcoded markup — that
+  refactor is separate work, not part of this script.
+- **`competitor_ratings.json`** — `{"fetchedAt": ..., "competitors": [...]}`,
+  rating + review count per competitor, plus a small capped sample of
+  their reviews (Google doesn't give more than that for listings you
+  don't own). Each row carries a `status`: `"ok"`, `"not_found"` (API
+  responded but not with a usable result for that place_id), or
+  `"error"` (request failed even after retries).
+
+## Retry behavior
+
+Every outbound `GET` in `fetch_owned_reviews.py` and
+`fetch_competitor_ratings.py` goes through `http_utils.get_with_retry`,
+which retries transient failures (429, 500, 502, 503, 504) with
+exponential backoff and jitter — honoring a `Retry-After` header on 429
+when the server sends one. A run that exhausts its retries raises clearly
+(`RetryExhaustedError`) instead of silently writing partial or stale-look
+data; the per-listing/per-competitor `status` field records it as
+`"error"` rather than pretending the fetch succeeded.
 
 ## Known limitations, honestly
 
