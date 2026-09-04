@@ -36,6 +36,20 @@ Design notes — read before adding a field:
   a float score — Phase 6 (sentiment classification) is a separate,
   not-yet-scoped piece of work; this schema doesn't pre-empt whatever
   that phase decides by inventing a scoring scale now.
+- `Mention.assigned_at`/`assigned_to`/`resolved_at` (3.2) put an
+  ingested-at timestamp and an assigned-at timestamp on the same row, so
+  the core PRD metric — median time from a negative mention appearing to
+  being assigned, target under 4 business hours — is computable with a
+  single-row query (`assigned_at - ingested_at`), not a cross-table join.
+- `Event` (3.1) is a separate append-only log, not a set of extra
+  timestamp columns bolted onto `Mention`, because most event types
+  (`login`, `export_downloaded`) aren't about a mention at all, and even
+  the ones that are (`item_assigned`, `item_resolved`) want a full audit
+  trail (every reassignment), not just the latest value — which is
+  exactly what `Mention`'s own columns above are for instead.
+- `ResponseTimeBaseline` (3.3) is schema-only: a place for a one-time
+  manual pre-launch measurement to live, not a computed metric. See its
+  own docstring.
 """
 
 from __future__ import annotations
@@ -47,6 +61,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     Index,
     Integer,
     String,
@@ -81,6 +96,18 @@ class RunStatus(str, enum.Enum):
     ERROR = "error"
 
 
+class EventType(str, enum.Enum):
+    """The five event types the PRD's measurement method names explicitly
+    ("from application logs (login events, alert timestamps, resolution
+    timestamps)"). Matches the PRD's own wording exactly, not a paraphrase."""
+
+    LOGIN = "login"
+    ITEM_INGESTED = "item_ingested"
+    ITEM_ASSIGNED = "item_assigned"
+    ITEM_RESOLVED = "item_resolved"
+    EXPORT_DOWNLOADED = "export_downloaded"
+
+
 class Mention(Base):
     """One row per external item: a review, a social/forum mention, or a
     press article. See the module docstring for why these three share a
@@ -91,6 +118,10 @@ class Mention(Base):
         UniqueConstraint("source", "external_id", name="uq_mentions_source_external_id"),
         Index("ix_mentions_source_published_at", "source", "published_at"),
         Index("ix_mentions_kind", "kind"),
+        # Supports 3.2's core metric query — median time from a negative
+        # mention appearing to being assigned — filtering on sentiment and
+        # ordering/filtering on assigned_at together.
+        Index("ix_mentions_sentiment_assigned_at", "sentiment", "assigned_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -149,6 +180,22 @@ class Mention(Base):
     # sets it.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # --- assignment & resolution (3.2) ---
+    # An ingested-at timestamp (above) and an assigned-at timestamp on the
+    # same row are what make the core PRD metric — median time from a
+    # negative mention appearing to being assigned, target under 4
+    # business hours — computable with a single-row query, not a
+    # cross-table join. See repository.assign_mention()/
+    # get_median_time_to_assignment() for the semantics (first-assignment-
+    # wins on assigned_at; assigned_to always updates on reassignment).
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Free text, not an enum: matches the mockup's "Assign to…" dropdown
+    # values (Gian/Paul/Boom/Mixi) today, but that roster isn't this
+    # schema's business to hardcode — see 6.4 (assignment roster with an
+    # owner).
+    assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"Mention(id={self.id!r}, source={self.source!r}, kind={self.kind!r}, external_id={self.external_id!r})"
 
@@ -188,3 +235,92 @@ class IngestionRun(Base):
 
     def __repr__(self) -> str:  # pragma: no cover - debug convenience only
         return f"IngestionRun(id={self.id!r}, source={self.source!r}, status={self.status!r})"
+
+
+class Event(Base):
+    """The application event log (3.1). The PRD's measurement method says
+    its success metrics come "from application logs (login events, alert
+    timestamps, resolution timestamps)" — those logs did not exist before
+    this table, and `repository.log_event()`/its convenience wrappers
+    (record_ingestion, assign_mention, resolve_mention, log_export,
+    log_login) are what write into it.
+
+    - `mention_id` is a bare nullable Integer with NO foreign-key
+      constraint, deliberately: not every event is about one specific
+      mention (a `login` or `export_downloaded` event isn't), so this
+      column can't be a mandatory FK, and adding an optional FK just to
+      get referential integrity on the subset of rows that have a value
+      would be over-modeling a column that's read, never joined-through,
+      by anything in this phase.
+    - `LOGIN` has no caller yet — there is no authentication system to
+      call it from (Phase 5.5 builds one). This is schema readiness, the
+      same pattern as `Mention.deleted_at`: nothing in this phase sets it,
+      but the column exists so the feature that will doesn't also need a
+      migration.
+    - `metadata_json` is named that, not `metadata`, because `metadata` is
+      a reserved attribute name on SQLAlchemy's `DeclarativeBase` (every
+      mapped class already has a `.metadata` pointing at its
+      `MetaData` object) — naming the mapped attribute `metadata` collides
+      with that and errors at import time.
+    """
+
+    __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_event_type_occurred_at", "event_type", "occurred_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[EventType] = mapped_column(String(32), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # No FK — see class docstring. Not every event is about one mention.
+    mention_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Who did it. Free text, not a foreign key to a users table — there is
+    # no auth system yet (Phase 5.5 builds one), so this is a name/handle
+    # string for now, same reasoning as Mention.assigned_to.
+    actor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug convenience only
+        return f"Event(id={self.id!r}, event_type={self.event_type!r}, mention_id={self.mention_id!r})"
+
+
+class ResponseTimeBaseline(Base):
+    """Schema-only support for 3.3: a pre-launch, one-time manual sample of
+    "how long did the last 20 negative reviews take to get a reply, before
+    this tool existed." That data-collection task is a human looking at
+    Remedy's real historical Google Business Profile dashboard — nothing
+    in this codebase can fabricate it, and this table intentionally ships
+    with no sample/seed rows.
+
+    See `docs/response-time-baseline-template.md` (written separately) for
+    the manual capture process, and `repository.record_baseline_response_time()`
+    for where each looked-up number lands once captured.
+    """
+
+    __tablename__ = "response_time_baselines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # e.g. "Google review reply, Remedy BGC, 2-star, June 2026" — a human-
+    # readable description of which historical item this row measures,
+    # not a foreign key to a Mention row (the reviews being sampled here
+    # predate this schema and were never ingested).
+    source_description: Mapped[str] = mapped_column(String(512), nullable=False)
+    # Nullable: a review with no reply as of the capture date is a real,
+    # worth-recording outcome (see docs/response-time-baseline-template.md),
+    # not missing data — excluding it would bias the baseline toward only
+    # the reviews that happened to get answered. NULL means "no reply yet";
+    # the capture date and any detail belongs in `notes`. Never a sentinel
+    # number (e.g. 0 or 9999) for this case — see this project's established
+    # preference (Phase 0/2) for NULL over a guessed value whenever "no data"
+    # and "a real zero/measured value" must stay distinguishable.
+    response_time_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    captured_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug convenience only
+        return f"ResponseTimeBaseline(id={self.id!r}, response_time_hours={self.response_time_hours!r})"
