@@ -41,6 +41,9 @@ jobs:
       - name: Lint
         run: ruff check backend/
 
+      - name: Dependency audit (5.7)
+        run: pip-audit -r backend/requirements.txt
+
       - name: Run migrations
         working-directory: backend
         run: alembic upgrade head

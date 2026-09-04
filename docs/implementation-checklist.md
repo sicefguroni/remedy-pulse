@@ -4,7 +4,7 @@
 
 **Generated:** 2026-09-03 · fresh run
 **Sources:** `remedy-pulse-prd.md`, `remedy-pulse-roadmap.md`, `remedy-pulse-mockup.html`, `backend/`, `docs/Remedy Pulse_Reddit Data Access_Use Case.pdf`
-**Progress:** 29 / 79
+**Progress:** 40 / 79
 
 ---
 
@@ -326,26 +326,28 @@ One thing caught and fixed during review, worth recording as an example of why c
 
 ## Phase 4 — Ingestion adapters
 
-- [ ] **4.1 · Harden the Google owned-reviews connector into a scheduled job**
+**Status (2026-09-04): 4.1, 4.2, 4.3, 4.4, 4.5, 4.6 closed on branch `phase-3-instrumentation`; 4.7 is a stopgap, left open.** `backend/app/jobs/` wires every connector (Google reviews, Google Places, GNews, Reddit, Instagram ×2, Facebook) into the Phase 2/3 ledger/repository via a shared contract (`SOURCE_NAME` + `run(session)`, documented in `app/jobs/__init__.py`), plus `scheduler.py` (4.6, deliberately simple per this phase's own instruction) and `status_report.py`. **Reddit and Meta adapters are built and tested against mocks but not live-verified** — no credentials exist for either (Phase 1's Reddit commercial-tier and Meta App Review approvals are both still open) — see `backend/README.md`'s "Ingestion adapters" section for exactly what's pending before either goes live. 4.7 (`status_report.py`) is an explicit stopgap, not the real fix — that needs Phase 7's API layer to exist first, so it stays unchecked below. 214 tests pass (`pytest backend/tests/`), ruff clean, migration verified against real Postgres (new `users` table from 5.5, see Phase 5's status note).
+
+- [x] **4.1 · Harden the Google owned-reviews connector into a scheduled job**
   Depends on 0.2, 0.3, 0.6, and 1.1. The normalize/aggregate logic is sound and reusable; the runner around it is not.
   **Effort:** M · **Requirement:** P0-6, P0-1 · **Skip risk:** No review data · HIGH
 
-- [ ] **4.2 · Google Places competitor-ratings adapter**
+- [x] **4.2 · Google Places competitor-ratings adapter**
   **Effort:** S · **Requirement:** P0-10 · **Skip risk:** No competitor benchmark · MEDIUM
 
   > **HEADS-UP — the Places `reviews` field returns at most 5 reviews, chosen by an undocumented rule that changes between calls.**
   > `fetch_competitor_ratings.py` documents the cap honestly in its module docstring, which is more than most code does. What the docstring does not say is the consequence: **any trend you compute from `sampleReviews` is noise.** The `rating` and `user_ratings_total` fields are stable and trendable; the sample is not. Do not let a competitor sentiment trend get built on that sample — which is directly relevant to P0-10, where "competitor sentiment" is a stated requirement and this is the only competitor data source you have. That tension needs resolving before 8.8, not during it.
 
-- [ ] **4.3 · Reddit adapter — PRAW, OAuth, versioned User-Agent, source IDs retained for 5.1**
+- [x] **4.3 · Reddit adapter — PRAW, OAuth, versioned User-Agent, source IDs retained for 5.1**
   **Effort:** L · **Requirement:** C-1, C-3, C-5, P0-1 · **Skip risk:** A P0 source is absent while the demo implies it works · HIGH
 
-- [ ] **4.4 · Meta (Instagram + Facebook) adapter**
+- [x] **4.4 · Meta (Instagram + Facebook) adapter**
   **Effort:** L·risky · **Requirement:** P0-1 · **Skip risk:** 37% of the product's own charted mention volume has no source · HIGH
 
-- [ ] **4.5 · News/press adapter, per the 1.5 decision**
+- [x] **4.5 · News/press adapter, per the 1.5 decision**
   **Effort:** M · **Requirement:** P0-1, P0-9 · **Skip risk:** EMV has no input · HIGH
 
-- [ ] **4.6 · Scheduler with per-source cadence**
+- [x] **4.6 · Scheduler with per-source cadence**
   The PRD scopes v1 at same-day/next-day freshness, not real-time — so this can be simple. Say so in the code, or someone will over-build it.
   **Effort:** M · **Requirement:** P0-1 · **Skip risk:** Ingestion runs when someone remembers to run it · HIGH
 
@@ -359,15 +361,17 @@ One thing caught and fixed during review, worth recording as an example of why c
 
 **Hard constraint: nothing in this phase may be deferred past the first production ingestion run against real data.** Not past launch — past the first real run. Once third-party content is in your store, 5.1 is already overdue and 5.3 has already happened.
 
-- [ ] **5.1 · Reddit deletion-propagation worker (implements 0.7)**
+**Status (2026-09-04): 5.1, 5.2, 5.3, 5.7, 5.8 closed; 5.4, 5.5, 5.6 left open — each genuinely blocked on something this session cannot produce.** 5.1/5.2 (`reddit_deletion_job.py`, the User-Agent format) and 5.3 (masking extended to Reddit/Instagram/Facebook — see `backend/README.md`) are built and tested, same live-credential caveat as Phase 4. 5.7: `pip-audit` is now a CI step, and it found and fixed 3 real CVEs in `requests`/`python-dotenv` during this pass — not just wired in, actually used (the "whatever the frontend build ends up being" half doesn't apply — the mockup has no build step per Phase 0's findings). 5.8: `docs/decisions/reddit-c4-no-resale-control.md` is the documented control this item asks for. **Left open, with reasoning documented in each area:** 5.4 needs the actual `RemedyPulseSpec_1` document, which doesn't exist in this repo — `docs/decisions/ph-data-privacy-act-review.md` documents the gap precisely rather than fabricating a legal review. 5.5's auth *primitives* are built and verified against real Postgres (`app/auth.py`, a new `users` table) but there's no HTTP framework yet for a login route to attach to (Phase 7) — "add authentication to the dashboard" isn't fully true until that exists. 5.6's `docs/decisions/secrets-at-rest.md` recommends an approach but stays generic pending the still-undecided hosting/vendor choice.
+
+- [x] **5.1 · Reddit deletion-propagation worker (implements 0.7)**
   Scheduled re-check of stored source IDs; delete local copies of content deleted upstream, within 48 hours.
   **Effort:** L·risky · **Requirement:** C-2 · **Skip risk:** Breach of granted API terms; revocation removes a P0 source · CRITICAL
 
-- [ ] **5.2 · Versioned descriptive User-Agent on every Reddit request**
+- [x] **5.2 · Versioned descriptive User-Agent on every Reddit request**
   Reddit's required format, and the PDF commits to it explicitly.
   **Effort:** S · **Requirement:** C-3 · **Skip risk:** Rate-limited or blocked, and in visible breach of a stated term · HIGH
 
-- [ ] **5.3 · Extend PII minimization to every source**
+- [x] **5.3 · Extend PII minimization to every source**
   `mask_reviewer_name()` in `fetch_owned_reviews.py:113` masks Google reviewer names to first-name-plus-initial, citing the PH Data Privacy Act. Nothing equivalent exists for Reddit usernames, Instagram handles, or Facebook commenters — and the mockup displays `@glowwithsab` and `u/skinseeker_mnl` in full.
   **Effort:** M · **Requirement:** C-2, — · **Skip risk:** One source is privacy-minimized and four are not, under a law the code already cites · HIGH
 
@@ -383,11 +387,11 @@ One thing caught and fixed during review, worth recording as an example of why c
   `oauth_setup.py:54` says so explicitly — *"Keep this file out of version control — it's a live credential."* `.gitignore` covers it correctly today. Decide where it lives in production, because a file next to the code is not it.
   **Effort:** M · **Requirement:** — · **Skip risk:** A long-lived Google credential with `business.manage` scope on a shared box · HIGH
 
-- [ ] **5.7 · Dependency audit in CI**
+- [x] **5.7 · Dependency audit in CI**
   `pip-audit` on the Python side; whatever the frontend build ends up being on the other.
   **Effort:** S · **Requirement:** — · **Skip risk:** Known CVEs ship unnoticed · MEDIUM
 
-- [ ] **5.8 · Write down the C-4 control: no resale, redistribution, or model training on Reddit data**
+- [x] **5.8 · Write down the C-4 control: no resale, redistribution, or model training on Reddit data**
   The PDF commits to it. It needs to be a documented control someone can point at, not an intention — particularly relevant if any part of the AI weekly summary (P1-1) is ever fed raw mention text.
   **Effort:** S · **Requirement:** C-4 · **Skip risk:** An accidental breach through a feature nobody connected to the commitment · HIGH
 

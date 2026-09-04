@@ -242,6 +242,109 @@ looked-up number lands once someone has actually done that lookup —
 "mean_hours"}` over whatever rows exist, `None` (not `0`) for the two
 derived fields until at least one row is captured.
 
+## Ingestion adapters and the scheduler (Phase 4)
+
+`backend/app/jobs/` wires every connector into the Phase 2/3 persistence
+layer as a proper job: `SOURCE_NAME` + `run(session)`, wrapping
+`start_run()`/`record_ingestion()` instead of writing standalone JSON.
+See `app/jobs/__init__.py`'s docstring for the exact contract and how to
+register a new one (one line in `JOBS`).
+
+- **4.1/4.2 — Google jobs** (`google_reviews_job.py`, `google_places_job.py`)
+  wrap the existing `fetch_owned_reviews.py`/`fetch_competitor_ratings.py`
+  logic (imported, not reimplemented) with the same per-listing/per-
+  competitor resilience those scripts already had.
+- **4.5 — `news_job.py`** wraps `fetch_news_articles.py` the same way.
+- **4.3/5.1/5.2 — Reddit** (`fetch_reddit_mentions.py`, `app/jobs/reddit_job.py`,
+  `app/jobs/reddit_deletion_job.py`): PRAW-based, a versioned descriptive
+  User-Agent per Reddit's required format (`_MASK_PEPPER`'s neighbor
+  constant `USER_AGENT` — the account-username placeholder in it must be
+  filled in before this can authenticate), a script-app credential flow,
+  and a *separate* recurring job (`reddit_deletion_job.py`, its own ledger
+  source `reddit_deletion_check`) that re-checks stored Reddit rows on a
+  schedule and scrubs content/author fields the moment an upstream
+  deletion is detected — "ingestion-in-reverse," not a delete webhook, per
+  `docs/decisions/reddit-deletion-propagation.md`. **Not live-verified**:
+  no Reddit credentials exist in this environment (the commercial Data
+  Access tier is still a pending approval per Phase 1); every test here
+  mocks PRAW at the import boundary. Fill in `REDDIT_CLIENT_ID` /
+  `REDDIT_CLIENT_SECRET` / `REDDIT_USERNAME` / `REDDIT_PASSWORD` (see
+  `.env.example`) and the User-Agent's username placeholder before this
+  goes live.
+- **4.4/5.3 — Meta** (`fetch_meta_mentions.py`, three separate job
+  wrappers): Instagram comments, Instagram mentions, and Facebook comments
+  are three independently-configured, independently-ledgered capabilities
+  (see `app/jobs/meta_job.py`'s module docstring for why — briefly, a
+  lapsed permission on one must not make the other two look stale, so
+  each gets its own `IngestionRun` source and its own `app.jobs.JOBS`
+  entry: `meta_instagram_comments_job.py`, `meta_instagram_mentions_job.py`,
+  `meta_facebook_comments_job.py`, all thin wrappers around
+  `meta_job.py`'s per-capability functions). **Not live-verified**: no
+  Meta App Review access exists yet for any of the three scopes (Phase
+  1.3, still open) — every test mocks the Graph API HTTP calls.
+- **5.3 — PII minimization, every source**: Facebook commenter names reuse
+  `fetch_owned_reviews.mask_reviewer_name()` (real names, same shape).
+  Reddit usernames and Instagram handles are pseudonyms, not names, so
+  each gets its own masking function (`fetch_reddit_mentions.mask_reddit_username()`,
+  `fetch_meta_mentions.mask_instagram_handle()`) — a short recognizable
+  prefix plus a fixed-length hash suffix, deterministic (same handle
+  always masks the same way, for dedup) but not a truncation of the
+  original. Neither is a security control (see each function's own
+  docstring for the honest limits) — both exist to satisfy the PH Data
+  Privacy Act minimization principle `mask_reviewer_name()` already cites,
+  extended to the sources that didn't have it before this phase.
+- **4.6 — `scheduler.py`**: deliberately simple, per the checklist's own
+  instruction ("the PRD scopes v1 at same-day/next-day freshness, not
+  real-time — say so in the code, or someone will over-build it"). A
+  per-source cadence check (`is_due()`, default 12h) plus `python -m
+  app.scheduler` (one pass) or `--loop` (a plain sleep loop) — not a task
+  queue.
+- **4.7 — `status_report.py`**: `python -m app.status_report` prints every
+  registered source's freshness. This is explicitly a **stopgap**, not
+  4.7 done — the real fix is a UI surface, which needs Phase 7's API
+  layer to exist first (see the script's own module docstring).
+
+## Authentication primitives (Phase 5.5)
+
+`app/auth.py` — `hash_password()`/`verify_password()` (bcrypt),
+`create_user()`/`authenticate()`, and hand-rolled HMAC-signed session
+tokens (`create_session_token()`/`verify_session_token()` — deliberately
+not JWT, see the module docstring's over-build reasoning). `authenticate()`
+runs a real bcrypt comparison even when the email isn't found (against a
+fixed dummy hash) so a failed lookup and a failed password check take
+comparably long, and never distinguishes "no such user" from "wrong
+password" in its return value — both are just `None`. A successful login
+updates `User.last_login_at` and calls `repository.log_login()`, so
+Phase 3's `EventType.LOGIN` finally has a caller.
+
+This is schema/logic only — **there is no HTTP framework or login route
+anywhere in this repo**, so "add authentication to the dashboard" isn't
+fully done by this alone. Phase 7 (the API layer) is what actually calls
+into this.
+
+## Compliance and security documentation (Phase 5)
+
+Several Phase 5 items are decisions/reviews, not code, and are recorded
+under `docs/decisions/`:
+- `ph-data-privacy-act-review.md` (5.4) — the spec `RemedyPulseSpec_1`,
+  cited by `mask_reviewer_name()` and elsewhere, does not exist in this
+  repo. Documents every citation found and what a real review must cover
+  once the actual spec is available — does not perform that review.
+- `reddit-c4-no-resale-control.md` (5.8) — the Reddit access request's
+  written commitment ("not resold, redistributed, or used to train any
+  model") and a recommended enforcement mechanism at the LLM-call
+  boundary, relevant the moment P1-1's AI summary is wired to a real
+  model instead of its current 3 canned strings.
+- `secrets-at-rest.md` (5.6) — `token.json`'s live-credential risk and a
+  generic recommendation (real secrets manager > env vars > bare file)
+  pending an actual hosting decision.
+
+`requirements.txt`'s `requests`/`python-dotenv` pins are set to the
+earliest versions `pip-audit` (5.7, now also a CI step —
+`.github/workflows/ci.yml`) reports zero known vulnerabilities for as of
+this phase; re-run `pip-audit -r requirements.txt` and bump the pin
+before trusting an older one again.
+
 ## Known limitations, honestly
 
 - Individual reviews have no public deep-link URL from either API — this

@@ -88,3 +88,48 @@ OUTLET_TIER_MAP = {
     "When In Manila": "Lifestyle Mag",
     "ANC": "Broadcast TV",
 }
+
+# ---------------------------------------------------------------------------
+# Reddit mentions ingestion (checklist 4.3, 5.1, 5.2, 5.3 — see
+# backend/fetch_reddit_mentions.py's module docstring for the connector
+# itself, docs/decisions/reddit-integration-status.md and
+# docs/decisions/reddit-deletion-propagation.md for why this exists and
+# what it does/doesn't cover yet). This block is additive only — nothing
+# above this line was changed to add it.
+#
+# Where to find Reddit credentials:
+# Register a "script" app at https://www.reddit.com/prefs/apps (self-serve,
+# no approval wait — distinct from the elevated commercial Data Access
+# tier the use-case PDF describes, which is a separate, still-pending
+# approval). That gives you REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET; the
+# script authenticates as whichever Reddit account's
+# REDDIT_USERNAME/REDDIT_PASSWORD you also provide. See
+# fetch_reddit_mentions.py's module docstring for why this project uses
+# that flow instead of a refresh-token flow.
+# ---------------------------------------------------------------------------
+
+# Subreddits searched for brand mentions, without the leading "r/". Seeded
+# with r/PhilippinesSkincare specifically because it's the mockup's own
+# existing sample Reddit mention (u/skinseeker_mnl in r/PhilippinesSkincare
+# — remedy-pulse-mockup.html); the other two are a plausible first pass for
+# where a PH skincare-clinic brand would actually get discussed. Owner:
+# Marketing should review/tune this list — same "first pass, not a
+# validated set" caveat NEWS_SEARCH_TERMS above already carries.
+REDDIT_SUBREDDITS = [
+    "PhilippinesSkincare",
+    "AskPhilippines",
+    "Philippines",
+]
+
+# Keyword terms searched within each subreddit above (one
+# subreddit.search() call per subreddit/term pair — see
+# fetch_reddit_mentions.py for why this is deliberately a search, not a
+# stream). Mirrors NEWS_SEARCH_TERMS's own narrow-terms reasoning directly
+# above: a bare brand word like "Remedy" is generic and pulls in unrelated
+# results, so every term names a specific branch or sub-brand instead.
+REDDIT_SEARCH_TERMS = [
+    "Remedy Skin Clinic",
+    "Remedy BGC",
+    "Remedy Vertis North",
+    "Skin Bar by Remedy",
+]
