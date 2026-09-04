@@ -19,3 +19,10 @@ pydantic-settings==2.6.1
 # Phase 4/5 adapters and auth primitives (backend/app/jobs/, backend/app/auth.py)
 praw==8.0.3          # Reddit adapter (4.3) — see fetch_reddit_mentions.py
 bcrypt==4.2.1        # password hashing for auth primitives (5.5) — see app/auth.py
+
+# Phase 6/7 classification and API layer
+# anthropic 1.x is built on httpx2, not the separate `httpx` PyPI package —
+# see app/classification.py / docs/decisions/sentiment-classifier-choice.md.
+anthropic==1.3.0     # sentiment classification (6.1) + topic tagging (6.5)
+fastapi==0.135.3     # the Phase 7 API layer — see app/api/
+uvicorn==0.44.0      # ASGI server: `uvicorn app.api.main:app`
