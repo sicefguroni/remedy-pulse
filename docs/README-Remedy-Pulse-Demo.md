@@ -16,6 +16,17 @@ Everything you see — the numbers, the reviews, the alerts, the ₱ figures —
 
 You'll see a small **"Demo"** badge in the top right corner as a constant reminder of this.
 
+### If a real Remedy Pulse API is running
+
+As of Phase 7, the same file can also show **real** data. If you (or IT) have the backend API
+running locally, click **"Log in"** next to the Demo badge and sign in — the page will then pull
+live mentions, reviews, topics, competitors, and EMV from that API instead of the sample data
+above, and the Demo badge, the "+ Simulate mention" chip, and the AI-summary "Regenerate" button
+all disappear, since those are demo-only affordances that shouldn't sit next to real data. If you
+don't log in, or the API isn't reachable, the page falls back to the same sample-data experience
+described in this guide, with a small banner saying so — nothing about the zero-install,
+zero-backend way of opening this file changes.
+
 ## Six sections to explore
 
 | Tab | What it's for |
@@ -44,7 +55,7 @@ This version does more than just look real — a lot of it actually behaves like
 - **Click "1 pending reply"** on the Reviews page to open a reply box — sending it updates the status instantly.
 - **Click the "Last synced" pill** in the header to simulate a data refresh.
 
-None of these actions save anywhere permanently or send anything to a real person — if you refresh the page, everything resets to how it started (except downloaded CSV files, which are real files that stay on your computer). That's expected at this stage.
+None of these actions save anywhere permanently or send anything to a real person — if you refresh the page, everything resets to how it started (except downloaded CSV files, which are real files that stay on your computer). That's expected at this stage, and it's still true even if you log in to see live data: Assign/Resolve/Send reply are not wired to the write side of the API yet, so they only update what's on your screen.
 
 ## What's not built yet (and why that's OK right now)
 
