@@ -4,7 +4,7 @@
 
 **Generated:** 2026-09-03 · fresh run
 **Sources:** `remedy-pulse-prd.md`, `remedy-pulse-roadmap.md`, `remedy-pulse-mockup.html`, `backend/`, `docs/Remedy Pulse_Reddit Data Access_Use Case.pdf`
-**Progress:** 26 / 79
+**Progress:** 29 / 79
 
 ---
 
@@ -300,11 +300,17 @@ Verified against a **real local Postgres** (`docker compose up -d` in `backend/`
 
 This phase sits here deliberately. A metric added after launch has no baseline, which makes it worthless at exactly the moment it is needed — the 30-day review the PRD's success metrics are written around.
 
-- [ ] **3.1 · Event log: login, item_ingested, item_assigned, item_resolved, export_downloaded**
+**Status (2026-09-04): 3.1, 3.2, and 3.4 closed; 3.3 is engineering-ready but still needs a human to actually do the lookup.** New `Event` table + `Mention.assigned_at`/`assigned_to`/`resolved_at` columns in `backend/app/models.py`, migration `4f7259f81e17` (verified against real Postgres — `alembic upgrade head`/`alembic check` zero drift/downgrade-upgrade roundtrip, same rigor as Phase 2). `backend/app/repository.py` adds `log_event`, `record_ingestion` (fires `ITEM_INGESTED` only on genuine first-insert, not on re-ingest — `upsert_mention()` now returns whether it inserted), `assign_mention` (first-assignment-wins on `assigned_at`, always updates `assigned_to`, always logs an event), `resolve_mention`, `log_export`/`get_export_activity` (3.4), `log_login` (schema-ready, no caller yet — Phase 5.5 builds auth), and `get_median_time_to_assignment()` — the actual 3.2 metric, median computed in Python so the same logic is correct on SQLite and Postgres. 80 tests pass (`pytest backend/tests/`, including real-Postgres coverage for the trickiest semantics), ruff clean.
+
+One thing caught and fixed during review, worth recording as an example of why cross-checking parallel work matters: the schema was first built with `response_time_hours` as non-nullable, but the 3.3 template doc (written in parallel, see below) correctly insists a review with no reply yet is "a real, worth-recording outcome," not something to omit. Fixed by making the column nullable and `get_baseline_summary()` report `no_reply_count` alongside the median/mean — computed only over rows that did get a reply — rather than silently dropping no-reply rows from the average, which would have made the baseline look better than reality.
+
+3.3 itself — the actual "look at Remedy's last 20 negative reviews and note reply times" — is a one-time human task against real historical data, not something to fabricate. `docs/response-time-baseline-template.md` is the ready-to-fill template plus the exact `record_baseline_response_time()` call shape; the table starts empty on purpose. Left unchecked below until someone with Google Business Profile access actually does it (no API approval needed — this is Phase 1's kind of blocker, not engineering's).
+
+- [x] **3.1 · Event log: login, item_ingested, item_assigned, item_resolved, export_downloaded**
   The PRD's measurement method says these come *"from application logs (login events, alert timestamps, resolution timestamps)."* Those logs do not exist, and neither does the login they assume.
   **Effort:** M · **Requirement:** — (enables all Success Metrics) · **Skip risk:** No evidence for or against the launch at the 30-day review · HIGH
 
-- [ ] **3.2 · Query for the core metric: median time from negative mention appearing → assigned**
+- [x] **3.2 · Query for the core metric: median time from negative mention appearing → assigned**
   The PRD names this *"the core success focus for v1"* with a target under 4 business hours. It needs an ingested-at timestamp and an assigned-at timestamp on the same row, which means it constrains the Phase 2 schema.
   **Effort:** S · **Requirement:** — · **Skip risk:** The one metric v1 is judged on cannot be computed · HIGH
 
@@ -312,7 +318,7 @@ This phase sits here deliberately. A metric added after launch has no baseline, 
   Even a rough manual sample of "how long did the last 20 negative reviews take to get a reply, before this tool existed."
   **Effort:** S · **Requirement:** — · **Skip risk:** "Response time improved" is unprovable — there is nothing to compare against · MEDIUM
 
-- [ ] **3.4 · Instrument export usage**
+- [x] **3.4 · Instrument export usage**
   Target: at least one CSV export per week. Cheap to add now, impossible to backfill.
   **Effort:** S · **Requirement:** P0-3 · **Skip risk:** A stated success metric goes unmeasured · LOW
 

@@ -171,6 +171,77 @@ code path than production actually uses, and only the Postgres run
 proves the real one works. It skips cleanly (not a failure) with no
 Postgres reachable.
 
+## Instrumentation (Phase 3 — event log, the core metric, response-time baseline)
+
+Phase 2 gave every mention an `ingested_at`. Phase 3 adds the rest of what
+the PRD's success metrics need: an event log, an `assigned_at`/`resolved_at`
+on the same row as `ingested_at`, and somewhere to put a pre-launch
+response-time baseline.
+
+- **`app/models.py` — `Event`** (3.1): one row per `login`,
+  `item_ingested`, `item_assigned`, `item_resolved`, or
+  `export_downloaded` occurrence — the application log the PRD's
+  measurement method assumes exists ("from application logs (login
+  events, alert timestamps, resolution timestamps)"). `mention_id` has no
+  FK constraint (not every event is about one mention); `metadata_json`
+  is named that, not `metadata`, because `metadata` collides with
+  SQLAlchemy's own reserved attribute on `Base`. `LOGIN` has no caller
+  yet — there's no auth system (Phase 5.5 builds one) — same
+  schema-readiness pattern as `Mention.deleted_at`.
+- **`app/models.py` — `Mention.assigned_at` / `assigned_to` / `resolved_at`**
+  (3.2): an ingested-at timestamp and an assigned-at timestamp on the
+  same row, so the core PRD metric — median time from a negative mention
+  appearing to being assigned, target under 4 business hours — is a
+  single-row computation, not a join.
+- **`app/models.py` — `ResponseTimeBaseline`** (3.3): schema only, no
+  seed data. See "Response-time baseline" below.
+- **`app/repository.py`** functions:
+  - `log_event()` — the generic logger everything else below calls.
+  - `record_ingestion()` — what a Phase 4 adapter should call instead of
+    `upsert_mention()` directly: it upserts *and* logs `ITEM_INGESTED`,
+    but only on a genuine first insert, never on a re-ingest of the same
+    `(source, external_id)`. This is also why `upsert_mention()` now
+    returns `bool` (`True` = inserted, `False` = updated) — determined by
+    an explicit existence check before the upsert, not a
+    dialect-specific trick, matching this project's general preference
+    for clarity over cleverness at its stated ingestion volume.
+  - `assign_mention()` — sets `assigned_to` unconditionally (reassignment
+    always updates who owns it) but sets `assigned_at` only the *first*
+    time (first-assignment-wins), because 3.2's metric is time to first
+    ownership, not time of most recent reassignment. Every call still
+    logs an `ITEM_ASSIGNED` event, reassignment included.
+  - `resolve_mention()` — sets `resolved_at` to now on every call (no
+    "unresolve" concept yet) and logs `ITEM_RESOLVED`.
+  - `log_export()` / `get_export_activity()` — the 3.4 export
+    instrumentation: log an `EXPORT_DOWNLOADED` event per CSV download,
+    count how many landed after some `since` timestamp (for checking the
+    "at least one export per week" target).
+  - `log_login()` — logs a `LOGIN` event; nothing calls it yet (no auth
+    system — Phase 5.5).
+  - `get_median_time_to_assignment()` — the 3.2 metric itself: median
+    `(assigned_at - ingested_at)` in hours across negative-sentiment,
+    assigned mentions (optionally scoped to `ingested_at >= since`).
+    Computed with Python's `statistics.median` rather than a SQL
+    `percentile_cont`, deliberately, so the exact same logic is correct
+    on SQLite (tests) and Postgres (production). Returns `None` — not
+    `0` — when there's no qualifying data yet.
+  - `record_baseline_response_time()` / `get_baseline_summary()` — see
+    below.
+
+### Response-time baseline (3.3)
+
+3.3 asks for a rough manual sample — "how long did the last 20 negative
+reviews take to get a reply, before this tool existed" — captured from
+Remedy's real historical Google Business Profile dashboard. That
+data-collection step is human work this codebase cannot fabricate;
+`docs/response-time-baseline-template.md` (written separately) is where
+that process is documented. `ResponseTimeBaseline` and
+`repository.record_baseline_response_time()` are only the place each
+looked-up number lands once someone has actually done that lookup —
+`get_baseline_summary()` then reports `{"count", "median_hours",
+"mean_hours"}` over whatever rows exist, `None` (not `0`) for the two
+derived fields until at least one row is captured.
+
 ## Known limitations, honestly
 
 - Individual reviews have no public deep-link URL from either API — this
