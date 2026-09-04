@@ -215,6 +215,8 @@ Phase 0 comes before any new feature because building on a false claim propagate
 
 None of this is engineering effort; all of it is calendar time you do not control. That is exactly why it goes first. Every item here can be in flight while Phase 2 is being built.
 
+**Status (2026-09-03):** by explicit direction, 1.1–1.4 and 1.6 were left undone in this pass — they are procurement/vendor/org decisions (submitting access requests, chasing approvals, locking a vendor path, setting trigger dates), not engineering, exactly as this phase's own framing says. **1.5's engineering half is done:** `backend/fetch_news_articles.py` now exists (GNews connector, same shape/conventions as the two Google connectors — retry via `http_utils`, `fetchedAt` + per-article `status`, graceful no-key failure, 7 new tests, ruff clean). It does not decide the vendor question — see `docs/decisions/news-press-ingestion-path.md` — it's the evaluation harness that decision doc recommends, ready to run the moment a (self-serve, no-approval-wait) GNews key exists.
+
 - [ ] **1.1 · Submit or chase the Google Business Profile API access request**
   `backend/README.md` correctly identifies this as *"the one real blocker"* and *"the long pole here, not the code."* Confirm whether it has actually been submitted, and get a status.
   **Effort:** L·risky · **Requirement:** P0-6 · **Skip risk:** No owned-review data at all — the Reviews tab cannot exist, and Google Reviews is the roadmap's designated "guaranteed early progress" source · CRITICAL
