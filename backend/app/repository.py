@@ -103,6 +103,12 @@ def upsert_mention(session: Session, **fields: Any) -> bool:
     real-time — see the PRD)."""
     if not fields.get("source") or not fields.get("external_id"):
         raise ValueError("upsert_mention() requires both source and external_id")
+    if not fields.get("kind"):
+        # Mention.kind is nullable=False at the DB level (models.Mention) -
+        # without this check, omitting it fails as an opaque DB constraint
+        # violation on the upsert below instead of a clear Python error
+        # naming the actual problem.
+        raise ValueError("upsert_mention() requires kind (e.g. 'review', 'mention', 'article')")
     existing_id = session.execute(
         select(Mention.id).where(
             Mention.source == fields["source"],
