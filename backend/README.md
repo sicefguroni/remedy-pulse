@@ -328,12 +328,16 @@ sentiment classification (6.1) and crisis/digest alert routing (6.3)
 together, since the five crisis / five digest conditions (copied
 verbatim from the mockup's `openAlertRulesModal()`, citing spec §9.2)
 are qualitative judgment calls, not independent of sentiment. Model:
-`llama-3.3-70b-versatile` via Groq — switched from Claude Opus 5 on
+`openai/gpt-oss-120b` via Groq — switched from Claude Opus 5 on
 explicit user direction (see `docs/decisions/09-sentiment-classifier-choice.md`'s
 "Update (2026-09-05)" section for why, and the honest trade-off it
 names; that document also proposes a concrete recall bar for the team
 to ratify: the PRD's own open question about "what precision/recall
 bar is acceptable before this drives the alert workflow unsupervised").
+The model landed on `openai/gpt-oss-120b`, not the originally-picked
+`llama-3.3-70b-versatile` — the first real API key exposed that model
+as deprecated on Groq's side (a live 404, caught by an actual test
+call rather than left unverified) before this code ever ran unattended.
 A missing `GROQ_API_KEY` raises `ClassifierNotConfiguredError` (a whole
 batch would fail identically, so stop immediately rather than degrade N
 times in a row); a transient API failure or an unparseable response
