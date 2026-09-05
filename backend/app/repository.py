@@ -51,7 +51,7 @@ from config import BACKFILL_WINDOW_DAYS
 def _upsert_insert(session: Session, values: dict[str, Any]):
     """Build the right dialect's ON CONFLICT upsert statement. Postgres is
     the only target this is meant to run against in production (see
-    docs/decisions/persistence-choice.md); SQLite support here exists so
+    docs/decisions/05-persistence-choice.md); SQLite support here exists so
     the exact same repository code is what the test suite exercises,
     instead of tests covering a different code path than production
     does."""
@@ -639,7 +639,7 @@ def get_overview_stats(
     # panel derived from it) defaults to kind=mention and can never show a kind=review row. Left
     # unrestricted, a classified-negative review would silently inflate this KPI forever with no
     # way to see or resolve it - reviews already have their own attention mechanism (the Reviews
-    # tab's pending-reply indicator, see docs/decisions/review-reply-flow.md), so this count
+    # tab's pending-reply indicator, see docs/decisions/13-review-reply-flow.md), so this count
     # matches exactly what's actually visible/actionable rather than diverging from it.
     alert_conditions = now_conditions + [
         Mention.kind == MentionKind.MENTION,
@@ -768,7 +768,7 @@ def get_topics_summary(session: Session, *, now: datetime | None = None) -> list
     `tag` ("needs-attention" | "watch" | null) is this implementation's
     own threshold on negativePct (>=30 -> needs-attention, >=15 -> watch,
     else null) - docs/api-contract.md names the two values but no
-    threshold; docs/decisions/topic-tagging-approach.md (6.5, built in
+    threshold; docs/decisions/11-topic-tagging-approach.md (6.5, built in
     parallel) may define a real one, in which case this should be
     revisited. See this phase's final report for that caveat."""
     now = now or datetime.now(timezone.utc)

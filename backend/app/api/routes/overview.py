@@ -1,6 +1,6 @@
 """app/api/routes/overview.py — GET /api/overview.
 
-Clarity Index: ports docs/decisions/clarity-index-formula.md's exact
+Clarity Index: ports docs/decisions/01-clarity-index-formula.md's exact
 formula (also implemented client-side today as
 remedy-pulse-mockup.html's computeClarityIndex()) to Python against real
 aggregate data, per docs/api-contract.md's own instruction not to invent
@@ -12,7 +12,7 @@ mockup's regenerateSummary() cycles the same 3 canned strings today
 the first one (deterministic, easy to test) rather than picking one at
 random or rotating server-side state nothing else in this project
 persists. Wiring this to a real LLM is explicitly out of scope for this
-phase (see docs/decisions/reddit-c4-no-resale-control.md's note that
+phase (see docs/decisions/07-reddit-c4-no-resale-control.md's note that
 P1-1 going live needs its own compliance gate first) - not attempted
 here.
 """
@@ -86,7 +86,7 @@ def _parse_period(
 
 
 def _clarity_and_net_sentiment(stats: OverviewStats) -> tuple[int, int]:
-    """Ports computeClarityIndex() (docs/decisions/clarity-index-formula.md)
+    """Ports computeClarityIndex() (docs/decisions/01-clarity-index-formula.md)
     to real aggregate data. Returns (clarityIndex score, netSentiment
     value) - the same sentiment counts feed both."""
     total_sentiment = stats.positive_count + stats.neutral_count + stats.negative_count

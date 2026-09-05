@@ -5,8 +5,8 @@ writes a normalized JSON file:
   reddit_mentions.json -> {"fetchedAt": <ISO-8601 UTC>, "mentions": [...]}
 
 This is the engineering half of checklist item 4.3. Read
-docs/decisions/reddit-integration-status.md and
-docs/decisions/reddit-deletion-propagation.md before touching this file —
+docs/decisions/04-reddit-integration-status.md and
+docs/decisions/03-reddit-deletion-propagation.md before touching this file —
 both were written specifically about this gap and this script closes only
 part of it (see "What this does and does NOT do" below).
 
@@ -57,7 +57,7 @@ What this does and does NOT do
 - Does NOT implement the 48-hour deletion-propagation obligation (C-2).
   That is a separate, recurring re-check job that re-validates already-
   stored rows against Reddit — see app/jobs/reddit_deletion_job.py and
-  docs/decisions/reddit-deletion-propagation.md for why "ingestion in
+  docs/decisions/03-reddit-deletion-propagation.md for why "ingestion in
   reverse" has to be its own job rather than something bolted onto a
   fetch here.
 - Resilience here is PRAW/prawcore's own (prawcore retries transient
@@ -102,7 +102,7 @@ Versioned User-Agent (checklist 5.2)
 --------------------------------------
 Reddit requires a descriptive, versioned User-Agent identifying the
 application and its author on every request — see
-docs/decisions/reddit-integration-status.md's verified quote from the
+docs/decisions/04-reddit-integration-status.md's verified quote from the
 submitted Data Access Request ("a descriptive, versioned User-Agent string
 identifies the application per Reddit's required format"). USER_AGENT
 below is a module-level constant, not built from env vars, so it is

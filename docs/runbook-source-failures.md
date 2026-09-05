@@ -90,7 +90,7 @@ These adapters are built and tested against mocks but **not live-verified** — 
 
 ### 3.4 `reddit_deletion_check` specifically — treat as higher severity than an ordinary ingestion failure
 
-This is not a normal ingestion job. Per `reddit_deletion_job.py`'s own docstring and `docs/decisions/reddit-deletion-propagation.md`: it re-checks already-stored Reddit rows against Reddit to comply with the written commitment (in the submitted Reddit Data Access Request) that content and author-identifying data are removed **within 48 hours of deletion on Reddit**.
+This is not a normal ingestion job. Per `reddit_deletion_job.py`'s own docstring and `docs/decisions/03-reddit-deletion-propagation.md`: it re-checks already-stored Reddit rows against Reddit to comply with the written commitment (in the submitted Reddit Data Access Request) that content and author-identifying data are removed **within 48 hours of deletion on Reddit**.
 
 A failed `reddit_deletion_check` run doesn't just mean stale data the way a failed ingestion run does — as the decision doc puts it, *"a failed run doesn't just mean stale data, as it would for ordinary ingestion; it means an active breach of a written retention commitment, growing more overdue with every hour it stays down."* The roadmap's own Phase 5 header states this as a hard constraint: nothing here may be deferred past the first production ingestion run against real data.
 
@@ -116,7 +116,7 @@ The PRD scopes v1 freshness at **same-day/next-day**, not real-time (`remedy-pul
 
 1. Do not assume "no news" — that is exactly the failure mode the PRD names. A blank or unchanged tab can mean the source is down, not that nothing happened.
 2. Check `GET /api/status` yourself if you have a way to (a session token and something to call it with), or ask whoever ran the morning check (§1) what it showed.
-3. There is currently **no named on-call or owner** for this — same as `docs/decisions/assignment-roster.md`'s own honest note that "who owns keeping the roster current" is unresolved. Don't invent an owner here either: until the team assigns one, escalate to whichever of the two engineers (Angelo or Ceferino, per the PRD's own author line) is reachable, and treat "nobody owns this yet" as a real gap to raise, not something to quietly work around.
+3. There is currently **no named on-call or owner** for this — same as `docs/decisions/10-assignment-roster.md`'s own honest note that "who owns keeping the roster current" is unresolved. Don't invent an owner here either: until the team assigns one, escalate to whichever of the two engineers (Angelo or Ceferino, per the PRD's own author line) is reachable, and treat "nobody owns this yet" as a real gap to raise, not something to quietly work around.
 4. Once someone with access confirms the cause (§2–§3) and re-runs ingestion (§4), the tab should reflect a fresh sync on the next page load / next successful `GET` call.
 
 ---

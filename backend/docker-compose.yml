@@ -1,5 +1,5 @@
 # Local development Postgres for backend/app (Phase 2 foundations).
-# Not a production deployment — see docs/decisions/persistence-choice.md
+# Not a production deployment — see docs/decisions/05-persistence-choice.md
 # for the actual persistence decision and its reasoning. This just gives
 # an engineer `docker compose up` and a DATABASE_URL that works.
 #

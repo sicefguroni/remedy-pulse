@@ -17,7 +17,7 @@ from app.models import Base  # noqa: E402
 def sqlite_session():
     """A throwaway in-memory SQLite database with the full app schema, for
     fast repository/model tests. Real usage targets Postgres exclusively
-    (see docs/decisions/persistence-choice.md); this exists purely so CI
+    (see docs/decisions/05-persistence-choice.md); this exists purely so CI
     doesn't need a live Postgres to exercise app/repository.py's logic —
     the ON CONFLICT upsert path is also tested directly against a real
     Postgres container in test_app_repository_postgres.py, skipped

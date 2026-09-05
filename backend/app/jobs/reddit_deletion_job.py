@@ -1,7 +1,7 @@
 """reddit_deletion_job.py — Phase 5.1: the Reddit 48-hour deletion-
 propagation worker (implements checklist 0.7 / requirement C-2).
 
-Read docs/decisions/reddit-deletion-propagation.md before touching this
+Read docs/decisions/03-reddit-deletion-propagation.md before touching this
 file — this job IS the "ingestion in reverse" described there: a recurring
 re-check of already-stored Reddit rows' Reddit-assigned IDs, not a delete
 webhook. Reddit does not notify integrators when a post or comment is

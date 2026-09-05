@@ -1,6 +1,6 @@
 """Tests for the 6.5 topic-tagging module (app/topic_tagging.py). The
 Claude API call is always mocked — see topic_tagging.py's module
-docstring and docs/decisions/topic-tagging-approach.md for why this is
+docstring and docs/decisions/11-topic-tagging-approach.md for why this is
 scoped as "tag against a fixed taxonomy," not real clustering. Runs
 against in-memory SQLite (see conftest.sqlite_session), same as
 test_app_auth.py."""

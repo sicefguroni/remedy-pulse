@@ -10,7 +10,7 @@ requests==2.34.2
 python-dotenv==1.2.2
 
 # Phase 2 foundations (backend/app/) — schema, persistence, service config.
-# See docs/decisions/persistence-choice.md for why Postgres + SQLAlchemy + Alembic.
+# See docs/decisions/05-persistence-choice.md for why Postgres + SQLAlchemy + Alembic.
 SQLAlchemy==2.0.36
 alembic==1.14.0
 psycopg[binary]==3.2.3
@@ -22,7 +22,7 @@ bcrypt==4.2.1        # password hashing for auth primitives (5.5) — see app/au
 
 # Phase 6/7 classification and API layer
 # anthropic 1.x is built on httpx2, not the separate `httpx` PyPI package —
-# see app/classification.py / docs/decisions/sentiment-classifier-choice.md.
+# see app/classification.py / docs/decisions/09-sentiment-classifier-choice.md.
 anthropic==1.3.0     # sentiment classification (6.1) + topic tagging (6.5)
 fastapi==0.135.3     # the Phase 7 API layer — see app/api/
 uvicorn==0.44.0      # ASGI server: `uvicorn app.api.main:app`

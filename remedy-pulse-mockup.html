@@ -3003,12 +3003,12 @@
   }
 
   // =========================================================================
-  // Clarity Index (Phase 0 / 0.10 — reused verbatim; see docs/decisions/clarity-index-formula.md)
+  // Clarity Index (Phase 0 / 0.10 — reused verbatim; see docs/decisions/01-clarity-index-formula.md)
   // =========================================================================
   /**
    * computeClarityIndex(inputs) -> integer 0-100
    * ClarityIndex = round(0.15*ratingScore + 0.40*sentimentScore + 0.20*responseRateScore + 0.25*volumeTrendScore)
-   * Full weight rationale: docs/decisions/clarity-index-formula.md. The real API ports this same
+   * Full weight rationale: docs/decisions/01-clarity-index-formula.md. The real API ports this same
    * formula server-side (per docs/api-contract.md); this client copy is used only to compute the
    * demo/sample gauge value from SAMPLE_DATA, so the demo stays internally consistent without a
    * second hardcoded score.

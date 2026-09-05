@@ -1,7 +1,7 @@
 """app/api/routes/roster.py — GET /api/roster.
 
 Backed by app.models.User rows (5.5) - see
-docs/decisions/assignment-roster.md for why this replaces the mockup's
+docs/decisions/10-assignment-roster.md for why this replaces the mockup's
 hardcoded Gian/Paul/Boom/Mixi list. Only active users are listed.
 """
 

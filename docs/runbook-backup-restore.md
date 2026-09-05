@@ -117,7 +117,7 @@ than silently implied):
 - **Production backup scheduling/retention.** This drill was a manual,
   one-time `pg_dump`. A real operational schedule (how often, retained
   how long, stored where durably — see
-  `docs/decisions/secrets-at-rest.md` for the parallel "which platform"
+  `docs/decisions/08-secrets-at-rest.md` for the parallel "which platform"
   open question this shares, since both depend on the still-undecided
   hosting choice) is a separate decision, not made here.
 - **Restore time at production data volume.** This drill's database was

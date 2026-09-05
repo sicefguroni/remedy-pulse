@@ -54,7 +54,7 @@ ratings via Places API) works without waiting on Google's approval.
     a free GNews API key at https://gnews.io (self-serve, no approval
     wait), paste it into `.env` as `GNEWS_API_KEY`, then run
     `python fetch_news_articles.py`. See
-    `docs/decisions/news-press-ingestion-path.md` for why GNews was
+    `docs/decisions/02-news-press-ingestion-path.md` for why GNews was
     picked as the first option to evaluate.
 
 ## What you get
@@ -159,7 +159,7 @@ alembic upgrade head          # creates the mentions + ingestion_runs tables
   and verified against a real local Postgres (`alembic upgrade head` /
   `alembic check` / a downgrade-then-upgrade roundtrip, not just that the
   migration file parses).
-- See `docs/decisions/persistence-choice.md` for why Postgres specifically
+- See `docs/decisions/05-persistence-choice.md` for why Postgres specifically
   (2.2's "YOUR CALL").
 
 Tests: `pytest backend/tests/` covers the repository/ledger logic against
@@ -264,7 +264,7 @@ register a new one (one line in `JOBS`).
   source `reddit_deletion_check`) that re-checks stored Reddit rows on a
   schedule and scrubs content/author fields the moment an upstream
   deletion is detected — "ingestion-in-reverse," not a delete webhook, per
-  `docs/decisions/reddit-deletion-propagation.md`. **Not live-verified**:
+  `docs/decisions/03-reddit-deletion-propagation.md`. **Not live-verified**:
   no Reddit credentials exist in this environment (the commercial Data
   Access tier is still a pending approval per Phase 1); every test here
   mocks PRAW at the import boundary. Fill in `REDDIT_CLIENT_ID` /
@@ -329,7 +329,7 @@ together, since the five crisis / five digest conditions (copied
 verbatim from the mockup's `openAlertRulesModal()`, citing spec §9.2)
 are qualitative judgment calls, not independent of sentiment. Model:
 `claude-opus-5` — this project's standing default per the `claude-api`
-skill's policy (see `docs/decisions/sentiment-classifier-choice.md`,
+skill's policy (see `docs/decisions/09-sentiment-classifier-choice.md`,
 which also proposes a concrete recall bar for the team to ratify: the
 PRD's own open question about "what precision/recall bar is acceptable
 before this drives the alert workflow unsupervised"). A missing
@@ -348,13 +348,13 @@ is the queryable seam between the two populations.
 `app/topic_tagging.py` — 6.5, scoped honestly as LLM **tagging** against
 the mockup's fixed five-topic taxonomy, not true unsupervised
 *clustering* (the checklist's literal title for this item) — see
-`docs/decisions/topic-tagging-approach.md` for why: real clustering
+`docs/decisions/11-topic-tagging-approach.md` for why: real clustering
 needs real data volume no adapter has live yet. Shares
 `ClassifierNotConfiguredError` with `classification.py` (not a
 duplicate) so a missing key stops a tagging batch the same way it stops
 a classification batch.
 
-`docs/decisions/assignment-roster.md` (6.4) — the `User` table (5.5) is
+`docs/decisions/10-assignment-roster.md` (6.4) — the `User` table (5.5) is
 the roster, replacing the mockup's hardcoded Gian/Paul/Boom/Mixi list;
 who's responsible for keeping it current is named as still unresolved,
 not invented.
@@ -395,16 +395,16 @@ papered over.
 
 Several Phase 5 items are decisions/reviews, not code, and are recorded
 under `docs/decisions/`:
-- `ph-data-privacy-act-review.md` (5.4) — the spec `RemedyPulseSpec_1`,
+- `06-ph-data-privacy-act-review.md` (5.4) — the spec `RemedyPulseSpec_1`,
   cited by `mask_reviewer_name()` and elsewhere, does not exist in this
   repo. Documents every citation found and what a real review must cover
   once the actual spec is available — does not perform that review.
-- `reddit-c4-no-resale-control.md` (5.8) — the Reddit access request's
+- `07-reddit-c4-no-resale-control.md` (5.8) — the Reddit access request's
   written commitment ("not resold, redistributed, or used to train any
   model") and a recommended enforcement mechanism at the LLM-call
   boundary, relevant the moment P1-1's AI summary is wired to a real
   model instead of its current 3 canned strings.
-- `secrets-at-rest.md` (5.6) — `token.json`'s live-credential risk and a
+- `08-secrets-at-rest.md` (5.6) — `token.json`'s live-credential risk and a
   generic recommendation (real secrets manager > env vars > bare file)
   pending an actual hosting decision.
 
@@ -445,7 +445,7 @@ closes:
 Two Phase 8 items are real, honestly-tracked gaps, not oversights — see
 `docs/implementation-checklist.md`'s own status notes for each:
 - **8.5** (Reviews reply flow) — the write endpoint exists and is
-  tested, and `docs/decisions/review-reply-flow.md` records the
+  tested, and `docs/decisions/13-review-reply-flow.md` records the
   recommended approach (deep-link to Business Profile rather than post
   via API), but the mockup's `sendReply()` doesn't call anything real
   yet — it needs each branch's actual Business Profile URL, which isn't
@@ -484,7 +484,7 @@ sign-off — see `docs/api-contract.md`'s EMV section.
   during this phase (seed → `pg_dump` → real `DROP DATABASE` → restore
   → verify row-for-row, `alembic check`, and the full Postgres test
   suite), not just a written procedure.
-- **9.7** — `docs/decisions/mediawatch-decommission.md`: a two-part
+- **9.7** — `docs/decisions/12-mediawatch-decommission.md`: a two-part
   gate (9.6's 30-day parallel run completing, plus a named sign-off)
   before decommissioning MediaWatch, rather than a bare calendar date.
 

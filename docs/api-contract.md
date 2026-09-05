@@ -49,7 +49,7 @@ Query params: `period` (`7d` default | `30d` | `90d` | `custom` with
 ```
 
 **Clarity Index** reuses the exact formula in
-`docs/decisions/clarity-index-formula.md` /
+`docs/decisions/01-clarity-index-formula.md` /
 `remedy-pulse-mockup.html`'s `computeClarityIndex()` — port it to Python
 against real aggregate data (rating, sentiment mix, response rate,
 mention-volume trend) rather than inventing a second formula.
@@ -58,7 +58,7 @@ mention-volume trend) rather than inventing a second formula.
 strings today (P1-1, not real). This endpoint may keep returning a
 canned/templated string for now — **do not** wire it to a real LLM call
 as part of this phase; that's explicitly out of scope (see
-`docs/decisions/reddit-c4-no-resale-control.md`'s note that P1-1 going
+`docs/decisions/07-reddit-c4-no-resale-control.md`'s note that P1-1 going
 live needs its own compliance gate first). Mark the field's source
 clearly in a code comment either way.
 
@@ -187,7 +187,7 @@ one entry in `GET /api/reviews`'s `listings` array), `404` if not found.
 ```
 
 `key`s and taxonomy come from 6.5's topic-tagging work
-(`docs/decisions/topic-tagging-approach.md`) — five fixed topics today,
+(`docs/decisions/11-topic-tagging-approach.md`) — five fixed topics today,
 matching the mockup's existing `topicMentions` object
 (facial-results, staff-service, rejuran, pricing, booking).
 
@@ -259,7 +259,7 @@ with a guessed formula.
 ```
 
 Backed by `app.models.User` rows (5.5) — see
-`docs/decisions/assignment-roster.md` for why this replaces the
+`docs/decisions/10-assignment-roster.md` for why this replaces the
 mockup's hardcoded Gian/Paul/Boom/Mixi list.
 
 ---
