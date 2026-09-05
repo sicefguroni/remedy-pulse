@@ -20,6 +20,8 @@ docs/                      Demo guide and supporting reference docs
 
 **To set up the review data connector:** see [`backend/README.md`](backend/README.md) for the Google Cloud setup steps, API access requirements, and known limitations.
 
+**To run the dashboard against a real local backend (not sample data):** see [`docs/local-dev-setup.md`](docs/local-dev-setup.md).
+
 ## What's next
 
 Connecting the dashboard to live data sources (Google, Meta, Reddit, X) is the next phase of work, gated on Business Profile API access approval from Google. See `backend/README.md` for details on that blocker.
