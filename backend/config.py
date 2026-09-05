@@ -28,6 +28,19 @@ Where to find each ID:
   GNEWS_API_KEY, per .env.example.
 """
 
+# The v1 backfill policy (checklist 9.2, PRD Non-Goals: "Deep historical
+# backfill (>90 days). v1 starts tracking from launch forward; going back
+# further is a data-availability and cost question best revisited once
+# the core loop is proven."). Enforced centrally in app.jobs's shared
+# is_within_backfill_window() helper, applied by every ingestion job
+# before it calls record_ingestion() - not a per-adapter opt-in, so a
+# future adapter can't forget it. Applies uniformly to both an initial
+# backfill run and steady-state polling (in steady state it should almost
+# never trigger, since polling only fetches recent items anyway - it's a
+# safety bound, e.g. against a keyword search surfacing a 2-year-old post
+# that still matches, not primarily a backfill-day mechanism).
+BACKFILL_WINDOW_DAYS = 90
+
 # Remedy's own branch listings — matches the four rows in the
 # Reviews tab of remedy-pulse-mockup.html exactly. Keep these keys in sync
 # if a branch is renamed there.
@@ -58,17 +71,93 @@ COMPETITOR_PLACE_IDS = {
     "Luminisce": "REPLACE_ME_LUMINISCE_PLACE_ID",
 }
 
+# ---------------------------------------------------------------------------
+# Brand alias matching (checklist 8.8 — P0-10's "keyword-variant matching"
+# requirement itself, per the checklist's own framing: "the mockup encodes
+# brand aliases as HTML `title` tooltips... those tooltips are the
+# requirement, stored in the only place they could be at mockup stage. Move
+# them into config.")
+#
+# This data was RECOVERED from git history, not invented here: the Phase 7
+# data-driven refactor (commit a18cd10) replaced the mockup's hand-written
+# markup wholesale, which silently deleted the `title="Also matches: ..."`
+# tooltips that carried this real domain knowledge (see the pre-refactor
+# version at commit a18cd10~1 for the original source). Recovered here so
+# it isn't lost, and because config is the right home for it, not HTML.
+# ---------------------------------------------------------------------------
+
+# Umbrella-brand aliases — any of these strings appearing in mention/review
+# text should count toward that brand's identity, not just an exact name
+# match. Keys match COMPETITOR_PLACE_IDS's formal names above (and
+# Mention.venue's actual stored value for competitor rows, per
+# app/jobs/google_places_job.py) so this dict can key off the same names
+# without a second name-mapping layer; "Remedy" is the umbrella brand
+# itself, with no analogous formal-name dict of its own.
+BRAND_ALIASES = {
+    "Remedy": [
+        "Remedy Skin Solutions", "Remedy Skin", "Remedy BGC", "Remedy clinic",
+        "Remedy GH", "Remedy Greenhills", "Remedy Vertis", "Remedy Vertis North",
+        "Skin Bar by Remedy",
+    ],
+    "Aivee Clinic": ["Aivee Skin Spa", "Foleon by Aivee"],
+    "Kamiseta Skin Clinic": ["Kamiseta Skin", "Kamiseta Skin Clinic"],
+    # Belo Medical Group, SkinStation, DermHQ, Luminisce had no aliases
+    # documented in the mockup's tooltips — not an oversight to silently
+    # "fix" here by guessing; add real ones if/when Marketing identifies
+    # variant names worth tracking for a given competitor.
+}
+
+# Branch-level aliases, IN ADDITION TO BRAND_ALIASES["Remedy"] above — a
+# mention naming one of these maps to this SPECIFIC owned listing, not just
+# "Remedy" generically (relevant for per-branch review/mention attribution,
+# e.g. fetch_owned_reviews.py's OWNED_LISTINGS matching). Only two of the
+# four owned listings had aliases documented in the mockup; preserved
+# exactly as found rather than inventing the other two.
+OWNED_LISTING_ALIASES = {
+    "Remedy — Vertis North": ["Remedy Vertis", "Remedy Vertis North"],
+    "Skin Bar by Remedy — Greenhills Mall": ["Remedy GH", "Remedy Greenhills", "Skin Bar by Remedy"],
+}
+
+# "Category Watch — Hair" (per the mockup's own note: "New tracked entities
+# per Marketing's §18 update — not yet reflected in Share of Voice above").
+# Each entity's keyword/boolean search query was explicitly marked "Boolean
+# query pending" in the mockup — i.e. these were proposed for tracking but
+# never actually wired into any adapter or matching logic. Preserved here
+# as the pending-decision list it already was; NOT expanded into real
+# tracking (no place_id, no search terms) without that decision being made
+# and the Boolean query actually being written — doing so unilaterally
+# would silently promote "someone typed this into the mockup once" into
+# "this is now tracked," which is exactly the kind of claim-vs-enforcement
+# gap this whole checklist exists to close, not reproduce.
+CATEGORY_WATCH_HAIR_PENDING = [
+    {"name": "Clinique de Paris", "note": None},
+    {"name": "Foleon by Aivee", "note": "also under Aivee"},
+    {"name": "Svenson", "note": None},
+]
+
 # Search terms fetch_news_articles.py queries GNews with, one request per
 # term, deduplicated by URL on the way out. Keep this narrow — broad terms
 # like "Remedy" alone pull in unrelated results (the word is generic).
 # Owner: Marketing should review/tune this list; it is a first pass, not
 # a validated set.
-NEWS_SEARCH_TERMS = [
-    '"Remedy Skin Clinic"',
-    '"Remedy BGC"',
-    '"Remedy Vertis North"',
-    '"Skin Bar by Remedy"',
-]
+#
+# Extended (8.8) with the aliases recovered into BRAND_ALIASES["Remedy"]
+# above, MERGED with (not replacing) the original hand-picked terms below —
+# "Remedy Skin Clinic" isn't in the recovered alias list but was already a
+# deliberate term here, and several existing tests
+# (test_jobs_news.py) mock specific search terms by exact string, so
+# silently dropping any of the original terms would break real,
+# already-passing test coverage for no reason. dict.fromkeys(...) dedupes
+# while preserving first-seen order (a plain set() would not).
+NEWS_SEARCH_TERMS = list(dict.fromkeys(
+    [
+        '"Remedy Skin Clinic"',
+        '"Remedy BGC"',
+        '"Remedy Vertis North"',
+        '"Skin Bar by Remedy"',
+    ]
+    + [f'"{alias}"' for alias in BRAND_ALIASES["Remedy"]]
+))
 
 # Maps an outlet name (as returned in a GNews article's source.name) to the
 # Rate Card tier remedy-pulse-mockup.html's EMV tab uses to price a
@@ -127,9 +216,17 @@ REDDIT_SUBREDDITS = [
 # stream). Mirrors NEWS_SEARCH_TERMS's own narrow-terms reasoning directly
 # above: a bare brand word like "Remedy" is generic and pulls in unrelated
 # results, so every term names a specific branch or sub-brand instead.
-REDDIT_SEARCH_TERMS = [
-    "Remedy Skin Clinic",
-    "Remedy BGC",
-    "Remedy Vertis North",
-    "Skin Bar by Remedy",
-]
+#
+# Extended (8.8) the same way NEWS_SEARCH_TERMS was — merged with, not
+# replacing, the original terms (test_fetch_reddit_mentions.py mocks
+# specific terms by exact string; see NEWS_SEARCH_TERMS's comment above for
+# the full reasoning).
+REDDIT_SEARCH_TERMS = list(dict.fromkeys(
+    [
+        "Remedy Skin Clinic",
+        "Remedy BGC",
+        "Remedy Vertis North",
+        "Skin Bar by Remedy",
+    ]
+    + BRAND_ALIASES["Remedy"]
+))

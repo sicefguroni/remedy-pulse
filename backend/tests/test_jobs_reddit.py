@@ -8,12 +8,30 @@ Nothing here makes a real network/PRAW call, and praw itself never needs
 to be installed to run these.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
 import app.jobs.reddit_job as reddit_job
 from app.models import IngestionRun, Mention, RunStatus
+
+# A relative "5 days ago" timestamp, computed at import time - NOT a
+# hardcoded absolute date. Phase 8's 9.2 backfill window
+# (is_within_backfill_window(), 90 days) filters items by real wall-clock
+# time, so a fixture pinned to a fixed calendar date silently ages out of
+# that window the longer this test suite exists (see the identical fix
+# in test_jobs_meta.py, where a hardcoded date HAD already aged out).
+_RECENT_PUBLISHED_AT = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+
+# A distinct sentinel from None - _mention_row's own `published_at`
+# parameter needs to accept an explicit None (some tests deliberately
+# construct a row with no date, e.g. test_run_no_published_at_stores_null)
+# as different from "caller didn't pass anything, use the default recent
+# date." Overloading None for both would silently break the explicit-None
+# tests the moment a default value is introduced - which is exactly what
+# happened here on the first attempt at this fix, caught by rerunning the
+# full suite rather than just the tests touched.
+_UNSET = object()
 
 
 def _mention_row(
@@ -21,9 +39,11 @@ def _mention_row(
     subreddit="PhilippinesSkincare",
     author="skin_a1b2c3d4",
     text="Went last week, results were great.",
-    published_at="2026-07-01T09:00:00+00:00",
+    published_at=_UNSET,
     source_url="https://www.reddit.com/r/PhilippinesSkincare/comments/abc123/",
 ):
+    if published_at is _UNSET:
+        published_at = _RECENT_PUBLISHED_AT
     return {
         "platform": "Reddit",
         "source": "reddit",
@@ -80,7 +100,10 @@ def test_run_success_ingests_mentions_and_records_success_run(sqlite_session, mo
     assert a1.text == "Went last week, results were great."
     assert a1.url == "https://www.reddit.com/r/PhilippinesSkincare/comments/a1/"
     assert a1.sentiment is None
-    assert a1.published_at.replace(tzinfo=None) == datetime(2026, 7, 1, 9, 0, 0)
+    # Compared against _RECENT_PUBLISHED_AT (not a hardcoded literal) since
+    # that's what _mention_row()'s default actually put on this row - see
+    # that fixture's own comment for why it's relative-to-now, not fixed.
+    assert a1.published_at.replace(tzinfo=None) == datetime.fromisoformat(_RECENT_PUBLISHED_AT).replace(tzinfo=None)
     assert a1.raw_payload["fullname"] == "t3_a1"
     assert a1.raw_payload["sourceUrl"] == "https://www.reddit.com/r/PhilippinesSkincare/comments/a1/"
 

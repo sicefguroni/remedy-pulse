@@ -54,7 +54,7 @@ if _BACKEND_ROOT not in sys.path:
 
 import fetch_reddit_mentions  # noqa: E402
 from app.models import RunStatus  # noqa: E402
-from app.repository import record_ingestion, start_run  # noqa: E402
+from app.repository import is_within_backfill_window, record_ingestion, start_run  # noqa: E402
 from fetch_reddit_mentions import fetch_all_mentions, get_reddit_client  # noqa: E402
 
 SOURCE_NAME = "reddit"
@@ -99,6 +99,16 @@ def run(session: Session) -> None:
         mentions = fetch_all_mentions(reddit)
 
         for item in mentions:
+            published_at = _parse_published_at(item.get("publishedAt"))
+
+            # 9.2 backfill policy: excluded entirely (not counted toward
+            # items_seen either) - this is Reddit keyword search, exactly
+            # the "how far back do we search" cost/volume case the PRD's
+            # Non-Goal is about. See
+            # app.repository.is_within_backfill_window's docstring.
+            if not is_within_backfill_window(published_at):
+                continue
+
             recorder.items_seen += 1
 
             fullname = item.get("fullname")
@@ -120,7 +130,7 @@ def run(session: Session) -> None:
                 text=item.get("text"),
                 url=item.get("sourceUrl"),
                 sentiment=item.get("sentiment"),
-                published_at=_parse_published_at(item.get("publishedAt")),
+                published_at=published_at,
                 raw_payload=item,
             )
             recorder.items_ingested += 1

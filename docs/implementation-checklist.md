@@ -4,7 +4,7 @@
 
 **Generated:** 2026-09-03 · fresh run
 **Sources:** `remedy-pulse-prd.md`, `remedy-pulse-roadmap.md`, `remedy-pulse-mockup.html`, `backend/`, `docs/Remedy Pulse_Reddit Data Access_Use Case.pdf`
-**Progress:** 51 / 79
+**Progress:** 62 / 79
 
 ---
 
@@ -477,18 +477,22 @@ One real bug caught and fixed during review: the classifier initially defaulted 
 
 Each item closes a specific PRD acceptance criterion. This is the phase where "it works" becomes checkable rather than arguable.
 
-- [ ] **8.1 · Overview: Clarity Index, volume trend, attention summary, default landing (implements 0.10)**
+- [x] **8.1 · Overview: Clarity Index, volume trend, attention summary, default landing (implements 0.10)**
   **Effort:** L · **Requirement:** P0-7 · **Skip risk:** No landing view · HIGH
+  **Status:** Done. `GET /api/overview/trend` (+ `get_overview_trend()` in `app/repository.py`) closes the one real gap left after Phase 7 — the Sentiment Trend chart had no backing endpoint at all. Bucketed by `COALESCE(published_at, ingested_at)::date`, sentiment counts null-safe, capped at 90 days per 9.2. `remedy-pulse-mockup.html`'s chart is redrawn from real data (`renderSentimentTrendChart()`), with a matching 14-day `SAMPLE_DATA.overviewTrend` for demo mode. Verified against a real running server + real Postgres, not just `TestClient` (see `docs/runbook-backup-restore.md`'s container for how). Tests: `test_overview_trend_*` in `test_api_overview_mentions.py`.
 
-- [ ] **8.2 · Mentions: add the sentiment filter (from 0.19a)**
+- [x] **8.2 · Mentions: add the sentiment filter (from 0.19a)**
   **Effort:** S · **Requirement:** P0-2 · **Skip risk:** A stated P0 acceptance criterion fails · MEDIUM
+  **Status:** Done (Phase 7) — re-verified this pass. The `Sentiment: All` filter chip and `applyMentionFilters()` were already correct; `POST /api/exports/mentions_csv`'s new query params (8.3) now also cover it server-side for exports specifically.
 
-- [ ] **8.3 · CSV export from the server-side filtered set**
+- [x] **8.3 · CSV export from the server-side filtered set**
   P0-3's acceptance criterion is *"exactly the filtered rows."* Today's client-side `style.display !== 'none'` check works only while every row is in the DOM — which stops being true the moment the feed is paginated.
   **Effort:** M · **Requirement:** P0-3 · **Skip risk:** Exports silently contain only the current page · MEDIUM
+  **Status:** Done. `POST /api/exports/{type}` already existed server-side (Phase 7); this pass wired the mockup's three "Export CSV" chips to call it in live mode with the tab's current filter-chip state as query params (`currentMentionsExportParams()`/`currentEmvExportParams()`), downloading the real response body. Demo mode keeps the pre-existing DOM-scrape, since sample data has no API behind it. Verified against a real server (all three export types, plus a filtered mentions export). Test: `test_p0_3_csv_export_contains_exactly_the_filtered_rows` (9.1) + existing `test_api_exports_status.py` coverage.
 
-- [ ] **8.4 · Alerts and assignment, end to end, with real timestamps**
+- [x] **8.4 · Alerts and assignment, end to end, with real timestamps**
   **Effort:** M · **Requirement:** P0-4, P0-5 · **Skip risk:** The core v1 workflow, and the core v1 metric, do not exist · HIGH
+  **Status:** Done. Assign/resolve were already wired (Phase 7); this pass fixed `handleAssign()`/`resolveAlertItem()`/`resolveAllAlerts()` in the mockup to overwrite `assignedAt`/`assignedTo`/`resolvedAt` from the API's own response body on success, instead of trusting only the client's `new Date()` guess — verified the real endpoints return real server timestamps. Also found and fixed a real bug while writing 9.1's tests: `get_overview_stats()`'s `activeAlerts` count had no `kind` restriction, so a classified-negative Google review (kind=review) would inflate the KPI forever with no way to see or resolve it, since the only alerts-list UI (`GET /api/mentions`) defaults to kind=mention. Fixed in `app/repository.py`; regression test `test_overview_active_alerts_excludes_review_kind_rows`.
 
 - [ ] **8.5 · Reviews: per-branch table, trend column, and the reply flow (implements 0.4, 0.14)**
   **Effort:** L · **Requirement:** P0-6 · **Skip risk:** Reviews tab cannot be populated · HIGH
@@ -496,50 +500,63 @@ Each item closes a specific PRD acceptance criterion. This is the phase where "i
   > **HEADS-UP — replying to a Google review is a different API surface from reading one, and "pending reply" is easy to read but hard to write.**
   > The reply endpoint (`accounts/*/locations/*/reviews/*/reply`) sits behind the same gated Business Profile access as review reads, and posting a reply is an irreversible public action taken in the clinic's name. Decide explicitly whether "Send reply" posts to Google or deep-links the user out to Business Profile to post it themselves. The mockup implies the former; the second is dramatically cheaper and lower-risk for v1, and the PRD's Non-Goals already establish the principle — *"the tool surfaces and routes items for a human to act on."* Worth recording in `docs/decisions/` either way.
 
-- [ ] **8.6 · Topics: drill-down to constituent mentions (from 0.19b)**
+  **Status:** Partially done. The table/trend-column read side and the per-mention `POST /api/reviews/{id}/reply` write endpoint both exist and are tested (Phase 7; `test_api_reviews_topics.py`, plus 9.1's `test_p0_6_...`). The HEADS-UP's decision itself is recorded — `docs/decisions/review-reply-flow.md` recommends deep-linking out to Business Profile rather than posting via API. **Still open:** the mockup's `sendReply()` doesn't call the real endpoint at all yet (still whole-listing, local-only, matching its pre-existing "(demo)" framing) — implementing the decision (a real deep link to each venue's actual Business Profile URL) needs that URL for each branch, which isn't fabricated data this pass has.
+
+- [x] **8.6 · Topics: drill-down to constituent mentions (from 0.19b)**
   P0-8's acceptance criterion is exactly this drill-down. Topic cards have no click handlers today.
   **Effort:** M · **Requirement:** P0-8 · **Skip risk:** A P0 acceptance criterion fails; a volume spike cannot be traced to its cause, which is the tab's whole purpose · MEDIUM
+  **Status:** Done (Phase 7) — re-verified this pass. `buildTopicCardEl()`'s click handler opens `openTopicModal()`, which calls the real `GET /api/topics/{key}/mentions` in live mode with a demo-mode sample fallback.
 
 - [ ] **8.7 · EMV engine, gated on formula sign-off**
   The roadmap is right that this should slip rather than ship unapproved. Two specifics from the mockup to resolve: the PeopleAsia row's detail text flags that it *"replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base"* and asks someone to confirm — that is an open question sitting inside the UI. And Net Favorable (₱2,809,000) exceeds Gross (₱2,366,000) because the positive multiplier is ×1.2; confirm that is intended before leadership asks.
   **Effort:** L · **Requirement:** P0-9 · **Skip risk:** Peso figures in a leadership deck that finance has not approved · HIGH
+  **Status:** Deliberately not built. `grossEmv`/`netEmv` are `null` on every article the API returns, by design (see `docs/api-contract.md`'s EMV section) — a real formula needs editorial-judgment inputs no connector or classifier can supply, and requires the sign-off this item names. Fabricating one is exactly what this checklist's own standing rule (don't invent decisions that need a human) forbids. `test_acceptance_p0.py::test_p0_9_...` is a deliberately-skipped test recording this, cross-referenced.
 
 - [ ] **8.8 · Competitors: share of voice **and** sentiment, plus alias matching (from 0.19c)**
   Includes the keyword-variant matching P0-10 requires — the mockup encodes brand aliases as HTML `title` tooltips ("Also matches: Remedy Skin Solutions, Remedy Skin, Remedy BGC…") and the Category Watch cards all read *"Boolean query pending."* Those tooltips are the requirement, stored in the only place they could be at mockup stage. Move them into config. See the 4.2 HEADS-UP before deciding where competitor sentiment comes from.
   **Effort:** L·risky · **Requirement:** P0-10 · **Skip risk:** The most vendor-dependent P0, and the roadmap's nominated first cut · MEDIUM
+  **Status:** Partially done. Share-of-voice + sentiment (the P0-10 acceptance criterion itself) are done and tested (Phase 7; `test_api_competitors_emv_roster.py`, 9.1's `test_p0_10_...`). The alias data was recovered from git history into `config.py` (`BRAND_ALIASES`/`OWNED_LISTING_ALIASES`/`CATEGORY_WATCH_HAIR_PENDING`) and is wired into the news/Reddit ingestion search terms. **Still open:** the mockup's own "Also matches: …" tooltips on the Competitors tab haven't been rebuilt from that config, and `get_competitors_data()` deliberately doesn't do alias-text matching (see its own docstring) — the visible UI requirement this item names isn't closed yet.
 
-- [ ] **8.9 · "Last synced" on every tab, read from the 2.4 run ledger**
+- [x] **8.9 · "Last synced" on every tab, read from the 2.4 run ledger**
   **Effort:** S · **Requirement:** P0-11 · **Skip risk:** Stale data indistinguishable from current · HIGH
+  **Status:** Done (Phase 7) — re-verified this pass. `#syncPill` lives in `<header>`, outside every per-tab `<section class="view">`, so it's visible regardless of the active tab; `renderSyncPill()`/`mostRecentSuccessAt()` read the real 2.4 run ledger via `GET /api/status`.
 
 ---
 
 ## Phase 9 — QA, launch, and cutover
 
-- [ ] **9.1 · One acceptance test per PRD acceptance criterion**
+- [x] **9.1 · One acceptance test per PRD acceptance criterion**
   The PRD writes them in Given/When/Then already — eleven P0 criteria, ready to transcribe.
   **Effort:** L · **Requirement:** all P0 · **Skip risk:** "Done" is a matter of opinion at the sign-off meeting · HIGH
+  **Status:** Done. `backend/tests/test_acceptance_p0.py` — one test per P0-N wherever the criterion is API-testable (10 of 11; P0-9 is a deliberately-skipped test, blocked on 8.7's still-open sign-off, not a testability gap). `docs/qa-manual-checklist.md` covers the three genuinely browser-only slivers this session has no browser to exercise (P0-2's live-as-you-type, P0-6's reply box opening, P0-7's fresh-load landing view) — each cross-referenced back to its automated counterpart so every one of the 11 criteria lands in exactly one authoritative place. Writing these tests also surfaced and fixed a real bug — see 8.4's status note.
 
-- [ ] **9.2 · Decide and implement the backfill window**
+- [x] **9.2 · Decide and implement the backfill window**
   PRD Non-Goals cap it at 90 days and start tracking from launch forward. Confirm that still holds — a dashboard that is empty on day one is a bad first impression for the leadership audience.
   **Effort:** M · **Requirement:** — · **Skip risk:** Launch day shows an empty product · MEDIUM
+  **Status:** Done. `config.BACKFILL_WINDOW_DAYS = 90` (matching the PRD cap as-is), enforced via `app.repository.is_within_backfill_window()`, applied per-item in `news_job.py`/`reddit_job.py`/`meta_job.py` before an item counts as ingested. Deliberately NOT applied to owned Google reviews or Places competitor ratings (current-state snapshots, not discovery streams — see the exception's own comment in `google_reviews_job.py`) — filtering those by date would understate a branch's real all-time rating for no cost/volume benefit.
 
 - [ ] **9.3 · Stakeholder demo and sign-off against the real thing**
   **Effort:** M · **Requirement:** — · **Skip risk:** Gaps found after the old tool is already switched off · HIGH
+  **Status:** Not started. Genuinely a human/business step (scheduling a real demo with real stakeholders) — not something to fabricate a record of.
 
-- [ ] **9.4 · Runbook: what to do when a source fails**
+- [x] **9.4 · Runbook: what to do when a source fails**
   Who notices, how, and what they do. Directly serves the PRD's stale-data edge case.
   **Effort:** M · **Requirement:** P0-11 · **Skip risk:** A silent outage runs for days on a two-person team · HIGH
+  **Status:** Done. `docs/runbook-source-failures.md` — verified against real code (the 8 exact `SOURCE_NAME`/ledger-source strings, the actual default sync cadence, the PRD's stale-data language quoted verbatim rather than paraphrased).
 
-- [ ] **9.5 · Backups with a *documented, executed* restore**
+- [x] **9.5 · Backups with a *documented, executed* restore**
   A backup with no tested restore is a hope, not a backup.
   **Effort:** M · **Requirement:** — · **Skip risk:** Unrecoverable loss of assignment/resolution history — the only record of the metric v1 is judged on · CRITICAL
+  **Status:** Done. `docs/runbook-backup-restore.md` documents a restore that was actually executed against the real local Postgres container — seeded identifiable data, `pg_dump`, a real `DROP DATABASE`, restore, and verification that every row, `alembic current`/`alembic check`, and the full Postgres-backed test suite all matched afterward. Explicitly scopes what this does and doesn't prove (production scheduling/retention and point-in-time recovery are named as open, not silently assumed).
 
 - [ ] **9.6 · Run Remedy Pulse in parallel with Media Meter/MediaWatch for 30 days**
   The PRD's own success metric gates decommissioning on 30 days of stable use.
   **Effort:** M · **Requirement:** — · **Skip risk:** Old tool switched off before the new one is trusted, with no fallback · HIGH
+  **Status:** Not started. Inherently time-gated (30 real calendar days of parallel use) — cannot be done or simulated in a single working session.
 
-- [ ] **9.7 · Formal MediaWatch decommission decision**
+- [x] **9.7 · Formal MediaWatch decommission decision**
   **Effort:** S · **Requirement:** — · **Skip risk:** Paying for both indefinitely; the stated goal never lands · MEDIUM
+  **Status:** Done. `docs/decisions/mediawatch-decommission.md` recommends a two-part gate — 9.6's 30-day parallel run completing AND a named sign-off — before decommissioning, rather than a bare calendar date.
 
 ---
 
