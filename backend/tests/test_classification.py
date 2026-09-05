@@ -1,6 +1,6 @@
 """Tests for app/classification.py (Phase 6: 6.1, 6.2, 6.3).
 
-The LLM call is always mocked — never make a real Anthropic API call from
+The LLM call is always mocked — never make a real Groq API call from
 the test suite (cost, network dependency, non-determinism). Every test
 monkeypatches `classification._call_model`, which is the one seam
 classify_sentiment() calls out to the model through."""
@@ -110,9 +110,9 @@ def test_classify_sentiment_blank_text_short_circuits_without_calling_model(monk
 
 
 def test_classify_sentiment_raises_clear_error_when_api_key_missing(monkeypatch):
-    monkeypatch.setattr(classification, "ANTHROPIC_API_KEY", None)
+    monkeypatch.setattr(classification, "GROQ_API_KEY", None)
 
-    with pytest.raises(ClassifierNotConfiguredError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(ClassifierNotConfiguredError, match="GROQ_API_KEY"):
         classify_sentiment("some text")
 
 

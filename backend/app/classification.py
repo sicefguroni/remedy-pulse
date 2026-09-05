@@ -8,6 +8,13 @@ the team to ratify — same status as every other `docs/decisions/*.md` in
 this repo — not a unilateral technical decision that also happens to bind
 the team's acceptable-risk threshold for the alert workflow.
 
+Model provider: Groq (`llama-3.3-70b-versatile`), switched from Claude
+Opus 5 on explicit user direction — see the decision doc's "Update
+(2026-09-05)" section for why (cost: Anthropic has no real free tier,
+unlike everything else this project runs on) and what that trade-off
+actually costs in classification quality, honestly, rather than assumed
+away.
+
 --- 6.1: one call does both sentiment AND crisis/digest routing ---
 
 `classify_sentiment()` calls the model exactly once per item and asks for
@@ -90,17 +97,11 @@ from app.models import Mention
 # of scope for touching config.py (see the batch's file-ownership note).
 load_dotenv()
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # See docs/decisions/09-sentiment-classifier-choice.md for why this model.
-MODEL_ID = "claude-opus-5"
+MODEL_ID = "llama-3.3-70b-versatile"
 MAX_TOKENS = 1024
-# Opus 5 runs adaptive thinking ON by default (unlike Opus 4.8/4.7) - "low"
-# keeps this bounded classification call (sentiment + routing over one
-# short text, not multi-step reasoning) fast and cheap without giving up
-# the model-tier quality the decision doc argues for; matches
-# topic_tagging.py's identical choice for its own single-call taxonomy tag.
-_EFFORT = "low"
 
 VALID_SENTIMENTS = {"Positive", "Neutral", "Negative"}
 VALID_ALERT_CATEGORIES = {"crisis", "digest"}
@@ -108,8 +109,8 @@ VALID_ALERT_CATEGORIES = {"crisis", "digest"}
 
 class ClassifierNotConfiguredError(RuntimeError):
     """Raised by classify_sentiment() (via _get_client()) when the
-    classifier can't run at all — no ANTHROPIC_API_KEY, or the `anthropic`
-    package isn't installed. Matches this project's existing connector
+    classifier can't run at all — no GROQ_API_KEY, or the `groq` package
+    isn't installed. Matches this project's existing connector
     convention of a clear, specific failure naming the exact problem (see
     fetch_news_articles.py's `raise SystemExit("GNEWS_API_KEY is not
     set...")` and app.auth.DuplicateEmailError) — a RuntimeError, not
@@ -120,17 +121,17 @@ class ClassifierNotConfiguredError(RuntimeError):
 
 
 class _ApiCallError(RuntimeError):
-    """Internal: raised by _call_model() when the Anthropic SDK call
-    itself fails (rate limit, timeout, a 5xx from the provider — a
-    response never came back, as opposed to _parse_response()'s "a
-    response came back but wasn't the expected shape"). Deliberately NOT
-    `anthropic.APIError` directly: catching that here would require
-    `anthropic` to be a safely-bound name in classify_sentiment()'s scope
-    even when the package isn't installed (the ClassifierNotConfiguredError
-    case), which risks a NameError masking that cleaner error instead of
-    propagating it. _call_model() is the one place that already knows
-    `anthropic` imported successfully (it's downstream of _get_client()),
-    so it's the only place that catches the SDK's own exception type."""
+    """Internal: raised by _call_model() when the Groq SDK call itself
+    fails (rate limit, timeout, a 5xx from the provider — a response
+    never came back, as opposed to _parse_response()'s "a response came
+    back but wasn't the expected shape"). Deliberately NOT `groq.APIError`
+    directly: catching that here would require `groq` to be a safely-bound
+    name in classify_sentiment()'s scope even when the package isn't
+    installed (the ClassifierNotConfiguredError case), which risks a
+    NameError masking that cleaner error instead of propagating it.
+    _call_model() is the one place that already knows `groq` imported
+    successfully (it's downstream of _get_client()), so it's the only
+    place that catches the SDK's own exception type."""
 
 
 @dataclass
@@ -201,61 +202,65 @@ def _build_user_prompt(text: str) -> str:
 
 
 def _get_client():
-    """Builds the Anthropic client, or raises ClassifierNotConfiguredError
-    with a message naming exactly what's missing. Kept separate from
+    """Builds the Groq client, or raises ClassifierNotConfiguredError with
+    a message naming exactly what's missing. Kept separate from
     classify_sentiment() so a caller/test can also fail fast on
     configuration without needing to pass in any text."""
-    if not ANTHROPIC_API_KEY:
+    if not GROQ_API_KEY:
         raise ClassifierNotConfiguredError(
-            "ANTHROPIC_API_KEY is not set. Sentiment classification calls "
-            "the Anthropic API and cannot run without it. Set "
-            "ANTHROPIC_API_KEY in the environment (or .env) running this "
-            "job. This project's .env.example/requirements.txt have not "
-            "been updated for this yet — see the classification module's "
-            "task report for the exact dependency/env var needed."
+            "GROQ_API_KEY is not set. Sentiment classification calls "
+            "the Groq API and cannot run without it. Set "
+            "GROQ_API_KEY in the environment (or .env) running this job."
         )
     try:
-        import anthropic
+        import groq
     except ImportError as exc:
         raise ClassifierNotConfiguredError(
-            "The `anthropic` package is not installed. Sentiment "
-            "classification needs the Anthropic Python SDK (`pip install "
-            "anthropic`) — it is not yet declared in "
-            "backend/requirements.txt; see this task's final report."
+            "The `groq` package is not installed. Sentiment "
+            "classification needs the Groq Python SDK (`pip install "
+            "groq`)."
         ) from exc
-    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return groq.Groq(api_key=GROQ_API_KEY)
 
 
 def _call_model(text: str) -> str:
     """Makes the one classification call and returns the raw text of the
     model's reply. Isolated into its own function specifically so tests
     can monkeypatch just this call (see test_classification.py) instead
-    of mocking the whole Anthropic SDK client.
+    of mocking the whole Groq SDK client.
 
     Raises ClassifierNotConfiguredError (via _get_client(), uncaught here
     - a caller should stop the batch, not retry) or _ApiCallError (the
     SDK call itself failed - a caller should degrade this one item, per
-    classify_sentiment()'s handling of it) - never anthropic.APIError
-    directly, so a caller never needs `anthropic` importable just to
+    classify_sentiment()'s handling of it) - never groq.APIError
+    directly, so a caller never needs `groq` importable just to
     catch this function's own failures."""
     client = _get_client()
-    # anthropic is guaranteed importable here - _get_client() above either
+    # groq is guaranteed importable here - _get_client() above either
     # already imported it successfully or raised ClassifierNotConfiguredError,
     # which propagates out of this function uncaught (not the except clause
     # below).
-    import anthropic
+    import groq
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=MODEL_ID,
-            max_tokens=MAX_TOKENS,
-            system=_SYSTEM_PROMPT,
-            output_config={"effort": _EFFORT},
-            messages=[{"role": "user", "content": _build_user_prompt(text)}],
+            max_completion_tokens=MAX_TOKENS,
+            # Groq's native JSON mode - a real reliability improvement this
+            # switch brings, not scope creep: it directly replaces what
+            # _strip_markdown_fence() below was only ever a workaround for.
+            # Requires the word "json" to appear somewhere in the prompt,
+            # which _SYSTEM_PROMPT's own "Respond with ONLY a single JSON
+            # object" already satisfies.
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": _build_user_prompt(text)},
+            ],
         )
-    except anthropic.APIError as exc:
+    except groq.APIError as exc:
         raise _ApiCallError(str(exc)) from exc
-    return "".join(block.text for block in response.content if block.type == "text")
+    return response.choices[0].message.content or ""
 
 
 def _strip_markdown_fence(raw: str) -> str:
@@ -313,8 +318,8 @@ def classify_sentiment(text: str) -> ClassificationResult:
     model call. See the module docstring for why these two decisions
     share a single call.
 
-    Raises ClassifierNotConfiguredError if ANTHROPIC_API_KEY isn't set (or
-    the `anthropic` package isn't installed) — a caller should catch this
+    Raises ClassifierNotConfiguredError if GROQ_API_KEY isn't set (or
+    the `groq` package isn't installed) — a caller should catch this
     specifically and decide how to degrade (e.g. skip the item, alert an
     operator), not let it crash a whole batch job silently.
 

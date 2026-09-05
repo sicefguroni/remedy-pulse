@@ -323,21 +323,22 @@ via `POST /api/auth/login`.
 
 ## Sentiment classification and alert routing (Phase 6)
 
-`app/classification.py` — one Claude API call per item does both
+`app/classification.py` — one Groq API call per item does both
 sentiment classification (6.1) and crisis/digest alert routing (6.3)
 together, since the five crisis / five digest conditions (copied
 verbatim from the mockup's `openAlertRulesModal()`, citing spec §9.2)
 are qualitative judgment calls, not independent of sentiment. Model:
-`claude-opus-5` — this project's standing default per the `claude-api`
-skill's policy (see `docs/decisions/09-sentiment-classifier-choice.md`,
-which also proposes a concrete recall bar for the team to ratify: the
-PRD's own open question about "what precision/recall bar is acceptable
-before this drives the alert workflow unsupervised"). A missing
-`ANTHROPIC_API_KEY` raises `ClassifierNotConfiguredError` (a whole batch
-would fail identically, so stop immediately rather than degrade N times
-in a row); a transient API failure or an unparseable response degrades
-to a low-confidence result instead, so one bad item never crashes
-`classify_unclassified_batch()`.
+`llama-3.3-70b-versatile` via Groq — switched from Claude Opus 5 on
+explicit user direction (see `docs/decisions/09-sentiment-classifier-choice.md`'s
+"Update (2026-09-05)" section for why, and the honest trade-off it
+names; that document also proposes a concrete recall bar for the team
+to ratify: the PRD's own open question about "what precision/recall
+bar is acceptable before this drives the alert workflow unsupervised").
+A missing `GROQ_API_KEY` raises `ClassifierNotConfiguredError` (a whole
+batch would fail identically, so stop immediately rather than degrade N
+times in a row); a transient API failure or an unparseable response
+degrades to a low-confidence result instead, so one bad item never
+crashes `classify_unclassified_batch()`.
 
 6.2 (the two conflicting definitions of `Mention.sentiment` — one
 star-derived, one text-derived) is resolved here too: a review's

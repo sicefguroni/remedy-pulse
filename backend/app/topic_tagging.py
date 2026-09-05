@@ -16,18 +16,22 @@ clustering later.
 
 Design notes:
 
-- One Claude API call per item (`tag_topics()`), not a batch endpoint —
+- One model call per item (`tag_topics()`), not a batch endpoint —
   matches this project's existing 6.1 lean ("hosted LLM, batched [meaning
   called per item across many items], with the raw text and the label
   both stored so you can re-score later") for the sibling sentiment
   classifier. Topic tagging is a small, cheap classification call
-  (`max_tokens=256`, `output_config.effort="low"` — a fixed-list
-  membership check doesn't need deep reasoning), same reasoning 6.1
-  already accepted for cost at this project's stated per-week item
-  volume.
-- Model: `claude-opus-5` — this project's default per the claude-api
-  skill ("ALWAYS use claude-opus-5 unless the user explicitly names a
-  different model"); nothing in this batch's scope named a different one.
+  (`max_completion_tokens=256` — a fixed-list membership check doesn't
+  need deep reasoning), same reasoning 6.1 already accepted for cost at
+  this project's stated per-week item volume.
+- Model provider: Groq (`llama-3.3-70b-versatile`), same as
+  `app.classification` — switched from Claude on explicit user
+  direction; see `docs/decisions/09-sentiment-classifier-choice.md`'s
+  "Update (2026-09-05)" section. `_call_model()` below mirrors
+  `app.classification._call_model()`'s shape deliberately, including the
+  same `ClassifierNotConfiguredError`/`_ApiCallError` split, so the two
+  sibling modules stay aligned on how they talk to the same provider
+  rather than each growing its own copy that drifts.
 - `classification.py` does not exist yet on this branch (checked before
   writing this file) — the API layer / sentiment classifier is being
   built in parallel by another agent. This module's error handling
@@ -81,7 +85,9 @@ TOPIC_TAXONOMY: dict[str, str] = {
     "booking": "Booking & Follow-up Response",
 }
 
-_MODEL = "claude-opus-5"
+# Same provider/model as app.classification - see that module's docstring
+# and docs/decisions/09-sentiment-classifier-choice.md.
+_MODEL = "llama-3.3-70b-versatile"
 
 _SYSTEM_PROMPT = (
     "You are a topic-tagging assistant for Remedy Skin Clinic's reputation "
@@ -99,9 +105,62 @@ _SYSTEM_PROMPT = (
 )
 
 
+class _ApiCallError(RuntimeError):
+    """Internal: mirrors app.classification._ApiCallError - raised by
+    _call_model() when the Groq SDK call itself fails, caught by
+    tag_topics() to become a logged [] rather than a crash. Not imported
+    from app.classification: that name is that module's own internal
+    detail, not a shared contract - only ClassifierNotConfiguredError is
+    actually shared between the two modules."""
+
+
+def _call_model(text: str) -> str:
+    """Makes the one topic-tagging call and returns the raw text of the
+    model's reply. Isolated into its own function specifically so tests
+    can monkeypatch just this call (see test_topic_tagging.py) instead of
+    mocking the whole Groq SDK client - mirrors
+    app.classification._call_model()'s shape deliberately.
+
+    Raises ClassifierNotConfiguredError (uncaught here - tag_topics()
+    lets it propagate, since every remaining item in a batch would fail
+    identically) or _ApiCallError (the SDK call itself failed -
+    tag_topics() catches this and degrades to [])."""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise ClassifierNotConfiguredError(
+            "GROQ_API_KEY is not set. Topic tagging calls the Groq API "
+            "and cannot run without it."
+        )
+    try:
+        import groq
+    except ImportError as exc:
+        raise ClassifierNotConfiguredError(
+            "The `groq` package is not installed. Topic tagging needs "
+            "the Groq Python SDK (`pip install groq`)."
+        ) from exc
+
+    client = groq.Groq(api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model=_MODEL,
+            max_completion_tokens=256,
+            # Groq's native JSON mode - see app.classification._call_model()'s
+            # identical choice. _SYSTEM_PROMPT already says "JSON object",
+            # satisfying the one requirement this mode imposes.
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": text},
+            ],
+        )
+    except groq.APIError as exc:
+        raise _ApiCallError(str(exc)) from exc
+    return response.choices[0].message.content or ""
+
+
 def tag_topics(text: str) -> list[str]:
-    """One Claude API call. Returns the subset of TOPIC_TAXONOMY's keys
-    the model judged `text` to match — zero, one, or several.
+    """One model call. Returns the subset of TOPIC_TAXONOMY's keys the
+    model judged `text` to match — zero, one, or several.
 
     Raises ClassifierNotConfiguredError (shared with app.classification —
     same exception, not a duplicate, reconciled in after review found
@@ -110,9 +169,8 @@ def tag_topics(text: str) -> list[str]:
     classify_sentiment(); every remaining item in a batch would fail
     identically if the key/package is missing, so tag_untagged_batch()
     should stop immediately rather than silently tagging N items as "no
-    topics" when tagging never actually ran) when ANTHROPIC_API_KEY isn't
-    set or the `anthropic` package isn't installed — imported lazily,
-    same guarded-import pattern as app.classification._get_client().
+    topics" when tagging never actually ran) when GROQ_API_KEY isn't set
+    or the `groq` package isn't installed.
 
     Returns [] (never raises) for the failure modes that ARE per-item and
     transient: an API-level error (rate limit, timeout, bad request, ...)
@@ -125,34 +183,12 @@ def tag_topics(text: str) -> list[str]:
     if not text or not text.strip():
         return []
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise ClassifierNotConfiguredError(
-            "ANTHROPIC_API_KEY is not set. Topic tagging calls the "
-            "Anthropic API and cannot run without it."
-        )
     try:
-        import anthropic
-    except ImportError as exc:
-        raise ClassifierNotConfiguredError(
-            "The `anthropic` package is not installed. Topic tagging "
-            "needs the Anthropic Python SDK (`pip install anthropic`)."
-        ) from exc
-
-    client = anthropic.Anthropic(api_key=api_key)
-    try:
-        response = client.messages.create(
-            model=_MODEL,
-            max_tokens=256,
-            system=_SYSTEM_PROMPT,
-            output_config={"effort": "low"},
-            messages=[{"role": "user", "content": text}],
-        )
-    except anthropic.APIError as exc:
-        logger.warning("tag_topics(): Claude API call failed (%s); returning []", exc)
+        raw_text = _call_model(text)
+    except _ApiCallError as exc:
+        logger.warning("tag_topics(): Groq API call failed (%s); returning []", exc)
         return []
 
-    raw_text = next((block.text for block in response.content if block.type == "text"), "")
     try:
         parsed = json.loads(raw_text)
         topics = parsed["topics"]

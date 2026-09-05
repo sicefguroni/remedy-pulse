@@ -1,24 +1,18 @@
 """Tests for the 6.5 topic-tagging module (app/topic_tagging.py). The
-Claude API call is always mocked — see topic_tagging.py's module
+Groq API call is always mocked — see topic_tagging.py's module
 docstring and docs/decisions/11-topic-tagging-approach.md for why this is
-scoped as "tag against a fixed taxonomy," not real clustering. Runs
-against in-memory SQLite (see conftest.sqlite_session), same as
-test_app_auth.py."""
+scoped as "tag against a fixed taxonomy," not real clustering. Every test
+monkeypatches `topic_tagging._call_model`, the one seam tag_topics()
+calls out to the model through - mirrors test_classification.py's
+identical pattern for its sibling module. Runs against in-memory SQLite
+(see conftest.sqlite_session), same as test_app_auth.py."""
 
 import json
-from types import SimpleNamespace
-from unittest.mock import MagicMock
 
-import anthropic
-
-# anthropic 1.x is built on httpx2, not the separate `httpx` PyPI package
-# (see the claude-api skill's API-drift warning) - anthropic.APIError's
-# `request` argument is typed as httpx2.Request, and httpx2 is already an
-# anthropic dependency, so no new test dependency is needed here.
-import httpx2 as httpx
 import pytest
 from sqlalchemy import select
 
+import app.topic_tagging as topic_tagging
 from app.classification import ClassifierNotConfiguredError
 from app.models import Mention
 from app.topic_tagging import (
@@ -29,28 +23,15 @@ from app.topic_tagging import (
 )
 
 
-def _fake_response(payload: dict) -> SimpleNamespace:
-    """Builds a minimal stand-in for the Anthropic SDK's Message object —
-    just enough shape for tag_topics()'s `next(b.text for b in
-    response.content if b.type == "text")` to work."""
-    text_block = SimpleNamespace(type="text", text=json.dumps(payload))
-    return SimpleNamespace(content=[text_block])
-
-
-@pytest.fixture(autouse=True)
-def _api_key(monkeypatch):
-    # Every test gets a fake key set by default; tests that care about the
-    # missing-key case unset it explicitly.
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-fake-key")
+def _response(topics: list[str]) -> str:
+    return json.dumps({"topics": topics})
 
 
 # --- tag_topics ---
 
 
 def test_tag_topics_parses_a_multi_topic_response(monkeypatch):
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = _fake_response({"topics": ["pricing", "booking"]})
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: _response(["pricing", "booking"]))
 
     result = tag_topics("Anyone know the price for Rejuran, and how do I book?")
 
@@ -58,9 +39,7 @@ def test_tag_topics_parses_a_multi_topic_response(monkeypatch):
 
 
 def test_tag_topics_returns_empty_list_when_no_topic_matches(monkeypatch):
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = _fake_response({"topics": []})
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: _response([]))
 
     result = tag_topics("Completely unrelated text about the weather today.")
 
@@ -68,9 +47,7 @@ def test_tag_topics_returns_empty_list_when_no_topic_matches(monkeypatch):
 
 
 def test_tag_topics_returns_a_single_topic_when_exactly_one_matches(monkeypatch):
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = _fake_response({"topics": ["staff-service"]})
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: _response(["staff-service"]))
 
     result = tag_topics("Front desk remembered my name, such a nice touch.")
 
@@ -78,11 +55,7 @@ def test_tag_topics_returns_a_single_topic_when_exactly_one_matches(monkeypatch)
 
 
 def test_tag_topics_drops_unknown_topic_keys_from_the_response(monkeypatch):
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = _fake_response(
-        {"topics": ["pricing", "made-up-topic-key"]}
-    )
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: _response(["pricing", "made-up-topic-key"]))
 
     result = tag_topics("Some text")
 
@@ -90,62 +63,54 @@ def test_tag_topics_drops_unknown_topic_keys_from_the_response(monkeypatch):
 
 
 def test_tag_topics_returns_empty_list_on_malformed_json(monkeypatch):
-    mock_client = MagicMock()
-    text_block = SimpleNamespace(type="text", text="not valid json at all")
-    mock_client.messages.create.return_value = SimpleNamespace(content=[text_block])
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: "not valid json at all")
 
     assert tag_topics("Some text") == []
 
 
 def test_tag_topics_returns_empty_list_when_topics_key_is_missing(monkeypatch):
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = _fake_response({"unexpected": "shape"})
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: json.dumps({"unexpected": "shape"}))
 
     assert tag_topics("Some text") == []
 
 
 def test_tag_topics_returns_empty_list_when_topics_value_is_not_a_list(monkeypatch):
-    mock_client = MagicMock()
-    mock_client.messages.create.return_value = _fake_response({"topics": "pricing"})
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: json.dumps({"topics": "pricing"}))
 
     assert tag_topics("Some text") == []
 
 
 def test_tag_topics_returns_empty_list_on_api_error(monkeypatch):
-    mock_client = MagicMock()
-    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-    mock_client.messages.create.side_effect = anthropic.APIError("boom", request, body=None)
-    monkeypatch.setattr(anthropic, "Anthropic", MagicMock(return_value=mock_client))
+    def _raise_api_error(text):
+        raise topic_tagging._ApiCallError("boom")
+
+    monkeypatch.setattr(topic_tagging, "_call_model", _raise_api_error)
 
     assert tag_topics("Some text") == []
 
 
-def test_tag_topics_raises_clear_error_without_calling_the_api_when_key_is_missing(monkeypatch):
+def test_tag_topics_raises_clear_error_without_calling_the_model_when_key_is_missing(monkeypatch):
     # Reconciled in after review: a missing API key means every remaining
     # item in a batch would fail identically, so this must raise (like
     # app.classification.classify_sentiment()'s equivalent case) rather
     # than silently return [] N times in a row — see
     # ClassifierNotConfiguredError's docstring in app/classification.py.
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    mock_anthropic_cls = MagicMock()
-    monkeypatch.setattr(anthropic, "Anthropic", mock_anthropic_cls)
+    # Deliberately does NOT mock _call_model here - lets the real function
+    # run, so this exercises the real "no key -> raise before ever
+    # importing groq or building a client" path, not a stand-in for it.
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    with pytest.raises(ClassifierNotConfiguredError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(ClassifierNotConfiguredError, match="GROQ_API_KEY"):
         tag_topics("Some text")
 
-    mock_anthropic_cls.assert_not_called()
 
-
-def test_tag_topics_returns_empty_list_for_blank_text_without_calling_the_api(monkeypatch):
-    mock_anthropic_cls = MagicMock()
-    monkeypatch.setattr(anthropic, "Anthropic", mock_anthropic_cls)
+def test_tag_topics_returns_empty_list_for_blank_text_without_calling_the_model(monkeypatch):
+    called = []
+    monkeypatch.setattr(topic_tagging, "_call_model", lambda text: called.append(text) or _response([]))
 
     assert tag_topics("") == []
     assert tag_topics("   ") == []
-    mock_anthropic_cls.assert_not_called()
+    assert called == []  # never reached the model
 
 
 def test_topic_taxonomy_has_the_five_mockup_topics_and_labels():
