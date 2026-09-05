@@ -414,6 +414,84 @@ earliest versions `pip-audit` (5.7, now also a CI step —
 this phase; re-run `pip-audit -r requirements.txt` and bump the pin
 before trusting an older one again.
 
+## The six tabs against real data (Phase 8)
+
+The Phase 7 API layer and mockup refactor left a few real gaps this phase
+closes:
+- `GET /api/overview/trend` (8.1) — the Overview tab's Sentiment Trend
+  chart had no backing endpoint at all when Phase 7 shipped. Bucketed by
+  `COALESCE(published_at, ingested_at)::date`, daily sentiment counts
+  null-safe, capped at 90 days (matching 9.2's backfill window). The
+  mockup redraws its chart from this data in live mode, with a matching
+  sample-data fallback for demo mode.
+- CSV export (8.3) — `POST /api/exports/{type}` already existed; the
+  mockup's three "Export CSV" buttons now call it in live mode with the
+  current tab's filter-chip state as query params, downloading the real
+  response body, instead of scraping only the DOM rows currently
+  visible (which silently drops anything off-page once a feed is
+  paginated).
+- Assign/resolve real timestamps (8.4) — the mockup now overwrites a
+  mention's `assignedAt`/`assignedTo`/`resolvedAt` from the API's own
+  response body on a successful write, rather than trusting only the
+  client's own `new Date()` guess.
+- A real bug, found while writing 9.1's acceptance tests: `GET
+  /api/overview`'s `activeAlerts` count had no `kind` restriction, so a
+  classified-negative Google review (`kind="review"`) would inflate that
+  KPI forever with no way to ever see or resolve it — the only
+  alerts-list UI, `GET /api/mentions`, defaults to `kind="mention"` and
+  can never show a review row. Fixed in `get_overview_stats()`
+  (`app/repository.py`); see `test_overview_active_alerts_excludes_review_kind_rows`.
+
+Two Phase 8 items are real, honestly-tracked gaps, not oversights — see
+`docs/implementation-checklist.md`'s own status notes for each:
+- **8.5** (Reviews reply flow) — the write endpoint exists and is
+  tested, and `docs/decisions/review-reply-flow.md` records the
+  recommended approach (deep-link to Business Profile rather than post
+  via API), but the mockup's `sendReply()` doesn't call anything real
+  yet — it needs each branch's actual Business Profile URL, which isn't
+  fabricated data this phase has.
+- **8.8** (Competitor alias tooltips) — the alias data itself
+  (`config.BRAND_ALIASES`/`OWNED_LISTING_ALIASES`) was recovered from
+  git history and is wired into ingestion search terms, but the
+  mockup's own "Also matches: …" tooltips on the Competitors tab
+  haven't been rebuilt from it yet.
+
+**8.7 (EMV engine) is deliberately not built.** `grossEmv`/`netEmv` stay
+`null` on every article until the formula this item names gets a real
+sign-off — see `docs/api-contract.md`'s EMV section.
+
+## QA and launch readiness (Phase 9)
+
+- **9.1** — `backend/tests/test_acceptance_p0.py` maps all eleven PRD
+  Must-Have (P0) Given/When/Then criteria to real API-level tests
+  wherever the criterion is API-testable (ten of eleven — P0-9 is a
+  deliberately-skipped test blocked on 8.7's sign-off, not a
+  testability gap). `docs/qa-manual-checklist.md` covers the three
+  genuinely browser-only slivers of behavior this working session has
+  no browser to exercise, each cross-referenced back to its automated
+  counterpart.
+- **9.2** — `config.BACKFILL_WINDOW_DAYS = 90`, enforced via
+  `app.repository.is_within_backfill_window()` and applied per-item in
+  the news/Reddit/Meta jobs before an item counts as ingested.
+  Deliberately **not** applied to owned Google reviews or Places
+  competitor ratings — those are current-state snapshots (a branch's
+  real all-time rating), not discovery streams, so filtering them by
+  date would understate them for no cost/volume benefit.
+- **9.4** — `docs/runbook-source-failures.md`: who notices a source
+  outage, how, and what they do about it.
+- **9.5** — `docs/runbook-backup-restore.md`: a backup/restore drill
+  that was actually executed against the real local Postgres container
+  during this phase (seed → `pg_dump` → real `DROP DATABASE` → restore
+  → verify row-for-row, `alembic check`, and the full Postgres test
+  suite), not just a written procedure.
+- **9.7** — `docs/decisions/mediawatch-decommission.md`: a two-part
+  gate (9.6's 30-day parallel run completing, plus a named sign-off)
+  before decommissioning MediaWatch, rather than a bare calendar date.
+
+**9.3** (stakeholder demo) and **9.6** (30-day parallel run) are
+genuinely not startable in a single working session — one is a human
+scheduling step, the other is inherently calendar-gated.
+
 ## Known limitations, honestly
 
 - Individual reviews have no public deep-link URL from either API — this
