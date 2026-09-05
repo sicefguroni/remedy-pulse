@@ -22,6 +22,8 @@ docs/                      Demo guide and supporting reference docs
 
 **To run the dashboard against a real local backend (not sample data):** see [`docs/local-dev-setup.md`](docs/local-dev-setup.md).
 
+**To deploy a real, reachable instance on free-tier cloud services:** see [`docs/runbook-deploy-free-tier.md`](docs/runbook-deploy-free-tier.md) (also published as an interactive artifact, linked at the top of that file).
+
 ## What's next
 
 Connecting the dashboard to live data sources (Google, Meta, Reddit, X) is the next phase of work, gated on Business Profile API access approval from Google. See `backend/README.md` for details on that blocker.
