@@ -1,14 +1,69 @@
 # Decision: sentiment classification method, model choice, and the precision/recall bar (6.1)
 
-**Status:** RECOMMENDATION — not yet ratified. This document proposes an approach, a model
-choice, and a concrete accuracy bar for the team to review and decide on; nothing here has
-been agreed or implemented as policy. It is a technical recommendation for how to build the
-classifier — it is explicitly **not** a unilateral decision about how much classification
-error the business is willing to accept before trusting the alert workflow unsupervised.
-That threshold is a product/risk call (the PRD names it an "engineering" open question, but
-the actual number is a business judgment about acceptable missed-crisis risk vs. reviewer
-workload) — this document proposes a number and the reasoning behind it, for the team to
-ratify, adjust, or reject. It covers checklist item 6.1.
+**Status:** RECOMMENDATION — not yet ratified, except the provider/model choice specifically,
+which **was** made explicitly by the user on 2026-09-05 (see "Update" immediately below) —
+everything else here (the approach, the precision/recall bar) is still a proposal for the
+team to review and decide on, not agreed or implemented as policy. It is explicitly **not**
+a unilateral decision about how much classification error the business is willing to accept
+before trusting the alert workflow unsupervised. That threshold is a product/risk call (the
+PRD names it an "engineering" open question, but the actual number is a business judgment
+about acceptable missed-crisis risk vs. reviewer workload) — this document proposes a number
+and the reasoning behind it, for the team to ratify, adjust, or reject. It covers checklist
+item 6.1.
+
+## Update (2026-09-05): switched to Groq
+
+**The user explicitly directed this switch** ("Let's use Groq as the primary classification
+model") — this is the one part of this document that is no longer a proposal, per the
+`claude-api` skill's own policy ("ALWAYS use claude-opus-5 unless the user explicitly names
+a different model"): an explicit user instruction naming a different provider is exactly the
+named exception, not an override to push back on.
+
+**What changed:** `app/classification.py` and `app/topic_tagging.py` now call Groq's API
+(`llama-3.3-70b-versatile`) instead of Claude Opus 5, via the official `groq` Python SDK
+(`groq==1.7.0`, installed and its client shape — `Groq`, `chat.completions.create`,
+`APIError` — inspected directly against that exact pin before wiring it in, not guessed
+from documentation). `GROQ_API_KEY` replaces `ANTHROPIC_API_KEY` everywhere this project
+reads it (`.env.example`, the GitHub Actions scheduler workflow, `backend/README.md`).
+
+**Why, in the terms this document itself already used:** the "Cost, for context (not the
+deciding factor)" section below was written when every option on the table was a paid
+Claude tier and the gap between them was single-digit dollars a month either way — cost
+genuinely wasn't the deciding factor then. It became one the moment
+`docs/runbook-deploy-free-tier.md` (9's free-tier deploy work) had to flag Anthropic
+explicitly as *"the one line item in this whole stack that isn't actually free"* — every
+other service in that deploy has a genuine recurring free tier; Claude does not. Groq's
+free tier, at this project's stated volume (a few hundred items a week, each a short
+review/mention/press excerpt — not the multi-thousand-token payload some other workloads
+send in one call), is a materially better fit for a project explicitly trying to deploy
+on free-tier infrastructure end to end.
+
+**What this costs, honestly, not assumed away:** the "Model tier" and bar-setting sections
+below argued for Opus specifically because this is "qualitative, judgment-heavy
+classification" — patient safety vs. routine complaint, sarcasm in code-switched Taglish,
+a ten-condition crisis/digest call in one pass. `llama-3.3-70b-versatile` is a real,
+capable instruction-following model, but it is not Claude Opus, and this document made an
+honest case for why the strongest available tier mattered specifically for this task. That
+case doesn't stop being true because the provider changed — it means the recall/precision
+bar this document proposes below (§"The precision/recall bar") is now the thing that
+actually tells you whether the trade-off was worth it, rather than a bar assumed to already
+be cleared. **Nothing in this update claims Groq clears that bar** — no labeled validation
+set existed before this switch either, so there is no before/after comparison to make yet.
+The validation path this document already proposes (§"How this would actually get
+measured") applies unchanged, now measuring the model actually in production instead of
+the one originally proposed.
+
+**A real reliability improvement that came with the switch, not scope creep:** Groq's API
+supports native JSON-mode output (`response_format={"type": "json_object"}`), which Claude's
+plain-prompt-only JSON instruction didn't have an equivalent for — this directly replaces
+what `_strip_markdown_fence()` in `app/classification.py` existed only to work around
+(a model occasionally wrapping its JSON in a markdown fence despite being asked not to).
+That workaround is left in place regardless, as a defensive fallback, not because it's still
+needed.
+
+---
+
+## Original decision (2026-09-04) — provider/model section superseded above; the rest still stands
 
 ## Decision
 

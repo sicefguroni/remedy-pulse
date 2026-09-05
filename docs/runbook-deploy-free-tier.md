@@ -22,7 +22,7 @@ items 1.1–1.3) have actually landed:
 |---|---|---|
 | Needs | Nothing pending | Google Business Profile access (1.1) and/or Meta App Review (1.3) |
 | Sources live | GNews (news/press), Reddit (self-serve script-app tier), Google Places (competitor ratings) | + Google owned reviews, + Instagram/Facebook |
-| Sentiment classification | Works (Anthropic API key, self-serve — see the cost note in §3) | Same |
+| Sentiment classification | Works (Groq API key, self-serve, genuinely free at this project's volume — §3) | Same |
 | What you get | A genuinely live dashboard with real news/Reddit/competitor data, real classification, real assign/resolve — just no owned-review or social data yet | The full six-tab picture |
 
 **Do Stage 1 first regardless of where Phase 1 stands.** It proves the
@@ -41,7 +41,7 @@ set on an already-working deployment), not a redo.
 | News/press | **GNews** | Free tier, self-serve, no approval wait | Already the 1.5 decision's pick |
 | Reddit | **Reddit "script" app** | Free, self-serve, no approval wait | Distinct from the elevated commercial tier 1.2 is still waiting on |
 | Competitor ratings | **Google Places API** | Free monthly credit | Needs a Cloud **billing account attached** even though usage stays inside the free credit — §3 |
-| Sentiment/topic classification | **Anthropic Claude API** | ⚠️ **Not actually free** — see §3 | Self-serve, no approval wait |
+| Sentiment/topic classification | **Groq API** (`llama-3.3-70b-versatile`) | Free, generous at this project's volume | Self-serve, no approval wait — see §3 |
 | Owned reviews | Google Business Profile API | — | Stage 2, gated on 1.1 |
 | Instagram/Facebook | Meta Graph API | — | Stage 2, gated on 1.3 |
 
@@ -116,17 +116,21 @@ repo secrets) is in the table at the end of this section.
    cross into paid usage. Set a budget alert (`backend/README.md`
    already recommends this).
 
-5. **Get an Anthropic API key.** [console.anthropic.com](https://console.anthropic.com).
+5. **Get a Groq API key.** [console.groq.com](https://console.groq.com) →
+   API Keys. Self-serve, no approval wait, and — unlike an equivalent
+   Claude/GPT key would be — a genuine recurring free tier, not a
+   one-time trial credit. Each classification call
+   (`app/classification.py`) is short (a few hundred tokens, one review/
+   mention/press excerpt at a time, not a large payload), which is
+   comfortably inside Groq's free-tier rate limits at this project's
+   stated volume (a few hundred items a week).
 
-   > ⚠️ **This is the one line item in this whole stack that isn't
-   > actually free.** New accounts get a small one-time trial credit,
-   > not a recurring free tier — unlike every other service here. Each
-   > classification call (`app/classification.py`) is cheap per item
-   > (a few hundred tokens), so a demo-scale test run costs a small
-   > fraction of a dollar, not a real budget line — but "generous free
-   > tier" does not honestly describe this one, and the trial credit
-   > will eventually run out. Set a spend limit in the console before
-   > wiring it into a scheduled job that runs unattended.
+   > ⚠️ **The free tier still has real rate limits** (requests/tokens
+   > per minute, and per day) — generous for this project's stated
+   > volume, not unlimited. If `app/scheduler.py`'s hourly run ever logs
+   > a `RateLimitError` from `classify_unclassified_batch()`, that's the
+   > signal to either space the schedule out further or move to a paid
+   > Groq tier — not a sign anything is broken.
 
 6. **Generate `SESSION_SECRET_KEY`.**
    ```
@@ -146,7 +150,7 @@ repo secrets) is in the table at the end of this section.
 | `GNEWS_API_KEY` | — (API doesn't ingest directly) | yes |
 | `REDDIT_CLIENT_ID` / `_SECRET` / `_USERNAME` / `_PASSWORD` | — | yes |
 | `GOOGLE_PLACES_API_KEY` | — | yes |
-| `ANTHROPIC_API_KEY` | — | yes |
+| `GROQ_API_KEY` | — | yes |
 | `SESSION_SECRET_KEY` | **yes** | — (the API signs tokens, not the scheduler) |
 
 The API server itself only ever reads `DATABASE_URL` and
@@ -319,8 +323,11 @@ State these plainly to anyone who asks what they're looking at.
   the pinger doesn't reach Neon directly, so an API request that's been
   quiet for a while may still have a brief extra delay on its first
   database query even with the pinger running.
-- **The Anthropic API key is not free** (§3) — the one real recurring
-  cost in this stack, however small at demo volume.
+- **Groq's free tier has real rate limits** (§3) — generous at this
+  project's stated volume, not unlimited. This is no longer the one
+  paid line item in the stack (it was, before switching from Claude —
+  see `docs/decisions/09-sentiment-classifier-choice.md`'s "Update"
+  section), but it is also not an infinite resource to build against.
 - **Nothing is alerting.** 4.7 makes a source failure visible *in the
   UI*; nothing pages anyone if the scheduler workflow itself stops
   running (a GitHub Actions outage, a secret rotated without updating
