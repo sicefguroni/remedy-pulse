@@ -1,0 +1,51 @@
+name: Ingestion scheduler (free-tier deploy)
+
+# Runs app/scheduler.py's "run once and exit" mode (its own module
+# docstring: "Meant to be called by cron / Windows Task Scheduler on
+# whatever external cadence is convenient") against whichever Postgres
+# DATABASE_URL secret is configured - Neon in docs/runbook-deploy-free-tier.md.
+# get_source_freshness() makes over-calling this harmless (4.6/scheduler.py's
+# own cadence check silently skips a source that isn't due yet), so an
+# hourly cron here is deliberately more frequent than any source's actual
+# 12h default cadence - it just means "check if anything is due," not
+# "force everything to run."
+#
+# Every credential below is optional at the secret level: a source with no
+# credentials configured for it fails cleanly with a clear per-source error
+# (see backend/README.md's ingestion adapters section) rather than crashing
+# the whole run, so this workflow works with only DATABASE_URL set and
+# whichever source secrets you actually have.
+
+on:
+  schedule:
+    - cron: "17 * * * *"  # hourly, offset off the hour so it isn't fighting every other repo's :00 cron
+  workflow_dispatch: {}  # manual "Run workflow" button, for testing without waiting for the schedule
+
+jobs:
+  run-due-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run due ingestion jobs
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
+          REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_IG_BUSINESS_ACCOUNT_ID: ${{ secrets.META_IG_BUSINESS_ACCOUNT_ID }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+        run: python -m app.scheduler

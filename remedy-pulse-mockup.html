@@ -329,6 +329,10 @@
     background:var(--gold-tint); border-radius:8px; padding:9px 14px; margin-bottom:16px;
   }
   #dataSourceBanner.show{ display:flex; }
+  /* 4.7: a real per-source ingestion failure reads as more urgent than the demo-mode notice
+     above (same banner element, different severity) - coral, matching the alerts panel's own
+     "crisis" tint, rather than the softer informational gold. */
+  #dataSourceBanner.coral{ color:var(--coral-text); background:var(--coral-tint); }
 
   .syncing-data .kpi .value, .syncing-data .gauge-score .num{ opacity:.4; }
   .kpi .value, .gauge-score .num{ transition: opacity .3s ease, color .2s ease; }
@@ -1140,7 +1144,6 @@
     const authChip = document.getElementById('authChip');
     const avatarBtn = document.getElementById('avatarBtn');
     const footerNote = document.getElementById('footerNote');
-    const banner = document.getElementById('dataSourceBanner');
 
     if (demoBadge){
       demoBadge.style.display = STATE.isDemoMode ? '' : 'none';
@@ -1167,16 +1170,45 @@
         ? 'Remedy Pulse — sample data for review, not live · actions below are simulated for demo purposes'
         : 'Remedy Pulse — connected to the live API · showing real data';
     }
-    if (banner){
-      if (STATE.isDemoMode && STATE.demoReason){
-        banner.classList.add('show');
-        banner.textContent = STATE.demoReason === 'not logged in'
-          ? '⚠ Not logged in — showing sample data. Log in for live data.'
-          : '⚠ Could not reach the live API — showing sample data.';
-      } else {
-        banner.classList.remove('show');
-        banner.textContent = '';
-      }
+    renderDataSourceBanner();
+  }
+
+  // #dataSourceBanner is shared by two mutually-exclusive concerns, in priority order: the
+  // existing demo-mode notice (unchanged from 7.7), and - only once actually live - 4.7's real
+  // per-source failure surfacing, read from GET /api/status (STATE.status, the same data
+  // renderSyncPill() reads). Called from both applyDemoGating() (demo-mode transitions) and
+  // renderSyncPill() (every place STATE.status changes: initial load, a manual refresh) so the
+  // banner is never stale relative to either.
+  function renderDataSourceBanner(){
+    const banner = document.getElementById('dataSourceBanner');
+    if (!banner) return;
+    if (STATE.isDemoMode && STATE.demoReason){
+      banner.classList.remove('coral');
+      banner.classList.add('show');
+      banner.textContent = STATE.demoReason === 'not logged in'
+        ? '⚠ Not logged in — showing sample data. Log in for live data.'
+        : '⚠ Could not reach the live API — showing sample data.';
+      return;
+    }
+    // 4.7: "a failed source must be visible to the marketing team, not only to whoever reads
+    // stderr." A source with lastStatus 'error' or 'access_denied' is a real problem; 'partial'
+    // (some items ingested, some failed) is a softer heads-up. null/'success' needs no banner.
+    const sources = (STATE.status && STATE.status.sources) || [];
+    const failing = sources.filter(s => s.lastStatus === 'error' || s.lastStatus === 'access_denied');
+    const partial = sources.filter(s => s.lastStatus === 'partial');
+    if (failing.length){
+      const names = failing.map(s => platformDisplay(s.source)).join(', ');
+      const detail = failing[0].lastError ? ' — ' + failing[0].lastError : '';
+      banner.classList.add('show', 'coral');
+      banner.textContent = '⚠ ' + names + ' failed to sync' + detail + '. Data may be stale.';
+    } else if (partial.length){
+      const names = partial.map(s => platformDisplay(s.source)).join(', ');
+      banner.classList.remove('coral');
+      banner.classList.add('show');
+      banner.textContent = '⚠ ' + names + ' partially synced last run — some items may be missing.';
+    } else {
+      banner.classList.remove('show', 'coral');
+      banner.textContent = '';
     }
   }
 
@@ -1315,9 +1347,11 @@
   }
   function renderSyncPill(){
     const label = document.getElementById('syncLabel');
-    if (!label) return;
-    const latest = mostRecentSuccessAt(STATE.status, STATE.overview);
-    label.textContent = latest ? ('Last synced ' + formatPHTime(latest)) : 'Last synced —:— PHT';
+    if (label){
+      const latest = mostRecentSuccessAt(STATE.status, STATE.overview);
+      label.textContent = latest ? ('Last synced ' + formatPHTime(latest)) : 'Last synced —:— PHT';
+    }
+    renderDataSourceBanner();
   }
 
   // 7.7: the pill's demo-fake sync animation is gated off outside demo mode — a real refresh of
