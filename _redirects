@@ -1,0 +1,5 @@
+# Cloudflare Pages rewrite (docs/runbook-deploy-free-tier.md, §6) - remedy-pulse-mockup.html
+# is the only page in this deploy and has no build step, so it isn't named index.html. A 200
+# rewrite (not a 301 redirect) keeps the deployed root URL working without renaming or
+# duplicating the file, and without any build tooling.
+/  /remedy-pulse-mockup.html  200
