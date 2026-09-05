@@ -4,7 +4,7 @@
 
 **Generated:** 2026-09-03 · fresh run
 **Sources:** `remedy-pulse-prd.md`, `remedy-pulse-roadmap.md`, `remedy-pulse-mockup.html`, `backend/`, `docs/Remedy Pulse_Reddit Data Access_Use Case.pdf`
-**Progress:** 40 / 79
+**Progress:** 51 / 79
 
 ---
 
@@ -399,7 +399,13 @@ One thing caught and fixed during review, worth recording as an example of why c
 
 ## Phase 6 — Sentiment classification and alert routing
 
-- [ ] **6.1 · Sentiment classifier, with the precision/recall bar decided first**
+**Status (2026-09-04): all 5 items closed on branch `phase-6-7-classification-api`.** `backend/app/classification.py` (6.1/6.2/6.3): one `claude-opus-5` call per item returns sentiment + confidence + crisis/digest routing together (the five-plus-five conditions copied verbatim from the mockup's `openAlertRulesModal()`), stores both the raw text and the result so re-scoring is always possible, and is what now overwrites a review's star-derived placeholder sentiment (6.2's reconciliation — `classified_at IS NULL` is the queryable seam between the two populations). `docs/decisions/sentiment-classifier-choice.md` proposes a concrete recall bar for the PRD's open question (recall ≥ 90% on Negative, ≥ 95% on `alert_category="crisis"` specifically, since a missed crisis is silent and unrecoverable while a false alarm merely wastes review time) — a recommendation for the team to ratify, not a unilateral bar. `backend/app/topic_tagging.py` (6.5) is scoped honestly as LLM **tagging** against the mockup's fixed five-topic taxonomy, not true unsupervised clustering (the item's literal title) — `docs/decisions/topic-tagging-approach.md` explains why: real clustering needs real ingestion volume no adapter has live yet, and building it against ~zero real data would be untestable. `docs/decisions/assignment-roster.md` (6.4) makes the existing `User` table (5.5) the roster, replacing the mockup's hardcoded four names — who owns keeping it current is named as still genuinely unresolved, not invented.
+
+One real bug caught and fixed during review: the classifier initially defaulted to `claude-sonnet-5` on a self-directed cost/quality tradeoff — a direct violation of the `claude-api` skill's non-negotiable "always use `claude-opus-5` unless the user explicitly names a different model, never downgrade for cost" policy. Corrected before commit, with the decision doc's reasoning rewritten to match (Opus is the right call on task-fit merits too here, not just the mandated one). Also caught: `classify_sentiment()` only degraded gracefully on a malformed model response, not a transient API failure (rate limit, timeout) — the latter would have crashed a whole classification batch, contradicting this project's established "one bad item must not take down a batch" rule used throughout every adapter. Fixed, with a new test. `topic_tagging.py` originally returned `[]` silently for a missing API key too (the two sibling modules disagreed on this — flagged by both parallel agents' own final reports); reconciled to raise the same `ClassifierNotConfiguredError` as `classification.py`, since every remaining item in a batch would fail identically if the key is missing.
+
+79 new/changed tests across this phase and Phase 7 combined (296 total passing), ruff clean, migration verified against real Postgres (`sentiment_confidence`/`classified_at`/`alert_category` columns added ahead of both this phase and the API layer specifically to avoid a cross-agent schema dependency).
+
+- [x] **6.1 · Sentiment classifier, with the precision/recall bar decided first**
   The PRD's open question: *"what precision/recall bar is acceptable before it's trusted to drive the alert workflow unsupervised?"* Answer it before building, not after.
   **Effort:** L·risky · **Requirement:** P0-4 · **Skip risk:** Either the alert list is noise nobody reads, or it silently misses negatives — both destroy the core v1 metric · HIGH
 
@@ -410,19 +416,19 @@ One thing caught and fixed during review, worth recording as an example of why c
   > **The lean:** hosted LLM, batched, with the raw text and the label both stored so you can re-score later. The volume here is one clinic group — a few hundred items a week per the mockup's own numbers — so per-item cost is genuinely small, and Taglish handling is where the accuracy actually lives.
   > **What would change my mind:** if the vendor decision lands somewhere with tunable sentiment *and* an exportable confidence score, take it — inheriting a tunable classifier beats building one.
 
-- [ ] **6.2 · Reconcile the two conflicting definitions of `sentiment`**
+- [x] **6.2 · Reconcile the two conflicting definitions of `sentiment`**
   `normalize_reviews()` derives it purely from stars (`>=4` Positive, `<=2` Negative). The mockup's feed items carry a text-derived sentiment. Same field name, two incompatible meanings, and they will be mixed in one feed.
   **Effort:** M · **Requirement:** P0-1, P0-2 · **Skip risk:** A single feed where "Negative" means two different things, sorted and filtered as if it means one · MEDIUM
 
-- [ ] **6.3 · Implement the Crisis Alert vs Daily Digest routing rules**
+- [x] **6.3 · Implement the Crisis Alert vs Daily Digest routing rules**
   The rules are already written and stakeholder-visible in the mockup's classification modal (`openAlertRulesModal()`, citing spec §9.2) — five crisis conditions, five digest conditions. This is a spec that already exists; implement it rather than reinventing it.
   **Effort:** L · **Requirement:** P0-4 · **Skip risk:** Every item routes the same way and the crisis path means nothing · HIGH
 
-- [ ] **6.4 · Assignment roster with an owner**
+- [x] **6.4 · Assignment roster with an owner**
   PRD open question. The mockup hardcodes Gian, Paul, Boom, Mixi in `handleAssign()`.
   **Effort:** S · **Requirement:** P0-4 · **Skip risk:** Items get assigned to people who have left, or cannot be assigned at all · MEDIUM
 
-- [ ] **6.5 · Topic clustering**
+- [x] **6.5 · Topic clustering**
   The mockup shows five themes with per-topic sentiment splits.
   **Effort:** L·risky · **Requirement:** P0-8 · **Skip risk:** Topics tab has no content · MEDIUM
 
@@ -430,10 +436,14 @@ One thing caught and fixed during review, worth recording as an example of why c
 
 ## Phase 7 — API and the data-driven UI refactor
 
-- [ ] **7.1 · Read API per tab**
+**Status (2026-09-04): 7.1, 7.2, 7.3, 7.5, 7.6, 7.7 closed; 7.4 partially done, left open.** Both the backend and the mockup refactor were built by separate parallel agents against one shared, hand-written contract (`docs/api-contract.md`) so they'd match without seeing each other's code — reconciled afterward: CORS was missing entirely (the mockup's `apiFetch()` would have been blocked by the browser against a real server; added `CORSMiddleware`, verified live with a real preflight + authenticated request against a running `uvicorn` process, not just the in-process `TestClient`). `app/api/` (7.1) implements every `GET` in the contract as a real, runnable FastAPI app — `uvicorn app.api.main:app`. `remedy-pulse-mockup.html`'s refactor (7.2/7.3/7.5/7.6/7.7) extracts every tab's hardcoded data into one module shaped to match the contract, renders everything via `createElement`/`textContent` (never `innerHTML` from concatenated data), computes relative time and the sync pill from real `GET /api/status`/`publishedAt` data, adds a shared loading/empty/error panel to all six tabs, and gates the Demo badge/simulate-mention/AI-summary-regenerate behind one `isDemoMode` flag — falling back to the original sample data (preserving the mockup's zero-install, zero-backend demo value) whenever no real API response is available.
+
+**7.4 is genuinely partial, not fully closed:** `assign`/`resolve` are implemented on both the API (`POST /api/mentions/{id}/assign|resolve`) and the mockup (wired end-to-end, with an optimistic local update + honest failure toast on a save error) — reconciled in after the mockup agent's own report flagged that its instructions covered the read/fetch layer but not exhaustively wiring every write action. `reply` is implemented on the API (`POST /api/reviews/{mention_id}/reply`) but **not** wired in the mockup, and that's a real, deliberate gap: the mockup's reply flow operates on a whole branch-level listing (`pendingReplies`, a count), while the API's endpoint needs one specific review's `mention_id` — there is no clean mapping between "reply to the next pending review at this branch" and "reply to review #123" without either the UI listing individual pending reviews to pick from, or the API adding a "reply to any one pending review at this venue" endpoint. That's a product/API design decision, not a wiring task, and is documented at the point in the mockup's fetch layer where it was found rather than papered over with an incorrect implementation.
+
+- [x] **7.1 · Read API per tab**
   **Effort:** L · **Requirement:** P0-1 … P0-11 · **Skip risk:** No path from store to screen · HIGH
 
-- [ ] **7.2 · Refactor the mockup from hardcoded markup to render-from-data**
+- [x] **7.2 · Refactor the mockup from hardcoded markup to render-from-data**
   This is the *"Piece 2"* refactor `fetch_owned_reviews.py:1-15` explicitly defers — *"this script doesn't do that refactor itself, it just produces the input for it."* Six feed items, six EMV rows, four alerts, four review rows, and five topic cards are all hand-written markup today.
   **Effort:** L · **Requirement:** all P0 · **Skip risk:** The validated UI cannot show real data · HIGH
 
@@ -443,21 +453,21 @@ One thing caught and fixed during review, worth recording as an example of why c
   > **The lean:** refactor in place, but extract the six tabs' data into one module and render from it — the halfway point that fixes the actual problem (markup is the data) without buying a toolchain. With 27 days to target, a framework migration competes directly with the P0 acceptance criteria in Phase 8.
   > **What would change my mind:** if the P2 multi-brand plan gets pulled forward, or if more than one person will be in this UI simultaneously, the framework's structure starts paying for itself and the in-place refactor becomes a second migration you'll pay for twice.
 
-- [ ] **7.3 · Escape all rendered content (implements 0.11)**
+- [x] **7.3 · Escape all rendered content (implements 0.11)**
   `textContent` over `innerHTML`; no HTML built from mention text by concatenation; no `onclick` attributes carrying data.
   **Effort:** M · **Requirement:** P0-1 · **Skip risk:** Stored XSS · HIGH
 
 - [ ] **7.4 · Write API: assign, resolve, send reply — with timestamps for Phase 3**
   **Effort:** M · **Requirement:** P0-4, P0-5, P0-6 · **Skip risk:** Actions still reset on refresh, exactly as the demo guide says they do today · HIGH
 
-- [ ] **7.5 · Real relative-time rendering and a PHT-correct sync pill (implements 0.12, 0.16)**
+- [x] **7.5 · Real relative-time rendering and a PHT-correct sync pill (implements 0.12, 0.16)**
   **Effort:** S · **Requirement:** P0-1, P0-11 · **Skip risk:** Freshness and recency both misreported · MEDIUM
 
-- [ ] **7.6 · Empty states and error states on every tab**
+- [x] **7.6 · Empty states and error states on every tab**
   Both are named PRD edge cases: *"if there are zero new mentions in a period, I want a clear empty state rather than an ambiguous blank screen."* Only the alerts panel and the EMV table have one today.
   **Effort:** M · **Requirement:** P0-1, P0-11 · **Skip risk:** Blank screen reads as breakage; a failed source reads as quiet · MEDIUM
 
-- [ ] **7.7 · Gate or remove every demo affordance before it faces real data**
+- [x] **7.7 · Gate or remove every demo affordance before it faces real data**
   The "Demo" badge, "+ Simulate mention" (see 0.13), `simulateSync()`, and the three canned AI summaries. Each needs an environment gate or removal — decided deliberately, not discovered at launch.
   **Effort:** S · **Requirement:** P1-3 · **Skip risk:** Simulated data indistinguishable from real data in a tool whose only job is being trusted · HIGH
 

@@ -310,6 +310,26 @@
     background:var(--sage-tint); border-radius:8px;
   }
 
+  /* ---------- Data states (7.6: empty / error / loading, every tab) ---------- */
+  .state-panel{
+    text-align:center; padding:32px 16px; border-radius:8px; font-size:12.5px;
+  }
+  .state-panel .state-title{ font-weight:600; font-size:13px; margin-bottom:4px; }
+  .state-panel .state-msg{ color:var(--ink-faint); max-width:420px; margin:0 auto; line-height:1.5; }
+  .state-panel.state-loading{ color:var(--ink-faint); background:var(--surface-2); }
+  .state-panel.state-empty{ color:var(--ink-dim); background:var(--surface-2); }
+  .state-panel.state-error{ color:var(--coral-text); background:var(--coral-tint); }
+  .state-panel .btn-mini{ margin-top:12px; }
+
+  /* ---------- Auth ---------- */
+  .chip.auth-chip{ font-weight:500; }
+  .avatar.clickable{ cursor:pointer; }
+  #dataSourceBanner{
+    display:none; align-items:center; gap:8px; font-size:12px; color:var(--gold-text);
+    background:var(--gold-tint); border-radius:8px; padding:9px 14px; margin-bottom:16px;
+  }
+  #dataSourceBanner.show{ display:flex; }
+
   .syncing-data .kpi .value, .syncing-data .gauge-score .num{ opacity:.4; }
   .kpi .value, .gauge-score .num{ transition: opacity .3s ease, color .2s ease; }
 
@@ -386,19 +406,21 @@
     <a data-view="emv">EMV</a>
   </nav>
   <div class="header-right">
-    <span class="demo-badge">Demo</span>
+    <span class="demo-badge" id="demoBadge">Demo</span>
+    <div class="chip auth-chip" id="authChip" onclick="openAuthModal()" title="Log in for live data">Log in</div>
     <div class="chip" onclick="openCommandPalette()" title="Quick actions"><span class="cmdk-full">⌘K</span><span class="cmdk-short">🔎</span></div>
     <div class="bell-wrap" style="position:relative;">
-      <button class="icon-btn" id="bellBtn" onclick="toggleBellMenu(event)" title="Alerts">🔔<span class="bell-badge" id="bellBadge">4</span></button>
+      <button class="icon-btn" id="bellBtn" onclick="toggleBellMenu(event)" title="Alerts">🔔<span class="bell-badge" id="bellBadge">0</span></button>
     </div>
-    <div class="live-pill" id="syncPill" onclick="simulateSync()">
+    <div class="live-pill" id="syncPill" onclick="handleSyncPillClick()">
       <span class="live-dot"></span> <span id="syncLabel">Last synced —:— PHT</span>
     </div>
-    <div class="avatar" title="Gian, Paul — Admin">GP</div>
+    <div class="avatar clickable" id="avatarBtn" onclick="openAuthModal()" title="Demo — not logged in">?</div>
   </div>
 </header>
 
 <main>
+  <div id="dataSourceBanner"></div>
 
   <!-- OVERVIEW -->
   <section class="view active" id="view-overview">
@@ -431,35 +453,35 @@
                   stroke-dasharray="235.6" stroke-dashoffset="235.6"/>
           </svg>
           <div class="gauge-score">
-            <div class="num" id="clarityNum">75</div>
+            <div class="num" id="clarityNum">—</div>
             <div class="lbl">of 100</div>
           </div>
         </div>
-        <div class="clarity-note">▲ 6 pts vs. last week</div>
+        <div class="clarity-note" id="clarityNote">—</div>
       </div>
 
       <div class="card kpi">
         <div class="eyebrow">Total Mentions</div>
-        <div class="value" id="kpiTotalMentionsValue">342</div>
-        <div class="delta up">▲ 18% · 291 last week</div>
+        <div class="value" id="kpiTotalMentionsValue">—</div>
+        <div class="delta" id="kpiTotalMentionsDelta">—</div>
       </div>
 
       <div class="card kpi">
         <div class="eyebrow">Net Sentiment</div>
-        <div class="value" id="kpiNetSentimentValue">+62</div>
-        <div class="delta up">▲ 4 pts</div>
+        <div class="value" id="kpiNetSentimentValue">—</div>
+        <div class="delta" id="kpiNetSentimentDelta">—</div>
       </div>
 
       <div class="card kpi">
         <div class="eyebrow">Avg. Google Rating</div>
-        <div class="value">5.0 ★</div>
-        <div class="delta flat">— steady, 128 reviews</div>
+        <div class="value" id="kpiAvgRatingValue">—</div>
+        <div class="delta flat" id="kpiAvgRatingDelta">—</div>
       </div>
 
       <div class="card kpi" id="kpiActiveAlerts">
         <div class="eyebrow">Active Alerts</div>
-        <div class="value" id="kpiActiveAlertsValue" style="color:var(--coral-text)">4</div>
-        <div class="delta down" id="kpiActiveAlertsDelta">1 crisis, 3 digest</div>
+        <div class="value" id="kpiActiveAlertsValue" style="color:var(--coral-text)">—</div>
+        <div class="delta down" id="kpiActiveAlertsDelta">—</div>
       </div>
     </div>
 
@@ -467,13 +489,11 @@
       <div class="card-head">
         <div>
           <h3>✨ This Week, Summarized</h3>
-          <div class="card-sub">Auto-generated exec narrative — preview of the planned AI weekly summary feature</div>
+          <div class="card-sub">Auto-generated exec narrative — preview of the planned AI weekly summary feature. The API keeps this templated/canned for now (no live LLM call), same as the demo.</div>
         </div>
-        <button class="btn-mini" onclick="regenerateSummary()">Regenerate</button>
+        <button class="btn-mini" id="regenerateBtn" onclick="regenerateSummary()">Regenerate</button>
       </div>
-      <div id="aiSummaryText" style="font-size:12.5px; color:var(--ink-dim); line-height:1.65;">
-        Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.
-      </div>
+      <div id="aiSummaryText" style="font-size:12.5px; color:var(--ink-dim); line-height:1.65;"></div>
     </div>
 
     <div class="grid-2">
@@ -481,7 +501,7 @@
         <div class="card-head">
           <div>
             <h3>Sentiment Trend</h3>
-            <div class="card-sub">Net sentiment score, owned entities, last 14 days</div>
+            <div class="card-sub">Net sentiment score, owned entities, last 14 days (sample trend — no timeseries endpoint in the API contract yet)</div>
           </div>
           <div class="chart-legend">
             <span><i class="swatch" style="background:var(--gold)"></i>Net score</span>
@@ -518,56 +538,7 @@
           </div>
         </div>
 
-        <div class="alert-item alert-crisis" data-alert-id="0" data-datetime="2026-07-01T09:03:00">
-          <div class="alert-dot high"></div>
-          <div class="alert-body">
-            <div class="alert-title" style="color:var(--coral-text);">🚨 Journalist inquiry re: patient complaint — Manila Bulletin</div>
-            <div class="alert-meta">News desk · <span class="alert-time">12 min ago</span> · Crisis Alert — send immediately</div>
-            <div class="alert-actions">
-              <button class="btn-mini primary btn-assign" onclick="handleAssign(this)">Assign</button>
-              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
-              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="alert-item" data-alert-id="1" data-datetime="2026-07-01T08:34:00">
-          <div class="alert-dot med"></div>
-          <div class="alert-body">
-            <div class="alert-title">2★ Google review — Remedy BGC</div>
-            <div class="alert-meta">Google · <span class="alert-time">41 min ago</span> · Daily Digest — isolated, no traction</div>
-            <div class="alert-actions">
-              <button class="btn-mini primary btn-assign" onclick="handleAssign(this)">Assign</button>
-              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
-              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="alert-item" data-alert-id="2" data-datetime="2026-07-01T06:15:00">
-          <div class="alert-dot low"></div>
-          <div class="alert-body">
-            <div class="alert-title">Sentiment dip in Reddit thread</div>
-            <div class="alert-meta">r/PhilippinesSkincare · <span class="alert-time">3 hrs ago</span> · Daily Digest — neutral discussion</div>
-            <div class="alert-actions">
-              <button class="btn-mini btn-assign" onclick="handleAssign(this)">Assign</button>
-              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
-              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="alert-item" data-alert-id="3">
-          <div class="alert-dot low"></div>
-          <div class="alert-body">
-            <div class="alert-title">Aivee mention volume +40% this week</div>
-            <div class="alert-meta">Competitor spike · Instagram, X · Daily Digest — competitive intel</div>
-            <div class="alert-actions">
-              <button class="btn-mini btn-view" onclick="openAlertModal(this)">View</button>
-              <button class="btn-mini btn-resolve" onclick="resolveAlert(this)">Resolve</button>
-            </div>
-          </div>
-        </div>
+        <div id="alertsListContainer"></div>
       </div>
     </div>
   </section>
@@ -591,17 +562,9 @@
             <div class="card-sub">Mention volume vs. competitive set, last 7 days</div>
           </div>
         </div>
-        <div class="pie-wrap">
-          <div class="pie-chart" data-center="Remedy 14%" style="background:conic-gradient(#A99C89 0% 40%, #F5A623 40% 67%, #FF5A3C 67% 81%, #2F8FE0 81% 89%, #16A863 89% 94%, #8B7EC8 94% 98%, #D9C9A3 98% 100%);"></div>
-          <div class="pie-legend">
-            <div class="src-row"><div class="src-icon" style="background:#A99C89"></div><div class="src-name">Belo</div><div class="src-pct">40%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#F5A623"></div><div class="src-name" title="Includes Aivee Skin Spa, Foleon by Aivee">Aivee <span class="spike-badge">▲ spike</span></div><div class="src-pct">27%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#FF5A3C"></div><div class="src-name" style="font-weight:600; color:var(--coral-text);" title="Also matches: Remedy Skin Solutions, Remedy Skin, Remedy BGC, Remedy clinic, Remedy GH, Remedy Greenhills, Remedy Vertis, Remedy Vertis North, Skin Bar by Remedy">Remedy</div><div class="src-pct" style="color:var(--coral-text);">14%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#2F8FE0"></div><div class="src-name">SkinStation</div><div class="src-pct">8%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#16A863"></div><div class="src-name">DermHQ</div><div class="src-pct">5%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#8B7EC8"></div><div class="src-name">Luminisce</div><div class="src-pct">4%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#D9C9A3"></div><div class="src-name" title="Includes Kamiseta Skin, Kamiseta Skin Clinic">Kamiseta <span class="tag gold" style="font-size:9px; padding:1px 5px;">New</span></div><div class="src-pct">2%</div></div>
-          </div>
+        <div class="pie-wrap" id="sovPieWrap">
+          <div class="pie-chart" id="sovPieChart"></div>
+          <div class="pie-legend" id="sovLegend"></div>
         </div>
       </div>
 
@@ -612,17 +575,9 @@
             <div class="card-sub">Owned entity mentions by channel</div>
           </div>
         </div>
-        <div class="pie-wrap">
-          <div class="pie-chart" data-center="342 mentions" style="background:conic-gradient(#16A863 0% 34%, #2F8FE0 34% 54%, #FF5A3C 54% 71%, #A99C89 71% 85%, #4A4038 85% 92%, #F5A623 92% 97%, #8B7EC8 97% 100%);"></div>
-          <div class="pie-legend">
-            <div class="src-row"><div class="src-icon" style="background:#16A863"></div><div class="src-name">Google Reviews</div><div class="src-pct">34%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#2F8FE0"></div><div class="src-name">Facebook</div><div class="src-pct">20%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#FF5A3C"></div><div class="src-name">Instagram</div><div class="src-pct">17%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#A99C89"></div><div class="src-name">Reddit</div><div class="src-pct">14%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#4A4038"></div><div class="src-name">X</div><div class="src-pct">7%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#F5A623"></div><div class="src-name">News / PR</div><div class="src-pct">5%</div></div>
-            <div class="src-row"><div class="src-icon" style="background:#8B7EC8"></div><div class="src-name">TikTok <span class="tag gold" style="font-size:9px; padding:1px 5px;">New</span></div><div class="src-pct">3%</div></div>
-          </div>
+        <div class="pie-wrap" id="sourcePieWrap">
+          <div class="pie-chart" id="sourcePieChart"></div>
+          <div class="pie-legend" id="sourceLegend"></div>
         </div>
       </div>
     </div>
@@ -639,53 +594,27 @@
         <span><i class="dot" style="background:var(--ink-faint)"></i>Neutral</span>
         <span><i class="dot" style="background:var(--coral)"></i>Negative</span>
       </div>
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <div>
-          <div class="sov-name us" style="margin-bottom:6px;">Remedy</div>
-          <div class="sentiment-bar"><div class="seg pos" style="width:71%"></div><div class="seg neu" style="width:22%"></div><div class="seg neg" style="width:7%"></div></div>
-        </div>
-        <div>
-          <div class="sov-name" style="margin-bottom:6px;">Belo</div>
-          <div class="sentiment-bar"><div class="seg pos" style="width:58%"></div><div class="seg neu" style="width:30%"></div><div class="seg neg" style="width:12%"></div></div>
-        </div>
-        <div>
-          <div class="sov-name" style="margin-bottom:6px;">Aivee <span class="spike-badge">▲ spike</span></div>
-          <div class="sentiment-bar"><div class="seg pos" style="width:49%"></div><div class="seg neu" style="width:28%"></div><div class="seg neg" style="width:23%"></div></div>
-        </div>
-        <div>
-          <div class="sov-name" style="margin-bottom:6px;">SkinStation</div>
-          <div class="sentiment-bar"><div class="seg pos" style="width:63%"></div><div class="seg neu" style="width:29%"></div><div class="seg neg" style="width:8%"></div></div>
-        </div>
-        <div>
-          <div class="sov-name" style="margin-bottom:6px;">DermHQ</div>
-          <div class="sentiment-bar"><div class="seg pos" style="width:66%"></div><div class="seg neu" style="width:26%"></div><div class="seg neg" style="width:8%"></div></div>
-        </div>
-      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;" id="competitorSentimentRows"></div>
     </div>
 
     <div class="card">
       <div class="card-head">
         <div>
           <h3>Top Voices</h3>
-          <div class="card-sub">Highest-reach accounts talking about the category this week — supports the KOL identification feature in §10 of the spec</div>
+          <div class="card-sub">Highest-reach accounts talking about the category this week — supports the KOL identification feature in §10 of the spec. Sample data — not yet in the API contract.</div>
         </div>
       </div>
-      <div class="src-row"><div class="src-icon" style="background:var(--coral-tint); color:var(--coral-text)">IG</div><div class="src-name">@glowwithsab · ~4.8K reach</div><span class="tag sage">Remedy advocate</span></div>
-      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">R</div><div class="src-name">u/skinseeker_mnl · ~1.2K reach</div><span class="tag gold">Comparing brands</span></div>
-      <div class="src-row"><div class="src-icon" style="background:var(--coral-tint); color:var(--coral-text)">IG</div><div class="src-name">@beauty.trends.ph · ~12K reach</div><span class="tag neutral">Category — no lean</span></div>
-      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">TT</div><div class="src-name">@glowgetterph · ~28K reach</div><span class="tag neutral">Aivee advocate</span></div>
+      <div id="topVoicesContainer"></div>
     </div>
 
     <div class="card">
       <div class="card-head">
         <div>
           <h3>Category Watch — Hair</h3>
-          <div class="card-sub">New tracked entities per Marketing's §18 update — not yet reflected in Share of Voice above</div>
+          <div class="card-sub">New tracked entities per Marketing's §18 update — not yet reflected in Share of Voice above. Sample data — not yet in the API contract.</div>
         </div>
       </div>
-      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">H</div><div class="src-name">Clinique de Paris</div><span class="tag neutral">Boolean query pending</span></div>
-      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">H</div><div class="src-name">Foleon by Aivee <span style="color:var(--ink-faint);">(also under Aivee)</span></div><span class="tag neutral">Boolean query pending</span></div>
-      <div class="src-row"><div class="src-icon" style="background:var(--surface-2); color:var(--ink)">H</div><div class="src-name">Svenson</div><span class="tag neutral">Boolean query pending</span></div>
+      <div id="categoryWatchContainer"></div>
     </div>
   </section>
 
@@ -707,54 +636,7 @@
       </div>
     </div>
     <div class="card" id="mentionsFeedCard">
-      <div class="feed-item" data-platform="Google" data-date="2026-07-01" data-datetime="2026-07-01T08:34:00" data-sentiment="Negative">
-        <div class="feed-avatar">🟢</div>
-        <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">Google Review · anonymous patient</span><span class="feed-source">Remedy BGC · <span class="feed-time">41 min ago</span></span></div>
-          <div class="feed-text">"Second time booking Rejuran with Dra. April's team, still waiting on a follow-up call back — service used to be faster."</div>
-          <div class="feed-meta"><span class="stars">★★</span><span>Sentiment: Negative</span><span>Reach: —</span><a class="source-link" onclick="viewSource('Google Review', 'Remedy BGC')">View source ↗</a></div>
-        </div>
-      </div>
-      <div class="feed-item" data-platform="Reddit" data-date="2026-07-01" data-datetime="2026-07-01T06:15:00" data-sentiment="Neutral">
-        <div class="feed-avatar">💬</div>
-        <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">u/skinseeker_mnl</span><span class="feed-source">r/PhilippinesSkincare · <span class="feed-time">3 hrs ago</span></span></div>
-          <div class="feed-text">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy's reviews look consistent but Aivee has more posts."</div>
-          <div class="feed-meta"><span>Sentiment: Neutral</span><span>Reach: ~1,200</span><a class="source-link" onclick="viewSource('r/PhilippinesSkincare', 'Remedy vs Aivee Rejuran')">View source ↗</a></div>
-        </div>
-      </div>
-      <div class="feed-item" data-platform="Instagram" data-date="2026-07-01" data-datetime="2026-07-01T03:15:00" data-sentiment="Positive">
-        <div class="feed-avatar">📸</div>
-        <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">@glowwithsab</span><span class="feed-source">Instagram comment on @remedy.ph · <span class="feed-time">6 hrs ago</span></span></div>
-          <div class="feed-text">"Best facial I've had in BGC, the clinic feels so clean and the staff actually explain what they're doing 🤍"</div>
-          <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~4,800</span><a class="source-link" onclick="viewSource('Instagram', '@remedy.ph glowwithsab')">View source ↗</a></div>
-        </div>
-      </div>
-      <div class="feed-item" data-platform="News" data-date="2026-06-30" data-datetime="2026-06-30T09:15:00" data-sentiment="Positive">
-        <div class="feed-avatar">📰</div>
-        <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">PeopleAsia editorial</span><span class="feed-source">Online News · <span class="feed-time">yesterday</span></span></div>
-          <div class="feed-text">Feature on SkinPen treatments includes commentary from Dr. April Geraldez-Rivera on emerging PH skincare trends.</div>
-          <div class="feed-meta"><span>Sentiment: Positive</span><span class="mono" style="color:var(--gold-text)">EMV ₱290,000</span><a class="source-link" onclick="viewSource('PeopleAsia', 'SkinPen feature April Geraldez-Rivera')">View source ↗</a></div>
-        </div>
-      </div>
-      <div class="feed-item" data-platform="Facebook" data-date="2026-06-29" data-datetime="2026-06-29T09:15:00" data-sentiment="Positive">
-        <div class="feed-avatar">💛</div>
-        <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">Facebook comment · patient</span><span class="feed-source">facebook.com/remedyph · <span class="feed-time">2 days ago</span></span></div>
-          <div class="feed-text">"Club Remedy's wellness room is such a nice touch after a facial, did not expect that at a derma clinic."</div>
-          <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~1,900</span><a class="source-link" onclick="viewSource('Facebook', 'facebook.com/remedyph Club Remedy wellness')">View source ↗</a></div>
-        </div>
-      </div>
-      <div class="feed-item" data-platform="TikTok" data-date="2026-06-28" data-datetime="2026-06-28T09:15:00" data-sentiment="Positive">
-        <div class="feed-avatar">🎵</div>
-        <div class="feed-body">
-          <div class="feed-top"><span class="feed-author">TikTok comment · patient</span><span class="feed-source">@remedy.ph on TikTok · <span class="feed-time">3 days ago</span></span></div>
-          <div class="feed-text">"The skin routine video was so helpful, saving this before my next Pico laser session."</div>
-          <div class="feed-meta"><span>Sentiment: Positive</span><span>Reach: ~2,600</span><a class="source-link" onclick="viewSource('TikTok', '@remedy.ph skin routine')">View source ↗</a></div>
-        </div>
-      </div>
+      <div id="mentionsFeedList"></div>
     </div>
   </section>
 
@@ -772,40 +654,7 @@
     <div class="card">
       <div class="table-scroll"><table>
         <thead><tr><th>Listing</th><th>Rating</th><th>Reviews</th><th>Trend (30d)</th><th>Response rate</th><th>Status</th></tr></thead>
-        <tbody>
-          <tr data-listing="Remedy — BGC (One Uptown Residence)">
-            <td>Remedy — BGC (One Uptown Residence)</td>
-            <td><span class="stars">★★★★★</span> 5.0</td>
-            <td>128</td>
-            <td class="mono" style="color:var(--sage-text)">▲ steady</td>
-            <td class="resp-rate">100%</td>
-            <td><span class="tag sage">All clear</span></td>
-          </tr>
-          <tr data-listing="Club Remedy — BGC" data-pending-total="1" data-response-rate-base="88">
-            <td>Club Remedy — BGC</td>
-            <td><span class="stars">★★★★★</span> 4.9</td>
-            <td>34</td>
-            <td class="mono" style="color:var(--sage-text)">▲ +0.1</td>
-            <td class="resp-rate">88%</td>
-            <td><span class="tag gold clickable" onclick="openReplyModal(this)">1 pending reply</span></td>
-          </tr>
-          <tr data-listing="Remedy — Vertis North">
-            <td title="Also matches: Remedy Vertis, Remedy Vertis North">Remedy — Vertis North</td>
-            <td><span class="stars">★★★★★</span> 4.8</td>
-            <td>52</td>
-            <td class="mono" style="color:var(--sage-text)">▲ +0.2</td>
-            <td class="resp-rate">95%</td>
-            <td><span class="tag sage">All clear</span></td>
-          </tr>
-          <tr data-listing="Skin Bar by Remedy — Greenhills Mall" data-pending-total="2" data-response-rate-base="80">
-            <td title="Also matches: Remedy GH, Remedy Greenhills, Skin Bar by Remedy">Skin Bar by Remedy — Greenhills Mall</td>
-            <td><span class="stars">★★★★☆</span> 4.6</td>
-            <td>19</td>
-            <td class="mono" style="color:var(--gold-text)">▲ new branch</td>
-            <td class="resp-rate">80%</td>
-            <td><span class="tag gold clickable" onclick="openReplyModal(this)">2 pending replies</span></td>
-          </tr>
-        </tbody>
+        <tbody id="reviewsTableBody"></tbody>
       </table></div>
     </div>
   </section>
@@ -824,50 +673,7 @@
       <span><i class="dot" style="background:var(--coral)"></i>Negative</span>
     </div>
 
-    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('facial-results')" title="Click to see constituent mentions">
-      <div class="card-head">
-        <div><h3>Facial Results & Glow</h3><div class="card-sub">138 mentions this week</div></div>
-        <span class="tag sage">Trending</span>
-      </div>
-      <div class="sentiment-bar"><div class="seg pos" style="width:82%"></div><div class="seg neu" style="width:14%"></div><div class="seg neg" style="width:4%"></div></div>
-      <div class="topic-quote">"Best facial I've had in BGC, the clinic feels so clean and the staff actually explain what they're doing."</div>
-    </div>
-
-    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('staff-service')" title="Click to see constituent mentions">
-      <div class="card-head">
-        <div><h3>Staff & Service Experience</h3><div class="card-sub">71 mentions this week</div></div>
-        <span class="tag sage">Trending</span>
-      </div>
-      <div class="sentiment-bar"><div class="seg pos" style="width:76%"></div><div class="seg neu" style="width:18%"></div><div class="seg neg" style="width:6%"></div></div>
-      <div class="topic-quote">"Club Remedy's wellness room is such a nice touch after a facial, did not expect that at a derma clinic."</div>
-    </div>
-
-    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('rejuran')" title="Click to see constituent mentions">
-      <div class="card-head">
-        <div><h3>Rejuran Specifically</h3><div class="card-sub">49 mentions this week</div></div>
-        <span class="tag gold">Watch</span>
-      </div>
-      <div class="sentiment-bar"><div class="seg pos" style="width:45%"></div><div class="seg neu" style="width:40%"></div><div class="seg neg" style="width:15%"></div></div>
-      <div class="topic-quote">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy's reviews look consistent but Aivee has more posts."</div>
-    </div>
-
-    <div class="card topic-card" style="margin-bottom:14px;" onclick="openTopicModal('pricing')" title="Click to see constituent mentions">
-      <div class="card-head">
-        <div><h3>Pricing & Packages</h3><div class="card-sub">38 mentions this week</div></div>
-        <span class="tag gold">Watch</span>
-      </div>
-      <div class="sentiment-bar"><div class="seg pos" style="width:38%"></div><div class="seg neu" style="width:47%"></div><div class="seg neg" style="width:15%"></div></div>
-      <div class="topic-quote">"Anyone know if Remedy has package deals for Pico laser? Price isn't listed on their page."</div>
-    </div>
-
-    <div class="card topic-card" onclick="openTopicModal('booking')" title="Click to see constituent mentions">
-      <div class="card-head">
-        <div><h3>Booking & Follow-up Response</h3><div class="card-sub">46 mentions this week</div></div>
-        <span class="tag coral">Needs attention</span>
-      </div>
-      <div class="sentiment-bar"><div class="seg pos" style="width:20%"></div><div class="seg neu" style="width:35%"></div><div class="seg neg" style="width:45%"></div></div>
-      <div class="topic-quote">"Second time booking Rejuran with Dra. April's team, still waiting on a follow-up call back — service used to be faster."</div>
-    </div>
+    <div id="topicsContainer"></div>
   </section>
 
   <!-- EMV -->
@@ -878,8 +684,8 @@
         <div class="desc">This month, all owned entities · rate card updated to Media Meter's published card per Gian's §6.3 note · click a row for the calculation</div>
       </div>
       <div class="filters">
-        <span class="tag gold" id="emvGrossTag">Gross ₱2,366,000</span>
-        <span class="tag sage" id="emvNetTag">Net Favorable ₱2,809,000</span>
+        <span class="tag gold" id="emvGrossTag">Gross —</span>
+        <span class="tag sage" id="emvNetTag">Net Favorable —</span>
         <div class="chip" id="emvOutletFilter" onclick="toggleEmvFilterMenu(event, this, 'outlet')">Outlet: All</div>
         <div class="chip" id="emvDateFilter" onclick="toggleEmvFilterMenu(event, this, 'date')">📅 All time</div>
         <div class="chip" onclick="exportEmvCSV()">⭳ Export CSV</div>
@@ -896,81 +702,7 @@
     <div class="card">
       <div class="table-scroll"><table>
         <thead><tr><th>Outlet</th><th>Article</th><th>Tier</th><th>Sentiment</th><th>Gross EMV</th><th>Net Favorable EMV</th><th></th></tr></thead>
-        <tbody id="emvTableBody">
-          <tr class="emv-row" data-outlet="Rappler" data-date="2026-06-29" onclick="toggleEmvDetail(this)">
-            <td><span class="chevron">▸</span>Rappler</td>
-            <td>Remedy BGC clinic review</td>
-            <td>National News</td>
-            <td><span class="tag sage">Positive</span></td>
-            <td class="emv-val">₱585,000</td>
-            <td class="emv-val">₱702,000</td>
-            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('Rappler', 'Remedy BGC clinic review')">View ↗</a></td>
-          </tr>
-          <tr class="emv-detail" style="display:none;">
-            <td colspan="7">Base AVE (National Newspaper) ₱200,000 → Prominence ×1.5 (headline) → AVE ₱300,000 → PubScore 0.65 → PR_Credibility ×3.0 → Gross EMV ≈ ₱585,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱702,000</td>
-          </tr>
-          <tr class="emv-row" data-outlet="Philippine Star" data-date="2026-06-15" onclick="toggleEmvDetail(this)">
-            <td><span class="chevron">▸</span>Philippine Star</td>
-            <td>April Rivera techpreneur profile</td>
-            <td>National News</td>
-            <td><span class="tag sage">Positive</span></td>
-            <td class="emv-val">₱360,000</td>
-            <td class="emv-val">₱432,000</td>
-            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('Philippine Star', 'April Rivera techpreneur profile')">View ↗</a></td>
-          </tr>
-          <tr class="emv-detail" style="display:none;">
-            <td colspan="7">Base AVE (National Newspaper) ₱200,000 → Prominence ×1.0 (substantial) → PubScore 0.60 → PR_Credibility ×3.0 → Gross EMV ≈ ₱360,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱432,000</td>
-          </tr>
-          <tr class="emv-row" data-outlet="PeopleAsia" data-date="2026-06-05" onclick="toggleEmvDetail(this)">
-            <td><span class="chevron">▸</span>PeopleAsia</td>
-            <td>SkinPen feature, panel commentary</td>
-            <td>Lifestyle Mag</td>
-            <td><span class="tag sage">Positive</span></td>
-            <td class="emv-val">₱536,000</td>
-            <td class="emv-val">₱643,000</td>
-            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('PeopleAsia', 'SkinPen feature April Geraldez-Rivera')">View ↗</a></td>
-          </tr>
-          <tr class="emv-detail" style="display:none;">
-            <td colspan="7">Base AVE (Lifestyle Magazine) ₱250,000 → Prominence ×1.3 (headline-adjacent) → AVE ₱325,000 → PubScore 0.55 → PR_Credibility ×3.0 → Gross EMV ≈ ₱536,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱643,000. Note: this replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base (₱120,000) — flag to Gian/Marketing to confirm the new figure.</td>
-          </tr>
-          <tr class="emv-row" data-outlet="When In Manila" data-date="2026-05-20" onclick="toggleEmvDetail(this)">
-            <td><span class="chevron">▸</span>When In Manila</td>
-            <td>Club Remedy wellness soft-launch feature</td>
-            <td>Lifestyle Mag</td>
-            <td><span class="tag sage">Positive</span></td>
-            <td class="emv-val">₱375,000</td>
-            <td class="emv-val">₱450,000</td>
-            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('When In Manila', 'Club Remedy wellness soft-launch feature')">View ↗</a></td>
-          </tr>
-          <tr class="emv-detail" style="display:none;">
-            <td colspan="7">Base AVE (Lifestyle Magazine) ₱250,000 → Prominence ×1.0 (substantial) → PubScore 0.50 → PR_Credibility ×3.0 → Gross EMV ≈ ₱375,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱450,000</td>
-          </tr>
-          <tr class="emv-row" data-outlet="Manila Bulletin" data-date="2026-05-02" onclick="toggleEmvDetail(this)">
-            <td><span class="chevron">▸</span>Manila Bulletin</td>
-            <td>Acne treatment trends roundup, brief mention</td>
-            <td>National News</td>
-            <td><span class="tag sky">Neutral</span></td>
-            <td class="emv-val">₱150,000</td>
-            <td class="emv-val">₱150,000</td>
-            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('Manila Bulletin', 'acne treatment trends roundup')">View ↗</a></td>
-          </tr>
-          <tr class="emv-detail" style="display:none;">
-            <td colspan="7">Base AVE (National Newspaper) ₱200,000 → Prominence ×0.5 (passing mention) → AVE ₱100,000 → PubScore 0.50 → PR_Credibility ×3.0 → Gross EMV ≈ ₱150,000 → Sentiment ×1.0 (neutral) → Net Favorable EMV ≈ ₱150,000</td>
-          </tr>
-          <tr class="emv-row" data-outlet="ANC" data-date="2026-04-10" onclick="toggleEmvDetail(this)">
-            <td><span class="chevron">▸</span>ANC</td>
-            <td>Dermatology segment, 30s brand mention</td>
-            <td>Broadcast TV</td>
-            <td><span class="tag sage">Positive</span></td>
-            <td class="emv-val">₱360,000</td>
-            <td class="emv-val">₱432,000</td>
-            <td><a class="source-link" onclick="event.stopPropagation(); viewSource('ANC', 'dermatology segment brand mention')">View ↗</a></td>
-          </tr>
-          <tr class="emv-detail" style="display:none;">
-            <td colspan="7">Base AVE (Broadcast TV, per 30s) ₱200,000 → Prominence ×1.0 (substantial) → PubScore 0.60 → PR_Credibility ×3.0 → Gross EMV ≈ ₱360,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱432,000. Online capture only, per §5.5 — this is the first TV placement in the tracker.</td>
-          </tr>
-          <tr id="emvEmptyRow" style="display:none;"><td colspan="7" style="text-align:center; color:var(--ink-faint); padding:20px 10px;">No coverage matches these filters (demo)</td></tr>
-        </tbody>
+        <tbody id="emvTableBody"></tbody>
       </table></div>
     </div>
   </section>
@@ -978,7 +710,7 @@
 </main>
 
 <footer class="note">
-  <span>Remedy Pulse — mock-up build · sample data for review, not live · actions below are simulated for demo purposes</span>
+  <span id="footerNote">Remedy Pulse — mock-up build · sample data for review, not live · actions below are simulated for demo purposes</span>
   <span>Spec ref: RemedyPulseSpec_1 · v0.1 draft</span>
 </footer>
 
@@ -988,6 +720,47 @@
 <div class="toast" id="toast"></div>
 
 <script>
+  // =========================================================================
+  // Remedy Pulse — data-driven refactor (Phase 7: 7.2/7.3/7.5/7.6/7.7)
+  //
+  // 7.2: every tab's hardcoded markup is now extracted into SAMPLE_DATA below,
+  //   shaped to match docs/api-contract.md's response bodies, and every tab
+  //   renders from a STATE object populated either by a real fetch() or by
+  //   SAMPLE_DATA (isDemoMode gate — see setDemoMode()/applyDemoGating()).
+  // 7.3: every render path below uses createElement/textContent, never
+  //   innerHTML built from concatenated data and never an onclick attribute
+  //   built from data. Where a template-string modal body is genuinely the
+  //   simplest correct tool, every interpolated field goes through
+  //   escapeHtml() — no exceptions.
+  // 7.5: formatRelativeTime()/formatPHTime() (from Phase 0) are reused as-is;
+  //   every rendered item's relative-time text is computed at render time
+  //   from its real publishedAt, and the sync pill is driven by GET
+  //   /api/status's most-recent lastSuccessAt across sources.
+  // 7.6: every one of the six tabs' render functions now has a real loading /
+  //   empty / error(+retry) state via renderStatePanel().
+  // 7.7: a single isDemoMode flag (STATE.isDemoMode) gates the Demo badge,
+  //   the "+ Simulate mention" chip, simulateSync(), and the canned AI
+  //   summary regenerate button — see applyDemoGating().
+  // =========================================================================
+
+  // ---------- Config ----------
+  const API_BASE = 'http://localhost:8000/api';
+  const AUTH_TOKEN_KEY = 'remedyPulseToken';
+  const AUTH_USER_KEY = 'remedyPulseUser';
+
+  // ---------- Escaping (implements 7.3 / 0.11) ----------
+  // Shared helper for anywhere a data field (author name, mention/review text, source name,
+  // branch/listing name, etc.) is interpolated into an HTML string via openModal()'s innerHTML,
+  // or into an HTML attribute built by concatenation. Every tab's item-render path below prefers
+  // createElement/textContent instead; escapeHtml() is used only where a template-string modal
+  // body is genuinely the simplest correct tool, and every interpolated field goes through it.
+  const ESCAPE_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escapeHtml(str){
+    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ESCAPE_HTML_MAP[ch]);
+  }
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
   // ---------- Tab navigation ----------
   const links = document.querySelectorAll('#tabNav a');
   const views = document.querySelectorAll('.view');
@@ -1016,17 +789,533 @@
     document.getElementById('modalOverlay').classList.remove('open');
   }
 
-  // ---------- Escaping ----------
-  // Shared helper for anywhere a data field (author name, mention/review text, source name,
-  // branch/listing name, etc.) is interpolated into an HTML string via openModal()'s innerHTML,
-  // or into an HTML attribute built by concatenation. Static template fragments with no
-  // interpolated data are left as plain innerHTML strings.
-  const ESCAPE_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-  function escapeHtml(str){
-    return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ESCAPE_HTML_MAP[ch]);
+  // =========================================================================
+  // 7.2 — Sample / demo data module
+  // One module, shaped like docs/api-contract.md's response bodies (same
+  // field names as the contract where sensible) so swapping "sample data"
+  // for "a real fetch()" is mechanical — see the fetch layer further down.
+  // This is also what keeps the file openable with zero backend (per
+  // docs/README-Remedy-Pulse-Demo.md).
+  // =========================================================================
+  const DEMO_TODAY = new Date('2026-07-01T00:00:00');
+  const DEMO_NOW = new Date('2026-07-01T09:15:00');
+
+  const SAMPLE_DATA = {
+    overview: {
+      clarityIndex: { score: 75, deltaVsLastWeek: 6 }, // score is recomputed live from this same sample data — see getClarityIndexInputsFromSample()
+      totalMentions: { value: 342, deltaPct: 18, priorPeriodValue: 291 },
+      netSentiment: { value: 62, deltaPts: 4 },
+      avgGoogleRating: { value: 5.0, reviewCount: 128 },
+      activeAlerts: { total: 4, crisis: 1, digest: 3 }, // shape-only; the rendered KPI is computed live from mentions.items so a Resolve click updates it immediately (see renderAlertsPanel)
+      aiSummaryText: 'Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.',
+      lastSyncedAt: '2026-07-01T09:15:00+00:00'
+    },
+    // "Regenerate" cycle — demo-only affordance (7.7). The contract keeps this canned/templated
+    // for the real API too (no live LLM call this phase); only the demo's cycling UI is gated.
+    aiSummaryVariants: [
+      'Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.',
+      'Net sentiment held steady at plus 62 this week despite a slower than usual follow-up call flagged in a Google review. Facial results and staff experience remain the most discussed topics, both strongly positive. Worth watching: a Reddit thread comparing Remedy to Aivee on Rejuran pricing is quietly gaining traction.',
+      'Earned media had a strong week. Rappler and Philippine Star coverage alone add up to more than 1.2 million pesos in gross EMV. Club Remedy wellness coverage is starting to show up in lifestyle press. There is no new negative coverage in news or PR; the only open item is a single unresolved Google review.'
+    ],
+    // GET /api/mentions shape. alertCategory carries the two "alerts" items too (crisis/digest) —
+    // the contract has no separate GET /api/alerts, so the Overview alerts panel is derived from
+    // this same array (filtered by alertCategory) rather than a second hardcoded list.
+    mentions: {
+      items: [
+        { id: 1, platform: 'google_reviews', author: 'Google Review · anonymous patient', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.', url: null, publishedAt: '2026-07-01T08:34:00+00:00', sentiment: 'Negative', topics: ['rejuran', 'booking'], venue: 'Remedy BGC', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: 'digest', alertTitle: '2★ Google review — Remedy BGC', alertNote: 'Daily Digest — isolated, no traction', stars: 2, reach: null },
+        { id: 2, platform: 'reddit', author: 'u/skinseeker_mnl', text: 'Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy’s reviews look consistent but Aivee has more posts.', url: null, publishedAt: '2026-07-01T06:15:00+00:00', sentiment: 'Neutral', topics: ['rejuran'], venue: 'r/PhilippinesSkincare', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: 'digest', alertTitle: 'Sentiment dip in Reddit thread', alertNote: 'Daily Digest — neutral discussion', stars: null, reach: '~1,200' },
+        { id: 3, platform: 'instagram', author: '@glowwithsab', text: 'Best facial I’ve had in BGC, the clinic feels so clean and the staff actually explain what they’re doing 🤍', url: null, publishedAt: '2026-07-01T03:15:00+00:00', sentiment: 'Positive', topics: ['facial-results'], venue: 'Instagram comment on @remedy.ph', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: null, stars: null, reach: '~4,800' },
+        { id: 4, platform: 'news_articles', author: 'PeopleAsia editorial', text: 'Feature on SkinPen treatments includes commentary from Dr. April Geraldez-Rivera on emerging PH skincare trends.', url: null, publishedAt: '2026-06-30T09:15:00+00:00', sentiment: 'Positive', topics: [], venue: 'Online News', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: null, stars: null, reach: null, emvNote: '₱290,000' },
+        { id: 5, platform: 'facebook', author: 'Facebook comment · patient', text: 'Club Remedy’s wellness room is such a nice touch after a facial, did not expect that at a derma clinic.', url: null, publishedAt: '2026-06-29T09:15:00+00:00', sentiment: 'Positive', topics: ['staff-service'], venue: 'facebook.com/remedyph', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: null, stars: null, reach: '~1,900' },
+        { id: 6, platform: 'tiktok', author: 'TikTok comment · patient', text: 'The skin routine video was so helpful, saving this before my next Pico laser session.', url: null, publishedAt: '2026-06-28T09:15:00+00:00', sentiment: 'Positive', topics: ['facial-results'], venue: '@remedy.ph on TikTok', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: null, stars: null, reach: '~2,600' },
+        { id: 7, platform: 'news_articles', author: 'Manila Bulletin news desk', text: 'Journalist inquiry re: a patient complaint alleging a treatment complication — requesting comment from Remedy.', url: null, publishedAt: '2026-07-01T09:03:00+00:00', sentiment: 'Negative', topics: [], venue: 'Manila Bulletin', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: 'crisis', alertTitle: '🚨 Journalist inquiry re: patient complaint — Manila Bulletin', alertNote: 'Crisis Alert — send immediately', stars: null, reach: null },
+        { id: 8, platform: 'instagram', author: 'Competitor spike — Aivee', text: 'Aivee Clinic mention volume is up sharply this week, driven mostly by Instagram (+52%) and X (+28%). No direct owned-entity impact detected yet.', url: null, publishedAt: '2026-07-01T00:00:00+00:00', sentiment: 'Neutral', topics: [], venue: 'Instagram, X', assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: 'digest', alertTitle: 'Aivee mention volume +40% this week', alertNote: 'Daily Digest — competitive intelligence', stars: null, reach: null }
+      ],
+      nextCursor: null
+    },
+    // GET /api/reviews shape. trendLabel is a sample-only decorative extra (no "Trend (30d)"
+    // field exists in the contract's Reviews shape) — real data renders "—" for that column
+    // rather than inventing a trend number (same honesty rule the contract states for EMV).
+    reviews: {
+      listings: [
+        { venue: 'Remedy — BGC (One Uptown Residence)', rating: 5.0, reviewCount: 128, pendingReplies: 0, responseRatePct: 100, status: 'ok', trendLabel: '▲ steady' },
+        { venue: 'Club Remedy — BGC', rating: 4.9, reviewCount: 34, pendingReplies: 1, responseRatePct: 88, status: 'ok', trendLabel: '▲ +0.1' },
+        { venue: 'Remedy — Vertis North', rating: 4.8, reviewCount: 52, pendingReplies: 0, responseRatePct: 95, status: 'ok', trendLabel: '▲ +0.2' },
+        { venue: 'Skin Bar by Remedy — Greenhills Mall', rating: 4.6, reviewCount: 19, pendingReplies: 2, responseRatePct: 80, status: 'ok', trendLabel: '▲ new branch' }
+      ]
+    },
+    // GET /api/topics shape.
+    topics: {
+      topics: [
+        { key: 'facial-results', label: 'Facial Results & Glow', mentionCountThisWeek: 138, sentimentSplit: { positivePct: 82, neutralPct: 14, negativePct: 4 }, sampleQuote: 'Best facial I’ve had in BGC, the clinic feels so clean and the staff actually explain what they’re doing.', tag: null },
+        { key: 'staff-service', label: 'Staff & Service Experience', mentionCountThisWeek: 71, sentimentSplit: { positivePct: 76, neutralPct: 18, negativePct: 6 }, sampleQuote: 'Club Remedy’s wellness room is such a nice touch after a facial, did not expect that at a derma clinic.', tag: null },
+        { key: 'rejuran', label: 'Rejuran Specifically', mentionCountThisWeek: 49, sentimentSplit: { positivePct: 45, neutralPct: 40, negativePct: 15 }, sampleQuote: 'Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy’s reviews look consistent but Aivee has more posts.', tag: 'watch' },
+        { key: 'pricing', label: 'Pricing & Packages', mentionCountThisWeek: 38, sentimentSplit: { positivePct: 38, neutralPct: 47, negativePct: 15 }, sampleQuote: 'Anyone know if Remedy has package deals for Pico laser? Price isn’t listed on their page.', tag: 'watch' },
+        { key: 'booking', label: 'Booking & Follow-up Response', mentionCountThisWeek: 46, sentimentSplit: { positivePct: 20, neutralPct: 35, negativePct: 45 }, sampleQuote: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.', tag: 'needs-attention' }
+      ]
+    },
+    // Demo fallback for GET /api/topics/{key}/mentions.
+    topicMentionsByKey: {
+      'facial-results': [
+        { author: '@glowwithsab', venue: 'Instagram comment on @remedy.ph', sentiment: 'Positive', text: 'Best facial I’ve had in BGC, the clinic feels so clean and the staff actually explain what they’re doing 🤍' },
+        { author: 'Google Review · verified patient', venue: 'Remedy — Vertis North', sentiment: 'Positive', text: 'Left with an actual glow, not just red skin. Booking again next month.' },
+        { author: 'TikTok comment · patient', venue: '@remedy.ph on TikTok', sentiment: 'Positive', text: 'The skin routine video was so helpful, saving this before my next Pico laser session.' }
+      ],
+      'staff-service': [
+        { author: 'Facebook comment · patient', venue: 'facebook.com/remedyph', sentiment: 'Positive', text: 'Club Remedy’s wellness room is such a nice touch after a facial, did not expect that at a derma clinic.' },
+        { author: 'Google Review · verified patient', venue: 'Remedy BGC', sentiment: 'Positive', text: 'Front desk remembered my name on my second visit, small thing but it matters.' }
+      ],
+      'rejuran': [
+        { author: 'u/skinseeker_mnl', venue: 'r/PhilippinesSkincare', sentiment: 'Neutral', text: 'Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy’s reviews look consistent but Aivee has more posts.' },
+        { author: 'Google Review · anonymous patient', venue: 'Remedy BGC', sentiment: 'Negative', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.' }
+      ],
+      'pricing': [
+        { author: 'Facebook comment · prospective patient', venue: 'facebook.com/remedyph', sentiment: 'Neutral', text: 'Anyone know if Remedy has package deals for Pico laser? Price isn’t listed on their page.' },
+        { author: 'Instagram DM excerpt · prospective patient', venue: '@remedy.ph', sentiment: 'Neutral', text: 'Asked about Rejuran pricing, still waiting to hear back on package rates.' }
+      ],
+      'booking': [
+        { author: 'Google Review · anonymous patient', venue: 'Remedy BGC', sentiment: 'Negative', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.' },
+        { author: 'Facebook comment · patient', venue: 'facebook.com/remedyph', sentiment: 'Negative', text: 'Called twice about rescheduling and never got a callback, had to just show up.' }
+      ]
+    },
+    // GET /api/competitors shape.
+    competitors: {
+      shareOfVoice: [
+        { name: 'Belo', pct: 40, isOwn: false },
+        { name: 'Aivee', pct: 27, isOwn: false, spike: true },
+        { name: 'Remedy', pct: 14, isOwn: true },
+        { name: 'SkinStation', pct: 8, isOwn: false },
+        { name: 'DermHQ', pct: 5, isOwn: false },
+        { name: 'Luminisce', pct: 4, isOwn: false },
+        { name: 'Kamiseta', pct: 2, isOwn: false, isNew: true }
+      ],
+      sourceBreakdown: [
+        { platform: 'Google Reviews', pct: 34 },
+        { platform: 'Facebook', pct: 20 },
+        { platform: 'Instagram', pct: 17 },
+        { platform: 'Reddit', pct: 14 },
+        { platform: 'X', pct: 7 },
+        { platform: 'News / PR', pct: 5 },
+        { platform: 'TikTok', pct: 3, isNew: true }
+      ],
+      competitorSentiment: [
+        { name: 'Remedy', positivePct: 71, neutralPct: 22, negativePct: 7, isOwn: true },
+        { name: 'Belo', positivePct: 58, neutralPct: 30, negativePct: 12, isOwn: false },
+        { name: 'Aivee', positivePct: 49, neutralPct: 28, negativePct: 23, isOwn: false, spike: true },
+        { name: 'SkinStation', positivePct: 63, neutralPct: 29, negativePct: 8, isOwn: false },
+        { name: 'DermHQ', positivePct: 66, neutralPct: 26, negativePct: 8, isOwn: false }
+      ]
+    },
+    // Not covered by docs/api-contract.md — no endpoint backs these two Competitors cards yet.
+    // Documented deviation: always rendered from this sample data regardless of isDemoMode,
+    // since there is nothing to fetch (see final report).
+    topVoices: [
+      { icon: 'IG', name: '@glowwithsab · ~4.8K reach', tag: 'Remedy advocate', tagClass: 'sage' },
+      { icon: 'R', name: 'u/skinseeker_mnl · ~1.2K reach', tag: 'Comparing brands', tagClass: 'gold' },
+      { icon: 'IG', name: '@beauty.trends.ph · ~12K reach', tag: 'Category — no lean', tagClass: 'neutral' },
+      { icon: 'TT', name: '@glowgetterph · ~28K reach', tag: 'Aivee advocate', tagClass: 'neutral' }
+    ],
+    categoryWatch: [
+      { name: 'Clinique de Paris' },
+      { name: 'Foleon by Aivee', note: '(also under Aivee)' },
+      { name: 'Svenson' }
+    ],
+    // GET /api/emv shape. grossEmv/netEmv are populated here (sample only) so the validated demo
+    // look is preserved; the real API always returns null for both per the contract, which the
+    // render layer (emvValText()) renders as an honest "Not yet priced" rather than a guess.
+    emv: {
+      grossTotal: 2366000,
+      netTotal: 2809000,
+      filtered: false,
+      articles: [
+        { id: 101, outlet: 'Rappler', headline: 'Remedy BGC clinic review', tier: 'National News', sentiment: 'Positive', grossEmv: 585000, netEmv: 702000, url: null, publishedAt: '2026-06-29T00:00:00+00:00', calcNote: 'Base AVE (National Newspaper) ₱200,000 → Prominence ×1.5 (headline) → AVE ₱300,000 → PubScore 0.65 → PR_Credibility ×3.0 → Gross EMV ≈ ₱585,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱702,000' },
+        { id: 102, outlet: 'Philippine Star', headline: 'April Rivera techpreneur profile', tier: 'National News', sentiment: 'Positive', grossEmv: 360000, netEmv: 432000, url: null, publishedAt: '2026-06-15T00:00:00+00:00', calcNote: 'Base AVE (National Newspaper) ₱200,000 → Prominence ×1.0 (substantial) → PubScore 0.60 → PR_Credibility ×3.0 → Gross EMV ≈ ₱360,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱432,000' },
+        { id: 103, outlet: 'PeopleAsia', headline: 'SkinPen feature, panel commentary', tier: 'Lifestyle Mag', sentiment: 'Positive', grossEmv: 536000, netEmv: 643000, url: null, publishedAt: '2026-06-05T00:00:00+00:00', calcNote: 'Base AVE (Lifestyle Magazine) ₱250,000 → Prominence ×1.3 (headline-adjacent) → AVE ₱325,000 → PubScore 0.55 → PR_Credibility ×3.0 → Gross EMV ≈ ₱536,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱643,000. Note: this replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base (₱120,000) — flag to Gian/Marketing to confirm the new figure.' },
+        { id: 104, outlet: 'When In Manila', headline: 'Club Remedy wellness soft-launch feature', tier: 'Lifestyle Mag', sentiment: 'Positive', grossEmv: 375000, netEmv: 450000, url: null, publishedAt: '2026-05-20T00:00:00+00:00', calcNote: 'Base AVE (Lifestyle Magazine) ₱250,000 → Prominence ×1.0 (substantial) → PubScore 0.50 → PR_Credibility ×3.0 → Gross EMV ≈ ₱375,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱450,000' },
+        { id: 105, outlet: 'Manila Bulletin', headline: 'Acne treatment trends roundup, brief mention', tier: 'National News', sentiment: 'Neutral', grossEmv: 150000, netEmv: 150000, url: null, publishedAt: '2026-05-02T00:00:00+00:00', calcNote: 'Base AVE (National Newspaper) ₱200,000 → Prominence ×0.5 (passing mention) → AVE ₱100,000 → PubScore 0.50 → PR_Credibility ×3.0 → Gross EMV ≈ ₱150,000 → Sentiment ×1.0 (neutral) → Net Favorable EMV ≈ ₱150,000' },
+        { id: 106, outlet: 'ANC', headline: 'Dermatology segment, 30s brand mention', tier: 'Broadcast TV', sentiment: 'Positive', grossEmv: 360000, netEmv: 432000, url: null, publishedAt: '2026-04-10T00:00:00+00:00', calcNote: 'Base AVE (Broadcast TV, per 30s) ₱200,000 → Prominence ×1.0 (substantial) → PubScore 0.60 → PR_Credibility ×3.0 → Gross EMV ≈ ₱360,000 → Sentiment ×1.2 (positive) → Net Favorable EMV ≈ ₱432,000. Online capture only, per §5.5 — this is the first TV placement in the tracker.' }
+      ]
+    },
+    // GET /api/roster shape.
+    roster: {
+      assignees: [
+        { id: 1, email: 'gian@remedy.ph', displayName: 'Gian' },
+        { id: 2, email: 'paul@remedy.ph', displayName: 'Paul' },
+        { id: 3, email: 'boom@remedy.ph', displayName: 'Boom' },
+        { id: 4, email: 'mixi@remedy.ph', displayName: 'Mixi' }
+      ]
+    },
+    // GET /api/status shape.
+    status: {
+      sources: [
+        { source: 'google_reviews', lastAttemptAt: '2026-07-01T09:15:00+00:00', lastSuccessAt: '2026-07-01T09:15:00+00:00', lastStatus: 'success', lastError: null },
+        { source: 'google_places_competitor', lastAttemptAt: '2026-07-01T09:10:00+00:00', lastSuccessAt: '2026-07-01T09:10:00+00:00', lastStatus: 'success', lastError: null },
+        { source: 'reddit', lastAttemptAt: '2026-07-01T08:50:00+00:00', lastSuccessAt: '2026-07-01T08:50:00+00:00', lastStatus: 'success', lastError: null },
+        { source: 'news_articles', lastAttemptAt: '2026-07-01T07:30:00+00:00', lastSuccessAt: '2026-07-01T07:30:00+00:00', lastStatus: 'success', lastError: null }
+      ]
+    }
+  };
+
+  const SIMULATE_POOL = [
+    { platform: 'facebook', author: 'Facebook comment · patient', venue: 'facebook.com/remedyph', text: 'Booked our first Club Remedy wellness session today, the space feels calming compared to a regular clinic.', sentiment: 'Positive', reach: '~2,100', stars: null },
+    { platform: 'x', author: '@skincareph_deals', venue: 'X', text: 'Pico laser results at Remedy BGC are honestly underrated, healed faster than expected.', sentiment: 'Positive', reach: '~3,400', stars: null },
+    { platform: 'google_reviews', author: 'Google Review · verified patient', venue: 'Club Remedy BGC', text: '5 stars, the wellness plus derma combo is such a smart idea. Will be back monthly.', sentiment: 'Positive', reach: null, stars: 5 }
+  ];
+
+  // Raw platform/source values (contract examples like "reddit", "google_reviews") mapped to the
+  // friendly display labels the UI already used — presentational only, filter state compares
+  // against the display label so the existing filter-chip logic needs no other changes.
+  const PLATFORM_DISPLAY = {
+    google_reviews: 'Google', google_places_competitor: 'Google', reddit: 'Reddit', instagram: 'Instagram',
+    facebook: 'Facebook', news_articles: 'News', tiktok: 'TikTok', x: 'X', twitter: 'X'
+  };
+  function platformDisplay(raw){
+    if (!raw) return 'Unknown';
+    if (PLATFORM_DISPLAY[raw]) return PLATFORM_DISPLAY[raw];
+    if (/^[A-Z]/.test(raw)) return raw; // already a display-style string (e.g. from live API)
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  const PLATFORM_AVATARS = { Google:'🟢', Reddit:'💬', Instagram:'📸', News:'📰', Facebook:'💛', TikTok:'🎵', X:'🐦' };
+
+  // =========================================================================
+  // Auth (7.7 depends on this) — a minimal login flow against POST
+  // /api/auth/login. Token + user are kept in localStorage and attached as
+  // Authorization: Bearer <token> on every fetch (see apiFetch()).
+  // =========================================================================
+  function getAuthToken(){ try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch(e){ return null; } }
+  function getAuthUser(){
+    try { const raw = localStorage.getItem(AUTH_USER_KEY); return raw ? JSON.parse(raw) : null; }
+    catch(e){ return null; }
+  }
+  function setAuth(token, user){
+    try {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user || null));
+    } catch(e){ /* localStorage unavailable (private mode etc.) — session just won't persist across reloads */ }
+  }
+  function clearAuth(){
+    try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_USER_KEY); } catch(e){}
   }
 
-  // ---------- Filter chip dropdowns ----------
+  function ApiError(status, message){
+    this.name = 'ApiError';
+    this.status = status;
+    this.message = message;
+  }
+  ApiError.prototype = Object.create(Error.prototype);
+
+  function toQuery(params){
+    if (!params) return '';
+    const qs = Object.keys(params)
+      .filter(k => params[k] != null && params[k] !== '')
+      .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
+      .join('&');
+    return qs ? '?' + qs : '';
+  }
+
+  async function apiFetch(path, options){
+    options = options || {};
+    const token = getAuthToken();
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    let res;
+    try {
+      res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+    } catch (networkErr){
+      throw new ApiError(0, 'network error');
+    }
+    if (res.status === 401) throw new ApiError(401, 'unauthorized');
+    if (!res.ok) throw new ApiError(res.status, 'request failed (' + res.status + ')');
+    return res.json();
+  }
+
+  // ---------- Fetch layer (7.2 step 3) — one function per GET endpoint the render code below
+  // needs, plus the assign/resolve write endpoints (7.4) reconciled in after both the read layer
+  // and the API layer landed. Wired into handleAssign()/resolveAlertItem() below — best-effort:
+  // the local STATE mutation always happens immediately (so the UI stays responsive even if the
+  // write fails), the real POST is fired in the background when not in demo mode, and a failure
+  // surfaces honestly via toast rather than silently pretending it saved.
+  //
+  // sendReply() is NOT wired to POST /api/reviews/{mention_id}/reply, and that's a real,
+  // deliberate gap, not an oversight: this UI's reply flow operates on a whole LISTING
+  // (l.pendingReplies, a branch-level count — see sendReply() below), matching the mockup's
+  // original per-branch "N pending replies" design, while the API's reply endpoint requires a
+  // SPECIFIC review's mention_id. There is no mapping from "reply to the next pending review at
+  // this branch" to "reply to review #123" without either (a) the UI listing individual pending
+  // reviews to choose from, or (b) the API adding a "reply to any one pending review at this
+  // venue" endpoint — a real product/API design decision, not a wiring task. Left local-only
+  // (matching its pre-existing "(demo)" framing) until that decision is made.
+  function login(email, password){
+    return apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  }
+  function fetchOverview(params){ return apiFetch('/overview' + toQuery(params)); }
+  function fetchMentions(params){ return apiFetch('/mentions' + toQuery(params)); }
+  function fetchReviews(){ return apiFetch('/reviews'); }
+  function fetchTopics(){ return apiFetch('/topics'); }
+  function fetchTopicMentions(key){ return apiFetch('/topics/' + encodeURIComponent(key) + '/mentions'); }
+  function fetchCompetitors(){ return apiFetch('/competitors'); }
+  function fetchEmv(params){ return apiFetch('/emv' + toQuery(params)); }
+  function fetchRoster(){ return apiFetch('/roster'); }
+  function fetchStatus(){ return apiFetch('/status'); }
+  function assignMention(mentionId, assignee){
+    return apiFetch('/mentions/' + encodeURIComponent(mentionId) + '/assign', {
+      method: 'POST', body: JSON.stringify({ assignee: assignee })
+    });
+  }
+  function resolveMention(mentionId){
+    return apiFetch('/mentions/' + encodeURIComponent(mentionId) + '/resolve', { method: 'POST' });
+  }
+
+  // =========================================================================
+  // App state + demo-mode gating (7.7)
+  // =========================================================================
+  const STATE = {
+    isDemoMode: true,
+    demoReason: 'not logged in', // 'not logged in' | 'offline' | null
+    user: null,
+    overview: null, mentions: null, reviews: null, topics: null,
+    competitors: null, emv: null, roster: null, status: null,
+    tabError: {} // { mentions, reviews, topics, competitors, emv } -> message string | null
+  };
+
+  function setDemoMode(isDemo, reason){
+    STATE.isDemoMode = isDemo;
+    STATE.demoReason = isDemo ? (reason || 'not logged in') : null;
+    applyDemoGating();
+  }
+
+  // Single source of truth for every demo-only affordance (7.7): the Demo badge, the
+  // "+ Simulate mention" chip, and the AI summary Regenerate button all check STATE.isDemoMode
+  // through this one function rather than four independent ad hoc checks.
+  function applyDemoGating(){
+    const demoBadge = document.getElementById('demoBadge');
+    const simChip = document.getElementById('simulateMentionChip');
+    const regenBtn = document.getElementById('regenerateBtn');
+    const authChip = document.getElementById('authChip');
+    const avatarBtn = document.getElementById('avatarBtn');
+    const footerNote = document.getElementById('footerNote');
+    const banner = document.getElementById('dataSourceBanner');
+
+    if (demoBadge){
+      demoBadge.style.display = STATE.isDemoMode ? '' : 'none';
+      demoBadge.textContent = STATE.demoReason === 'offline' ? 'Demo · API unreachable'
+        : STATE.demoReason === 'not logged in' ? 'Demo · not logged in'
+        : 'Demo';
+    }
+    if (simChip) simChip.style.display = STATE.isDemoMode ? '' : 'none';
+    if (regenBtn) regenBtn.style.display = STATE.isDemoMode ? '' : 'none';
+    if (authChip) authChip.style.display = STATE.isDemoMode ? '' : 'none';
+    if (avatarBtn){
+      if (STATE.isDemoMode){
+        avatarBtn.textContent = '?';
+        avatarBtn.title = 'Demo — not logged in. Click to log in.';
+      } else {
+        const name = (STATE.user && (STATE.user.display_name || STATE.user.email)) || 'U';
+        const initials = name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+        avatarBtn.textContent = initials;
+        avatarBtn.title = name + ' — click to log out';
+      }
+    }
+    if (footerNote){
+      footerNote.textContent = STATE.isDemoMode
+        ? 'Remedy Pulse — sample data for review, not live · actions below are simulated for demo purposes'
+        : 'Remedy Pulse — connected to the live API · showing real data';
+    }
+    if (banner){
+      if (STATE.isDemoMode && STATE.demoReason){
+        banner.classList.add('show');
+        banner.textContent = STATE.demoReason === 'not logged in'
+          ? '⚠ Not logged in — showing sample data. Log in for live data.'
+          : '⚠ Could not reach the live API — showing sample data.';
+      } else {
+        banner.classList.remove('show');
+        banner.textContent = '';
+      }
+    }
+  }
+
+  function handleUnauthorized(){
+    clearAuth();
+    STATE.user = null;
+    setDemoMode(true, 'not logged in');
+    showToast('Session expired — showing sample data');
+    loadAllFromSample();
+  }
+
+  // ---------- Auth modal ----------
+  function openAuthModal(){
+    if (!STATE.isDemoMode && STATE.user){
+      openModal(
+        '<button class="modal-close" onclick="closeModal()">×</button>' +
+        '<h4>Account</h4>' +
+        '<div style="font-size:12.5px;color:var(--ink-dim);margin-bottom:14px;">Logged in as ' + escapeHtml(STATE.user.display_name || STATE.user.email || '') + '</div>' +
+        '<button class="btn-mini" id="logoutBtn">Log out</button>'
+      );
+      const btn = document.getElementById('logoutBtn');
+      if (btn) btn.addEventListener('click', () => { logout(); closeModal(); });
+      return;
+    }
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>Log in</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Connects to the live API at ' + escapeHtml(API_BASE) + '. Without this, Remedy Pulse shows sample data only.</div>' +
+      '<div id="authError" style="display:none;font-size:12px;color:var(--coral-text);margin-bottom:10px;"></div>' +
+      '<div style="margin-bottom:10px;"><div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;">Email</div>' +
+      '<input type="email" id="authEmail" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;"></div>' +
+      '<div style="margin-bottom:14px;"><div style="font-size:11px;color:var(--ink-faint);margin-bottom:4px;">Password</div>' +
+      '<input type="password" id="authPassword" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:12.5px;"></div>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="btn-mini primary" id="authSubmitBtn">Log in</button>' +
+      '<button class="btn-mini" onclick="closeModal()">Stay in demo mode</button>' +
+      '</div>'
+    );
+    const submitBtn = document.getElementById('authSubmitBtn');
+    if (submitBtn) submitBtn.addEventListener('click', submitLogin);
+    const passEl = document.getElementById('authPassword');
+    if (passEl) passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitLogin(); });
+  }
+
+  async function submitLogin(){
+    const emailEl = document.getElementById('authEmail');
+    const passEl = document.getElementById('authPassword');
+    const errEl = document.getElementById('authError');
+    const submitBtn = document.getElementById('authSubmitBtn');
+    const email = emailEl ? emailEl.value.trim() : '';
+    const password = passEl ? passEl.value : '';
+    if (!email || !password){
+      if (errEl){ errEl.textContent = 'Enter both an email and a password.'; errEl.style.display = 'block'; }
+      return;
+    }
+    if (submitBtn){ submitBtn.textContent = 'Logging in…'; submitBtn.disabled = true; }
+    try {
+      const res = await login(email, password);
+      setAuth(res.token, res.user);
+      closeModal();
+      showToast('Logged in — loading live data…');
+      await initApp();
+    } catch (err){
+      if (errEl){
+        errEl.textContent = (err.status === 401) ? 'Invalid email or password.'
+          : (err.status === 0) ? "Couldn't reach the API — check it's running at " + API_BASE + '.'
+          : 'Something went wrong logging in. Try again.';
+        errEl.style.display = 'block';
+      }
+      if (submitBtn){ submitBtn.textContent = 'Log in'; submitBtn.disabled = false; }
+    }
+  }
+
+  function logout(){
+    clearAuth();
+    STATE.user = null;
+    showToast('Logged out — showing sample data');
+    initApp();
+  }
+
+  // =========================================================================
+  // 7.5 — relative time / PHT sync pill (Phase 0's formatRelativeTime()/
+  // formatPHTime() reused verbatim; only what feeds them changes)
+  // =========================================================================
+  function formatRelativeTime(isoString, now){
+    if (!isoString) return '';
+    const then = new Date(isoString);
+    if (isNaN(then.getTime())) return '';
+    now = now || new Date();
+    const diffMs = now - then;
+    if (diffMs < 0) return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return diffMin + ' min ago';
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return diffHr + ' hr' + (diffHr === 1 ? '' : 's') + ' ago';
+    const diffDay = Math.round(diffHr / 24);
+    if (diffDay === 1) return 'yesterday';
+    if (diffDay < 7) return diffDay + ' days ago';
+    const sameYear = then.getFullYear() === now.getFullYear();
+    return then.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatPHTime(date){
+    date = date || new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(date);
+    const h = (parts.find(p => p.type === 'hour') || {}).value || '00';
+    const m = (parts.find(p => p.type === 'minute') || {}).value || '00';
+    return h + ':' + m + ' PHT';
+  }
+
+  // "now" for relative-time math: the demo's fixed instant in demo mode (so sample publishedAt
+  // values read sensibly, exactly like Phase 0's DEMO_NOW), the real clock once live data loads.
+  function nowForRelativeTime(){ return STATE.isDemoMode ? DEMO_NOW : new Date(); }
+  function todayForFilters(){ return STATE.isDemoMode ? DEMO_TODAY : new Date(); }
+
+  // Wires the sync pill to the REAL GET /api/status response (7.5): the most recent successful
+  // run across every registered source, per the contract's own definition of lastSyncedAt.
+  function mostRecentSuccessAt(status, overview){
+    let latest = null;
+    if (status && Array.isArray(status.sources)){
+      status.sources.forEach(s => {
+        if (s.lastSuccessAt){
+          const t = new Date(s.lastSuccessAt);
+          if (!isNaN(t.getTime()) && (!latest || t > latest)) latest = t;
+        }
+      });
+    }
+    if (!latest && overview && overview.lastSyncedAt){
+      const t = new Date(overview.lastSyncedAt);
+      if (!isNaN(t.getTime())) latest = t;
+    }
+    return latest;
+  }
+  function renderSyncPill(){
+    const label = document.getElementById('syncLabel');
+    if (!label) return;
+    const latest = mostRecentSuccessAt(STATE.status, STATE.overview);
+    label.textContent = latest ? ('Last synced ' + formatPHTime(latest)) : 'Last synced —:— PHT';
+  }
+
+  // 7.7: the pill's demo-fake sync animation is gated off outside demo mode — a real refresh of
+  // GET /api/status takes its place so a viewer can never mistake a simulated sync time for a
+  // real one.
+  function handleSyncPillClick(){
+    if (STATE.isDemoMode) simulateSync();
+    else refreshStatus();
+  }
+  function simulateSync(){
+    if (!STATE.isDemoMode) return;
+    const pill = document.getElementById('syncPill');
+    const label = document.getElementById('syncLabel');
+    if (pill.classList.contains('syncing')) return;
+    pill.classList.add('syncing');
+    document.body.classList.add('syncing-data');
+    label.textContent = 'Syncing…';
+    setTimeout(() => {
+      renderSyncPill();
+      pill.classList.remove('syncing');
+      document.body.classList.remove('syncing-data');
+      showToast('Data refreshed (demo)');
+    }, 900);
+  }
+  async function refreshStatus(){
+    const pill = document.getElementById('syncPill');
+    const label = document.getElementById('syncLabel');
+    if (pill.classList.contains('syncing')) return;
+    pill.classList.add('syncing');
+    label.textContent = 'Syncing…';
+    try {
+      STATE.status = await fetchStatus();
+      renderSyncPill();
+      showToast('Status refreshed');
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      showToast("Couldn't refresh status");
+    } finally {
+      pill.classList.remove('syncing');
+    }
+  }
+
+  // ---------- Filter chip dropdowns (decorative period/source/entity filters — unchanged
+  // behaviour from the pre-refactor mockup; see final report for why these stay UI-only) ----------
   function closeAllChipMenus(){
     document.querySelectorAll('.chip-menu').forEach(m => m.remove());
   }
@@ -1066,62 +1355,7 @@
   document.addEventListener('click', closeAllChipMenus);
 
   // ---------- Custom date range modal (shared) ----------
-  const DEMO_TODAY = new Date('2026-07-01T00:00:00');
-  // The demo's fixed "current moment" — every hardcoded "X min/hrs ago" string in the sample
-  // data (feed items, alerts) is expressed as an offset from this instant, so relative-time
-  // text can be computed from a real data-datetime instead of being baked into the markup.
-  const DEMO_NOW = new Date('2026-07-01T09:15:00');
   let customDateCallback = null;
-
-  // ---------- Relative time (implements 0.16 — derive display text from real timestamps) ----------
-  function formatRelativeTime(isoString, now){
-    if (!isoString) return '';
-    const then = new Date(isoString);
-    if (isNaN(then.getTime())) return '';
-    now = now || new Date();
-    const diffMs = now - then;
-    if (diffMs < 0) return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const diffMin = Math.round(diffMs / 60000);
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return diffMin + ' min ago';
-    const diffHr = Math.round(diffMin / 60);
-    if (diffHr < 24) return diffHr + ' hr' + (diffHr === 1 ? '' : 's') + ' ago';
-    const diffDay = Math.round(diffHr / 24);
-    if (diffDay === 1) return 'yesterday';
-    if (diffDay < 7) return diffDay + ' days ago';
-    const sameYear = then.getFullYear() === now.getFullYear();
-    return then.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
-  }
-
-  // Applies formatRelativeTime() to every feed/alert item carrying a data-datetime, replacing
-  // the placeholder text in its .feed-time / .alert-time span. Called on load, and safe to
-  // re-run any time new timestamped items are inserted.
-  function applyRelativeTimestamps(){
-    document.querySelectorAll('.feed-item[data-datetime]').forEach(it => {
-      const span = it.querySelector('.feed-time');
-      if (span) span.textContent = formatRelativeTime(it.dataset.datetime, DEMO_NOW);
-    });
-    document.querySelectorAll('.alert-item[data-datetime]').forEach(it => {
-      const span = it.querySelector('.alert-time');
-      if (span) span.textContent = formatRelativeTime(it.dataset.datetime, DEMO_NOW);
-    });
-  }
-  applyRelativeTimestamps();
-
-  // ---------- Philippine time (implements 0.12 — timezone-correct, not the viewer's local clock) ----------
-  function formatPHTime(date){
-    date = date || new Date();
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false
-    }).formatToParts(date);
-    const h = (parts.find(p => p.type === 'hour') || {}).value || '00';
-    const m = (parts.find(p => p.type === 'minute') || {}).value || '00';
-    return h + ':' + m + ' PHT';
-  }
-  (function initSyncLabel(){
-    const label = document.getElementById('syncLabel');
-    if (label) label.textContent = 'Last synced ' + formatPHTime();
-  })();
   function openCustomDateModal(onApply, presetFrom, presetTo){
     openModal(
       '<button class="modal-close" onclick="closeModal()">×</button>' +
@@ -1142,7 +1376,7 @@
   function applyCustomDateModal(){
     const from = document.getElementById('customDateFrom').value;
     const to = document.getElementById('customDateTo').value;
-    if (!from || !to){ showToast('Pick both dates (demo)'); return; }
+    if (!from || !to){ showToast('Pick both dates'); return; }
     closeModal();
     if (customDateCallback) customDateCallback(from, to);
   }
@@ -1157,14 +1391,19 @@
     return d >= new Date(fromStr + 'T00:00:00') && d <= new Date(toStr + 'T00:00:00');
   }
   function cutoffDate(days){
-    const d = new Date(DEMO_TODAY);
+    const d = new Date(todayForFilters());
     d.setDate(d.getDate() - days);
     return d;
   }
 
   // ---------- Source links ----------
-  function viewSource(outlet, query){
-    const url = 'https://www.google.com/search?q=' + encodeURIComponent(outlet + ' ' + query);
+  function viewSource(outlet, queryOrUrl, realUrl){
+    if (realUrl){
+      window.open(realUrl, '_blank', 'noopener');
+      showToast('Opening source');
+      return;
+    }
+    const url = 'https://www.google.com/search?q=' + encodeURIComponent(outlet + ' ' + queryOrUrl);
     window.open(url, '_blank', 'noopener');
     showToast('Opening search for the live source (demo — production deep-links to the ingested URL)');
   }
@@ -1181,11 +1420,9 @@
     });
   });
 
-  // ---------- Simulate-mention gate (P1-3: must be blocked while live data is "flowing") ----------
+  // ---------- Simulate-mention gate (7.7 + P1-3) ----------
   function isMentionsFeedLive(){
     const liveChip = document.getElementById('liveToggle');
-    // The toggle's resting/default state is "Live"; simulation is only demo-safe once the
-    // marketer has explicitly switched it to "Paused".
     return !liveChip || liveChip.textContent.trim() !== 'Paused';
   }
   function updateSimulateMentionChipState(){
@@ -1197,45 +1434,314 @@
   }
   updateSimulateMentionChipState();
 
-  // ---------- Alerts: assign / view / resolve ----------
-  // 'meta' is a fixed string; 'metaPrefix' + 'datetime' + 'metaSuffix' is used instead wherever
-  // the meta line carries a relative-time component, so that text is derived from the same
-  // data-datetime driving the on-page .alert-time span (implements 0.16) rather than duplicated.
-  const alertDetails = {
-    '0': {
-      title: '🚨 Journalist inquiry re: patient complaint — Manila Bulletin',
-      metaPrefix: 'News desk', datetime: '2026-07-01T09:03:00', metaSuffix: 'Crisis Alert — send immediately',
-      body: '<p style="margin-bottom:10px;">A Manila Bulletin reporter has reached out requesting comment on a patient complaint alleging a treatment complication. This matches two Crisis Alert conditions: Mainstream Media Exposure and Founder/Doctor Reputation Risk.</p><p style="font-size:12px;color:var(--ink-faint);">Recommended: loop in Gian and Dr. Rivera before any reply goes out. Do not respond to the reporter directly without sign-off.</p>'
-    },
-    '1': {
-      title: '2★ Google review — Remedy BGC',
-      metaPrefix: 'Google', datetime: '2026-07-01T08:34:00', metaSuffix: 'unresponded',
-      body: '<p style="margin-bottom:10px;">"Second time booking Rejuran with Dra. April\u2019s team, still waiting on a follow-up call back — service used to be faster."</p><p style="font-size:12px;color:var(--ink-faint);">Reviewer: anonymous patient · Branch: Remedy BGC (One Uptown Residence) · Classified: Daily Digest (isolated complaint, no traction)</p>'
-    },
-    '2': {
-      title: 'Sentiment dip in Reddit thread',
-      metaPrefix: 'r/PhilippinesSkincare', datetime: '2026-07-01T06:15:00', metaSuffix: '',
-      body: '<p style="margin-bottom:10px;">"Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy\u2019s reviews look consistent but Aivee has more posts."</p><p style="font-size:12px;color:var(--ink-faint);">Thread sentiment shifted neutral → slightly negative over 6 replies · Estimated reach ~1,200 · Classified: Daily Digest (neutral discussion)</p>'
-    },
-    '3': {
-      title: 'Aivee mention volume +40% this week',
-      meta: 'Competitor spike · Instagram, X',
-      body: '<p style="margin-bottom:10px;">Aivee Clinic mention volume is up sharply this week, driven mostly by Instagram (+52%) and X (+28%).</p><p style="font-size:12px;color:var(--ink-faint);">No direct owned-entity impact detected yet · Classified: Daily Digest (competitive intelligence)</p>'
+  // =========================================================================
+  // 7.6 — generic empty/error/loading state panel, reused by every tab
+  // =========================================================================
+  function renderStatePanel(container, type, title, message, onRetry){
+    container.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'state-panel state-' + type;
+    const t = document.createElement('div');
+    t.className = 'state-title';
+    t.textContent = title;
+    const m = document.createElement('div');
+    m.className = 'state-msg';
+    m.textContent = message;
+    panel.appendChild(t);
+    panel.appendChild(m);
+    if (onRetry){
+      const btn = document.createElement('button');
+      btn.className = 'btn-mini';
+      btn.textContent = 'Retry';
+      btn.addEventListener('click', onRetry);
+      panel.appendChild(btn);
     }
-  };
+    container.appendChild(panel);
+  }
 
-  function alertMetaText(d){
-    if (d.meta) return d.meta;
-    const parts = [d.metaPrefix, formatRelativeTime(d.datetime, DEMO_NOW)];
-    if (d.metaSuffix) parts.push(d.metaSuffix);
-    return parts.join(' · ');
+  // =========================================================================
+  // Overview tab
+  // =========================================================================
+  function renderOverviewTab(){
+    const ov = STATE.overview;
+    if (!ov) return;
+
+    const score = (ov.clarityIndex && typeof ov.clarityIndex.score === 'number') ? ov.clarityIndex.score : 0;
+    const delta = ov.clarityIndex ? ov.clarityIndex.deltaVsLastWeek : null;
+    const gaugePath = document.getElementById('gaugeValuePath');
+    const gaugeOffset = 235.6 * (1 - clamp(score, 0, 100) / 100);
+    if (gaugePath) requestAnimationFrame(() => { gaugePath.style.strokeDashoffset = String(gaugeOffset); });
+    countUp('clarityNum', score, { duration: 1000 });
+    const noteEl = document.getElementById('clarityNote');
+    if (noteEl) noteEl.textContent = (delta == null) ? '' : ((delta >= 0 ? '▲ ' : '▼ ') + Math.abs(delta) + ' pts vs. last week');
+
+    const tm = ov.totalMentions || { value: 0, deltaPct: 0, priorPeriodValue: null };
+    countUp('kpiTotalMentionsValue', tm.value, { duration: 1000 });
+    const tmDelta = document.getElementById('kpiTotalMentionsDelta');
+    if (tmDelta){
+      tmDelta.textContent = (tm.deltaPct >= 0 ? '▲ ' : '▼ ') + Math.abs(tm.deltaPct) + '%' + (tm.priorPeriodValue != null ? ' · ' + tm.priorPeriodValue + ' last period' : '');
+      tmDelta.className = 'delta ' + (tm.deltaPct > 0 ? 'up' : tm.deltaPct < 0 ? 'down' : 'flat');
+    }
+
+    const ns = ov.netSentiment || { value: 0, deltaPts: 0 };
+    countUp('kpiNetSentimentValue', ns.value, { prefix: ns.value >= 0 ? '+' : '', duration: 1000 });
+    const nsDelta = document.getElementById('kpiNetSentimentDelta');
+    if (nsDelta){
+      nsDelta.textContent = (ns.deltaPts >= 0 ? '▲ ' : '▼ ') + Math.abs(ns.deltaPts) + ' pts';
+      nsDelta.className = 'delta ' + (ns.deltaPts > 0 ? 'up' : ns.deltaPts < 0 ? 'down' : 'flat');
+    }
+
+    const rating = ov.avgGoogleRating || { value: null, reviewCount: 0 };
+    const ratingVal = document.getElementById('kpiAvgRatingValue');
+    const ratingDelta = document.getElementById('kpiAvgRatingDelta');
+    if (ratingVal) ratingVal.textContent = (typeof rating.value === 'number') ? (rating.value.toFixed(1) + ' ★') : '—';
+    if (ratingDelta) ratingDelta.textContent = '— steady, ' + (rating.reviewCount != null ? rating.reviewCount : 0) + ' reviews';
+
+    const summaryEl = document.getElementById('aiSummaryText');
+    if (summaryEl) summaryEl.textContent = ov.aiSummaryText || '';
+
+    renderAlertsPanel();
+  }
+
+  // Sample-data-only "Trending" label mirrors the pre-refactor mockup's two hardcoded "Trending"
+  // topic cards, purely presentational; alertTitleFor()/alertNoteFor() below have the same
+  // curated-sample-vs-honest-derivation split.
+  function alertSeverityClass(m){
+    if (m.alertCategory === 'crisis') return 'high';
+    if (m.sentiment === 'Negative') return 'med';
+    return 'low';
+  }
+  function alertTitleFor(m){
+    if (m.alertTitle) return m.alertTitle;
+    const prefix = m.alertCategory === 'crisis' ? '🚨 ' : '';
+    const text = m.text || '(no text)';
+    return prefix + (text.length > 100 ? text.slice(0, 97) + '…' : text);
+  }
+  function alertNoteFor(m){
+    if (m.alertNote) return m.alertNote;
+    return m.alertCategory === 'crisis' ? 'Crisis Alert — send immediately' : 'Daily Digest';
+  }
+
+  // Alerts are derived from mentions.items filtered by alertCategory (7.2) — the contract has no
+  // separate GET /api/alerts endpoint (see the report's "Deviations" section).
+  function renderAlertsPanel(){
+    const container = document.getElementById('alertsListContainer');
+    const openTag = document.getElementById('alertOpenTag');
+    const kpiValue = document.getElementById('kpiActiveAlertsValue');
+    const kpiDelta = document.getElementById('kpiActiveAlertsDelta');
+    const bellBadge = document.getElementById('bellBadge');
+    if (!container) return;
+
+    if (STATE.tabError.mentions){
+      renderStatePanel(container, 'error', "Couldn't load alerts", STATE.tabError.mentions, () => loadMentionsTab(true));
+      return;
+    }
+    if (!STATE.mentions){
+      renderStatePanel(container, 'loading', 'Loading alerts…', 'Fetching the latest mentions.');
+      return;
+    }
+
+    const alerts = STATE.mentions.items
+      .filter(m => (m.alertCategory === 'crisis' || m.alertCategory === 'digest') && !m.resolvedAt)
+      .sort((a, b) => (a.alertCategory === 'crisis' ? 0 : 1) - (b.alertCategory === 'crisis' ? 0 : 1));
+
+    container.innerHTML = '';
+    if (!alerts.length){
+      const empty = document.createElement('div');
+      empty.id = 'alertsEmptyState';
+      empty.className = 'alerts-empty';
+      empty.textContent = '✓ All caught up — nothing needs attention right now';
+      container.appendChild(empty);
+    } else {
+      alerts.forEach(m => container.appendChild(buildAlertItemEl(m)));
+    }
+
+    const total = alerts.length;
+    const crisis = alerts.filter(a => a.alertCategory === 'crisis').length;
+    const digest = total - crisis;
+    if (openTag){
+      openTag.textContent = total + ' open';
+      openTag.className = total === 0 ? 'tag sage' : 'tag coral';
+    }
+    if (kpiValue){
+      kpiValue.textContent = total;
+      kpiValue.style.color = total === 0 ? 'var(--sage-text)' : 'var(--coral-text)';
+    }
+    if (kpiDelta){
+      kpiDelta.textContent = total === 0 ? 'All caught up' : crisis + ' crisis, ' + digest + ' digest';
+      kpiDelta.className = total === 0 ? 'delta flat' : 'delta down';
+    }
+    if (bellBadge){
+      bellBadge.textContent = total;
+      bellBadge.style.display = total === 0 ? 'none' : 'flex';
+    }
+  }
+
+  function buildAlertItemEl(m){
+    const item = document.createElement('div');
+    item.className = 'alert-item' + (m.alertCategory === 'crisis' ? ' alert-crisis' : '');
+    item.dataset.mentionId = m.id;
+
+    const dot = document.createElement('div');
+    dot.className = 'alert-dot ' + alertSeverityClass(m);
+    item.appendChild(dot);
+
+    const body = document.createElement('div');
+    body.className = 'alert-body';
+
+    const title = document.createElement('div');
+    title.className = 'alert-title';
+    if (m.alertCategory === 'crisis') title.style.color = 'var(--coral-text)';
+    title.textContent = alertTitleFor(m);
+    body.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'alert-meta';
+    meta.appendChild(document.createTextNode((m.venue || platformDisplay(m.platform) || '') + ' · '));
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'alert-time';
+    timeSpan.textContent = formatRelativeTime(m.publishedAt, nowForRelativeTime());
+    meta.appendChild(timeSpan);
+    meta.appendChild(document.createTextNode(' · ' + alertNoteFor(m)));
+    body.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'alert-actions';
+    if (m.assignedTo){
+      const label = document.createElement('span');
+      label.className = 'tag sage assigned-label';
+      label.textContent = 'Assigned: ' + m.assignedTo;
+      actions.appendChild(label);
+    } else {
+      const assignBtn = document.createElement('button');
+      assignBtn.className = 'btn-mini' + (m.alertCategory === 'crisis' ? ' primary' : '');
+      assignBtn.textContent = 'Assign';
+      assignBtn.addEventListener('click', () => handleAssign(assignBtn, m));
+      actions.appendChild(assignBtn);
+    }
+    const viewBtn = document.createElement('button');
+    viewBtn.className = 'btn-mini btn-view';
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => openAlertModal(m));
+    actions.appendChild(viewBtn);
+    const resolveBtn = document.createElement('button');
+    resolveBtn.className = 'btn-mini btn-resolve';
+    resolveBtn.textContent = 'Resolve';
+    resolveBtn.addEventListener('click', () => resolveAlertItem(m, item));
+    actions.appendChild(resolveBtn);
+    body.appendChild(actions);
+
+    item.appendChild(body);
+    return item;
+  }
+
+  function handleAssign(btn, m){
+    const select = document.createElement('select');
+    select.className = 'assign-select';
+    const roster = (STATE.roster && STATE.roster.assignees) || SAMPLE_DATA.roster.assignees;
+    const blank = document.createElement('option');
+    blank.value = ''; blank.textContent = 'Assign to…';
+    select.appendChild(blank);
+    roster.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a.displayName; opt.textContent = a.displayName;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', function(){
+      if (!this.value) return;
+      const assignee = this.value;
+      m.assignedTo = assignee;
+      m.assignedAt = new Date().toISOString();
+      const label = document.createElement('span');
+      label.className = 'tag sage assigned-label';
+      label.textContent = 'Assigned: ' + assignee;
+      this.replaceWith(label);
+      if (STATE.isDemoMode){
+        showToast('Assigned to ' + assignee + ' (demo)');
+        return;
+      }
+      // Optimistic: the local mutation above already happened, so the UI is responsive
+      // immediately. The real write happens in the background; a failure is surfaced
+      // honestly rather than silently swallowed (the local state stays changed either
+      // way — reverting it on failure would fight the user's own click, so the failure
+      // toast asks them to retry instead).
+      assignMention(m.id, assignee)
+        .then(() => showToast('Assigned to ' + assignee))
+        .catch(() => showToast('Assigned to ' + assignee + ' locally — save failed, try again'));
+    });
+    btn.replaceWith(select);
+  }
+
+  function resolveAlertItem(m, el){
+    m.resolvedAt = new Date().toISOString();
+    if (el){
+      el.style.transition = 'opacity .3s ease, max-height .3s ease, margin .3s ease, padding .3s ease';
+      el.style.maxHeight = el.offsetHeight + 'px';
+      requestAnimationFrame(() => {
+        el.style.opacity = '0';
+        el.style.maxHeight = '0px';
+        el.style.marginTop = '0';
+        el.style.paddingTop = '0';
+        el.style.paddingBottom = '0';
+        el.style.overflow = 'hidden';
+      });
+    }
+    setTimeout(() => renderAlertsPanel(), el ? 320 : 0);
+    if (STATE.isDemoMode){
+      showToast('Alert resolved (demo)');
+      return;
+    }
+    resolveMention(m.id)
+      .then(() => showToast('Alert resolved'))
+      .catch(() => showToast('Alert resolved locally — save failed, try again'));
+  }
+
+  function resolveAllAlerts(){
+    if (!STATE.mentions){ showToast('No open alerts'); return; }
+    const open = STATE.mentions.items.filter(m => (m.alertCategory === 'crisis' || m.alertCategory === 'digest') && !m.resolvedAt);
+    if (!open.length){ showToast('No open alerts'); return; }
+    const now = new Date().toISOString();
+    open.forEach(m => { m.resolvedAt = now; });
+    renderAlertsPanel();
+    if (STATE.isDemoMode){
+      showToast('All alerts resolved (demo)');
+      return;
+    }
+    Promise.allSettled(open.map(m => resolveMention(m.id))).then(results => {
+      const failed = results.filter(r => r.status === 'rejected').length;
+      showToast(failed ? (failed + ' of ' + open.length + ' failed to save — try again') : 'All alerts resolved');
+    });
+  }
+
+  function openAlertModal(m){
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>' + escapeHtml(alertTitleFor(m)) + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' +
+        escapeHtml((m.venue || platformDisplay(m.platform) || '') + ' · ' + formatRelativeTime(m.publishedAt, nowForRelativeTime()) + ' · ' + alertNoteFor(m)) +
+      '</div>' +
+      '<p style="margin-bottom:10px;">' + escapeHtml(m.text || '') + '</p>' +
+      (m.alertCategory === 'crisis'
+        ? '<p style="font-size:12px;color:var(--ink-faint);">Recommended: loop in Gian and Dr. Rivera before any reply goes out. Do not respond to the reporter directly without sign-off.</p>'
+        : '<p style="font-size:12px;color:var(--ink-faint);">' + escapeHtml('Author: ' + (m.author || 'unknown') + (m.sentiment ? ' · Sentiment: ' + m.sentiment : '')) + '</p>') +
+      '<div style="display:flex;gap:8px;margin-top:18px;">' +
+      '<button class="btn-mini primary" id="modalResolveAlertBtn">Mark resolved</button>' +
+      '<button class="btn-mini" onclick="closeModal()">Close</button>' +
+      '</div>'
+    );
+    const btn = document.getElementById('modalResolveAlertBtn');
+    if (btn) btn.addEventListener('click', () => {
+      const el = document.querySelector('.alert-item[data-mention-id="' + CSS.escape(String(m.id)) + '"]');
+      resolveAlertItem(m, el);
+      closeModal();
+    });
   }
 
   function openAlertRulesModal(){
     openModal(
       '<button class="modal-close" onclick="closeModal()">×</button>' +
       '<h4>Alert Classification Rules</h4>' +
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Per Gian\u2019s update to §9.2 — routes each item to a Crisis Alert (immediate) or the Daily Digest</div>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Per Gian’s update to §9.2 — routes each item to a Crisis Alert (immediate) or the Daily Digest</div>' +
       '<div style="font-size:12.5px;color:var(--ink);font-weight:600;margin-bottom:6px;">🚨 Crisis Alert — send immediately if any apply</div>' +
       '<ul style="margin:0 0 16px 18px; color:var(--ink-dim); font-size:12px; line-height:1.7;">' +
       '<li>Patient safety or medical risk — injury, malpractice, viral complication, misinformation</li>' +
@@ -1255,114 +1761,6 @@
     );
   }
 
-  function handleAssign(btn){
-    const select = document.createElement('select');
-    select.className = 'assign-select';
-    select.innerHTML = '<option value="">Assign to…</option><option>Gian</option><option>Paul</option><option>Boom</option><option>Mixi</option>';
-    select.addEventListener('change', function(){
-      if (!this.value) return;
-      const label = document.createElement('span');
-      label.className = 'tag sage assigned-label';
-      label.textContent = 'Assigned: ' + this.value;
-      this.replaceWith(label);
-      showToast('Assigned to ' + this.value + ' (demo)');
-    });
-    btn.replaceWith(select);
-  }
-
-  function openAlertModal(btn){
-    const item = btn.closest('.alert-item');
-    const id = item.dataset.alertId;
-    const d = alertDetails[id];
-    if (!d) return;
-    openModal(
-      '<button class="modal-close" onclick="closeModal()">×</button>' +
-      '<h4>' + escapeHtml(d.title) + '</h4>' +
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + escapeHtml(alertMetaText(d)) + '</div>' +
-      d.body +
-      '<div style="display:flex;gap:8px;margin-top:18px;">' +
-      '<button class="btn-mini primary" onclick="resolveAlertById(\'' + id + '\')">Mark resolved</button>' +
-      '<button class="btn-mini" onclick="closeModal()">Close</button>' +
-      '</div>'
-    );
-  }
-
-  function resolveAlertById(id){
-    const item = document.querySelector('.alert-item[data-alert-id="' + id + '"]');
-    if (item) resolveAlertItem(item);
-    closeModal();
-  }
-
-  function resolveAlert(btn){
-    const item = btn.closest('.alert-item');
-    resolveAlertItem(item);
-  }
-
-  function resolveAlertItem(item){
-    if (!item) return;
-    item.style.transition = 'opacity .3s ease, max-height .3s ease, margin .3s ease, padding .3s ease';
-    item.style.maxHeight = item.offsetHeight + 'px';
-    item.style.opacity = '1';
-    requestAnimationFrame(() => {
-      item.style.opacity = '0';
-      item.style.maxHeight = '0px';
-      item.style.marginTop = '0';
-      item.style.paddingTop = '0';
-      item.style.paddingBottom = '0';
-      item.style.overflow = 'hidden';
-    });
-    setTimeout(() => {
-      item.remove();
-      updateAlertCounts();
-    }, 320);
-    showToast('Alert resolved (demo)');
-  }
-
-  function resolveAllAlerts(){
-    const items = [...document.querySelectorAll('#view-overview .alert-item')];
-    if (!items.length){ showToast('No open alerts (demo)'); return; }
-    items.forEach(it => it.remove());
-    updateAlertCounts();
-    showToast('All alerts resolved (demo)');
-  }
-
-  function updateAlertCounts(){
-    const remaining = document.querySelectorAll('#view-overview .alert-item').length;
-    const tag = document.getElementById('alertOpenTag');
-    const kpiValue = document.getElementById('kpiActiveAlertsValue');
-    const kpiDelta = document.getElementById('kpiActiveAlertsDelta');
-    const bellBadge = document.getElementById('bellBadge');
-    if (tag){
-      tag.textContent = remaining + ' open';
-      tag.className = remaining === 0 ? 'tag sage' : 'tag coral';
-    }
-    if (kpiValue){
-      kpiValue.textContent = remaining;
-      kpiValue.style.color = remaining === 0 ? 'var(--sage-text)' : 'var(--coral-text)';
-    }
-    if (kpiDelta){
-      kpiDelta.textContent = remaining === 0 ? 'All caught up' : remaining + ' awaiting action';
-      kpiDelta.className = remaining === 0 ? 'delta flat' : 'delta down';
-    }
-    if (bellBadge){
-      bellBadge.textContent = remaining;
-      bellBadge.style.display = remaining === 0 ? 'none' : 'flex';
-    }
-    if (remaining === 0 && tag && !document.getElementById('alertsEmptyState')){
-      const card = tag.closest('.card');
-      if (card){
-        const empty = document.createElement('div');
-        empty.id = 'alertsEmptyState';
-        empty.className = 'alerts-empty';
-        empty.textContent = '✓ All caught up — nothing needs attention right now';
-        card.appendChild(empty);
-      }
-    } else if (remaining > 0){
-      const empty = document.getElementById('alertsEmptyState');
-      if (empty) empty.remove();
-    }
-  }
-
   // ---------- Notification bell ----------
   function toggleBellMenu(e){
     e.stopPropagation();
@@ -1376,23 +1774,23 @@
     menu.style.right = '0';
     menu.style.left = 'auto';
     menu.style.minWidth = '230px';
-    const items = [...document.querySelectorAll('#view-overview .alert-item')];
-    if (!items.length){
+    const alerts = STATE.mentions
+      ? STATE.mentions.items.filter(m => (m.alertCategory === 'crisis' || m.alertCategory === 'digest') && !m.resolvedAt)
+      : [];
+    if (!alerts.length){
       const empty = document.createElement('div');
       empty.className = 'chip-menu-item';
       empty.textContent = 'No active alerts';
       menu.appendChild(empty);
     } else {
-      items.forEach(it => {
-        const title = it.querySelector('.alert-title').textContent;
+      alerts.forEach(m => {
         const row = document.createElement('div');
         row.className = 'chip-menu-item';
-        row.textContent = title;
+        row.textContent = alertTitleFor(m);
         row.addEventListener('click', () => {
           menu.remove();
           switchTab('overview');
-          const viewBtn = it.querySelector('.btn-view');
-          if (viewBtn) openAlertModal(viewBtn);
+          openAlertModal(m);
         });
         menu.appendChild(row);
       });
@@ -1414,7 +1812,8 @@
     { label: 'Regenerate AI weekly summary', run: () => { switchTab('overview'); regenerateSummary(); } },
     { label: 'Export Mentions to CSV', run: () => { switchTab('mentions'); exportMentionsCSV(); } },
     { label: 'Export EMV to CSV', run: () => { switchTab('emv'); exportEmvCSV(); } },
-    { label: 'Export Reviews to CSV', run: () => { switchTab('reviews'); exportReviewsCSV(); } }
+    { label: 'Export Reviews to CSV', run: () => { switchTab('reviews'); exportReviewsCSV(); } },
+    { label: 'Log in / account', run: () => openAuthModal() }
   ];
 
   function renderCommandList(filter){
@@ -1471,79 +1870,107 @@
     }
   });
 
-  // ---------- Reviews: reply workflow ----------
-  let currentReplyTag = null;
-  function openReplyModal(tagEl){
-    const tr = tagEl.closest('tr');
-    const listing = tr ? tr.dataset.listing : 'this listing';
-    const ratingCell = tr ? tr.children[1].textContent.trim() : '';
-    currentReplyTag = tagEl;
-    openModal(
-      '<button class="modal-close" onclick="closeModal()">×</button>' +
-      '<h4>Reply to review — ' + escapeHtml(listing) + '</h4>' +
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + escapeHtml(ratingCell) + ' · pending reply</div>' +
-      '<textarea id="replyText" placeholder="Write a reply…"></textarea>' +
-      '<div style="display:flex;gap:8px;margin-top:14px;">' +
-      '<button class="btn-mini primary" onclick="sendReply()">Send reply</button>' +
-      '<button class="btn-mini" onclick="closeModal()">Cancel</button>' +
-      '</div>'
-    );
-  }
-
-  function sendReply(){
-    closeModal();
-    const tag = currentReplyTag;
-    if (tag){
-      const tr = tag.closest('tr');
-      if (tr){
-        // Track pending-reply count per branch and only clear the tag once it hits zero
-        // (implements 0.14 — previously a single reply cleared the branch regardless of
-        // how many replies were actually still pending).
-        const totalPending = parseInt(tr.dataset.pendingTotal, 10) || 1;
-        const baseRate = parseFloat(tr.dataset.responseRateBase);
-        let remaining = tr.dataset.pendingRemaining !== undefined
-          ? parseInt(tr.dataset.pendingRemaining, 10)
-          : totalPending;
-        remaining = Math.max(0, remaining - 1);
-        tr.dataset.pendingRemaining = String(remaining);
-
-        const rateCell = tr.querySelector('.resp-rate');
-        if (rateCell){
-          if (remaining === 0 || isNaN(baseRate)){
-            rateCell.textContent = '100%';
-          } else {
-            // Fill the gap to 100% proportionally across the branch's original pending count,
-            // so each reply sent nudges the response rate up instead of jumping straight to 100%.
-            const repliesSent = totalPending - remaining;
-            const newRate = Math.round(baseRate + ((100 - baseRate) / totalPending) * repliesSent);
-            rateCell.textContent = newRate + '%';
-          }
-        }
-
-        if (remaining === 0){
-          tag.className = 'tag sage';
-          tag.textContent = 'All clear';
-          tag.removeAttribute('onclick');
-          tag.style.cursor = 'default';
-        } else {
-          tag.textContent = remaining === 1 ? '1 pending reply' : remaining + ' pending replies';
-        }
-      }
+  // =========================================================================
+  // Mentions tab
+  // =========================================================================
+  function renderMentionsTab(){
+    const listContainer = document.getElementById('mentionsFeedList');
+    if (!listContainer) return;
+    if (STATE.tabError.mentions){
+      renderStatePanel(listContainer, 'error', "Couldn't load mentions", STATE.tabError.mentions, () => loadMentionsTab(true));
+      return;
     }
-    currentReplyTag = null;
-    showToast('Reply sent (demo)');
+    if (!STATE.mentions){
+      renderStatePanel(listContainer, 'loading', 'Loading mentions…', 'Fetching the latest activity.');
+      return;
+    }
+    const items = STATE.mentions.items;
+    listContainer.innerHTML = '';
+    if (!items.length){
+      renderStatePanel(listContainer, 'empty', 'No mentions in this period', 'Nothing has come in for the current filters yet — check back soon or widen the date range.');
+      return;
+    }
+    items.slice()
+      .sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0))
+      .forEach(m => listContainer.appendChild(buildFeedItemEl(m)));
+    applyMentionFilters();
   }
 
-  function exportReviewsCSV(){
-    const rows = [['Listing','Rating','Reviews','Trend','Response rate','Status']];
-    document.querySelectorAll('#view-reviews table tbody tr').forEach(tr => {
-      const cells = [...tr.children].map(td => td.textContent.trim().replace(/\s+/g, ' '));
-      rows.push(cells);
-    });
-    downloadCSV('remedy-pulse-reviews.csv', rows);
+  function buildFeedItemEl(m){
+    const platformLabel = platformDisplay(m.platform);
+    const item = document.createElement('div');
+    item.className = 'feed-item';
+    item.dataset.platform = platformLabel;
+    item.dataset.sentiment = m.sentiment || '';
+    item.dataset.mentionId = m.id;
+    if (m.publishedAt){
+      const d = new Date(m.publishedAt);
+      if (!isNaN(d.getTime())) item.dataset.date = d.toISOString().slice(0, 10);
+    }
+
+    const avatar = document.createElement('div');
+    avatar.className = 'feed-avatar';
+    avatar.textContent = PLATFORM_AVATARS[platformLabel] || '💬';
+    item.appendChild(avatar);
+
+    const body = document.createElement('div');
+    body.className = 'feed-body';
+
+    const top = document.createElement('div');
+    top.className = 'feed-top';
+    const authorSpan = document.createElement('span');
+    authorSpan.className = 'feed-author';
+    authorSpan.textContent = m.author || 'Unknown';
+    const sourceSpan = document.createElement('span');
+    sourceSpan.className = 'feed-source';
+    sourceSpan.appendChild(document.createTextNode((m.venue || '') + ' · '));
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'feed-time';
+    timeSpan.textContent = formatRelativeTime(m.publishedAt, nowForRelativeTime());
+    sourceSpan.appendChild(timeSpan);
+    top.appendChild(authorSpan);
+    top.appendChild(sourceSpan);
+    body.appendChild(top);
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'feed-text';
+    textDiv.textContent = m.text || '';
+    body.appendChild(textDiv);
+
+    const meta = document.createElement('div');
+    meta.className = 'feed-meta';
+    if (m.stars){
+      const starsSpan = document.createElement('span');
+      starsSpan.className = 'stars';
+      starsSpan.textContent = '★'.repeat(m.stars);
+      meta.appendChild(starsSpan);
+    }
+    const sentimentSpan = document.createElement('span');
+    sentimentSpan.textContent = 'Sentiment: ' + (m.sentiment || 'Unknown');
+    meta.appendChild(sentimentSpan);
+    if (m.emvNote){
+      const emvSpan = document.createElement('span');
+      emvSpan.className = 'mono';
+      emvSpan.style.color = 'var(--gold-text)';
+      emvSpan.textContent = 'EMV ' + m.emvNote;
+      meta.appendChild(emvSpan);
+    } else {
+      const reachSpan = document.createElement('span');
+      reachSpan.textContent = 'Reach: ' + (m.reach || '—');
+      meta.appendChild(reachSpan);
+    }
+    const sourceLink = document.createElement('a');
+    sourceLink.className = 'source-link';
+    sourceLink.textContent = 'View source ↗';
+    sourceLink.addEventListener('click', () => viewSource(platformLabel, ((m.author || '') + ' ' + (m.venue || '')).trim(), m.url));
+    meta.appendChild(sourceLink);
+    body.appendChild(meta);
+
+    item.appendChild(body);
+    return item;
   }
 
-  // ---------- Mentions: search, platform, date, simulate, export ----------
+  // ---------- Mentions: search, platform, date filters ----------
   let mentionSearchQuery = '';
   let mentionPlatform = 'All';
   let mentionSentiment = 'All';
@@ -1629,107 +2056,45 @@
     });
   }
 
+  // ---------- Simulate mention (demo-only, 7.7) ----------
   let simulatePoolIndex = -1;
-  let currentTotalMentions = 342;
-
   function incrementTotalMentions(){
-    currentTotalMentions += 1;
-    const el = document.getElementById('kpiTotalMentionsValue');
-    if (el) el.textContent = currentTotalMentions;
+    if (STATE.overview && STATE.overview.totalMentions){
+      STATE.overview.totalMentions.value += 1;
+      const el = document.getElementById('kpiTotalMentionsValue');
+      if (el) el.textContent = STATE.overview.totalMentions.value;
+    }
   }
-
   function simulateIncomingMention(){
-    // Gate: simulation must be blocked while the toggle indicates real/live data is flowing,
-    // and only permitted in the paused/demo-safe state (implements 0.13 — this condition was
-    // previously inverted, refusing when Paused and allowing when Live).
+    if (!STATE.isDemoMode){ showToast('Simulate mention is a demo-only affordance'); return; }
     if (isMentionsFeedLive()){
       showToast('Live data is flowing — switch to Paused to simulate a mention (demo-safe gate)');
       return;
     }
-    const pool = [
-      { avatar: '📘', platform: 'Facebook', author: 'Facebook comment · patient', source: 'facebook.com/remedyph', text: 'Booked our first Club Remedy wellness session today, the space feels calming compared to a regular clinic.', sentiment: 'Positive', reach: '~2,100' },
-      { avatar: '🐦', platform: 'X', author: '@skincareph_deals', source: 'X', text: 'Pico laser results at Remedy BGC are honestly underrated, healed faster than expected.', sentiment: 'Positive', reach: '~3,400' },
-      { avatar: '🟢', platform: 'Google', author: 'Google Review · verified patient', source: 'Club Remedy BGC', text: '5 stars, the wellness plus derma combo is such a smart idea. Will be back monthly.', sentiment: 'Positive', reach: '—' }
-    ];
-    simulatePoolIndex = (simulatePoolIndex + 1) % pool.length;
-    const m = pool[simulatePoolIndex];
-    const card = document.getElementById('mentionsFeedCard');
-    if (!card) return;
-    const todayStr = DEMO_TODAY.toISOString().slice(0, 10);
+    simulatePoolIndex = (simulatePoolIndex + 1) % SIMULATE_POOL.length;
+    const base = SIMULATE_POOL[simulatePoolIndex];
+    const m = Object.assign({
+      id: 'sim-' + Date.now(), publishedAt: new Date().toISOString(),
+      topics: [], assignedTo: null, assignedAt: null, resolvedAt: null, alertCategory: null
+    }, base);
+    if (STATE.mentions) STATE.mentions.items.unshift(m);
 
-    // Built with createElement/textContent rather than innerHTML + string-concatenated onclick
-    // attributes, so mention content (author, source, text) can never be interpreted as markup
-    // or break out of an attribute — implements 0.11. This is also the code path that will
-    // carry real review/comment text once wired to live data.
-    const item = document.createElement('div');
-    item.className = 'feed-item new-flash';
-    item.dataset.platform = m.platform;
-    item.dataset.date = todayStr;
-    item.dataset.datetime = new Date().toISOString();
-    item.dataset.sentiment = m.sentiment;
-
-    const avatar = document.createElement('div');
-    avatar.className = 'feed-avatar';
-    avatar.textContent = m.avatar;
-
-    const body = document.createElement('div');
-    body.className = 'feed-body';
-
-    const top = document.createElement('div');
-    top.className = 'feed-top';
-    const authorSpan = document.createElement('span');
-    authorSpan.className = 'feed-author';
-    authorSpan.textContent = m.author;
-    const sourceSpan = document.createElement('span');
-    sourceSpan.className = 'feed-source';
-    const sourceText = document.createTextNode(m.source + ' · ');
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'feed-time';
-    timeSpan.textContent = 'just now';
-    sourceSpan.appendChild(sourceText);
-    sourceSpan.appendChild(timeSpan);
-    top.appendChild(authorSpan);
-    top.appendChild(sourceSpan);
-
-    const textDiv = document.createElement('div');
-    textDiv.className = 'feed-text';
-    textDiv.textContent = m.text;
-
-    const meta = document.createElement('div');
-    meta.className = 'feed-meta';
-    const sentimentSpan = document.createElement('span');
-    sentimentSpan.textContent = 'Sentiment: ' + m.sentiment;
-    const reachSpan = document.createElement('span');
-    reachSpan.textContent = 'Reach: ' + m.reach;
-    const sourceLink = document.createElement('a');
-    sourceLink.className = 'source-link';
-    sourceLink.textContent = 'View source ↗';
-    sourceLink.addEventListener('click', () => viewSource(m.platform, m.author));
-    meta.appendChild(sentimentSpan);
-    meta.appendChild(reachSpan);
-    meta.appendChild(sourceLink);
-
-    body.appendChild(top);
-    body.appendChild(textDiv);
-    body.appendChild(meta);
-    item.appendChild(avatar);
-    item.appendChild(body);
-
-    card.insertBefore(item, card.firstChild);
-    setTimeout(() => item.classList.remove('new-flash'), 1800);
+    const listContainer = document.getElementById('mentionsFeedList');
+    if (!listContainer) return;
+    if (listContainer.querySelector('.state-panel')) listContainer.innerHTML = '';
+    const el = buildFeedItemEl(m);
+    el.classList.add('new-flash');
+    listContainer.insertBefore(el, listContainer.firstChild);
+    setTimeout(() => el.classList.remove('new-flash'), 1800);
     incrementTotalMentions();
     applyMentionFilters();
-    if (item.style.display === 'none'){
-      showToast('New mention added but hidden by current filters (demo)');
-    } else {
-      showToast('New mention detected (demo)');
-    }
+    showToast(el.style.display === 'none' ? 'New mention added but hidden by current filters (demo)' : 'New mention detected (demo)');
   }
 
   function exportMentionsCSV(){
     const card = document.getElementById('mentionsFeedCard');
     const items = [...card.querySelectorAll('.feed-item')].filter(it => it.style.display !== 'none');
-    const rows = [['Author','Source','Text','Sentiment','Reach']];
+    const rows = [['Author', 'Source', 'Text', 'Sentiment', 'Reach']];
     items.forEach(it => {
       const author = (it.querySelector('.feed-author') || {}).textContent || '';
       const source = (it.querySelector('.feed-source') || {}).textContent || '';
@@ -1742,22 +2107,572 @@
     downloadCSV('remedy-pulse-mentions.csv', rows);
   }
 
-  function exportEmvCSV(){
-    const rows = [['Outlet','Article','Tier','Sentiment','Gross EMV','Net Favorable EMV']];
-    document.querySelectorAll('#view-emv table tbody tr.emv-row').forEach(tr => {
-      if (tr.style.display === 'none') return;
-      const cells = [...tr.children].slice(0, 6).map(td => td.textContent.trim().replace(/\s+/g, ' '));
-      rows.push(cells);
-    });
-    downloadCSV('remedy-pulse-emv.csv', rows);
+  function downloadCSV(filename, rows){
+    const csv = rows.map(r => r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Downloaded ' + filename);
   }
 
-  // ---------- EMV: outlet + date filtering with live totals ----------
+  // =========================================================================
+  // Reviews tab
+  // =========================================================================
+  function normalizeReviews(reviews){
+    (reviews.listings || []).forEach(l => {
+      if (l._totalPending === undefined) l._totalPending = l.pendingReplies;
+      if (l._baseResponseRatePct === undefined) l._baseResponseRatePct = l.responseRatePct;
+    });
+    return reviews;
+  }
+
+  function tableEmptyCell(colSpan){
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = colSpan;
+    tr.appendChild(td);
+    return { tr, td };
+  }
+
+  function renderReviewsTab(){
+    const tbody = document.getElementById('reviewsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (STATE.tabError.reviews){
+      const { tr, td } = tableEmptyCell(6);
+      tbody.appendChild(tr);
+      renderStatePanel(td, 'error', "Couldn't load reviews", STATE.tabError.reviews, () => loadReviewsTab(true));
+      return;
+    }
+    if (!STATE.reviews){
+      const { tr, td } = tableEmptyCell(6);
+      tbody.appendChild(tr);
+      renderStatePanel(td, 'loading', 'Loading reviews…', 'Fetching branch listings.');
+      return;
+    }
+    const listings = STATE.reviews.listings;
+    if (!listings.length){
+      const { tr, td } = tableEmptyCell(6);
+      tbody.appendChild(tr);
+      renderStatePanel(td, 'empty', 'No review listings yet', 'No owned Google Business listings have been connected yet.');
+      return;
+    }
+    listings.forEach(l => tbody.appendChild(buildReviewRowEl(l)));
+  }
+
+  function buildReviewRowEl(l){
+    const tr = document.createElement('tr');
+    tr.dataset.listing = l.venue;
+
+    const tdName = document.createElement('td');
+    tdName.textContent = l.venue;
+    tr.appendChild(tdName);
+
+    const tdRating = document.createElement('td');
+    const ratingNum = (typeof l.rating === 'number') ? l.rating : null;
+    if (ratingNum != null){
+      const starsSpan = document.createElement('span');
+      starsSpan.className = 'stars';
+      const full = clamp(Math.round(ratingNum), 0, 5);
+      starsSpan.textContent = '★'.repeat(full) + '☆'.repeat(5 - full);
+      tdRating.appendChild(starsSpan);
+      tdRating.appendChild(document.createTextNode(' ' + ratingNum.toFixed(1)));
+    } else {
+      tdRating.textContent = '—';
+    }
+    tr.appendChild(tdRating);
+
+    const tdCount = document.createElement('td');
+    tdCount.textContent = (l.reviewCount != null) ? l.reviewCount : '—';
+    tr.appendChild(tdCount);
+
+    const tdTrend = document.createElement('td');
+    tdTrend.className = 'mono';
+    tdTrend.style.color = l.trendLabel ? 'var(--sage-text)' : 'var(--ink-faint)';
+    tdTrend.textContent = l.trendLabel || '—'; // not in the contract's Reviews shape — honest gap, not invented
+    tr.appendChild(tdTrend);
+
+    const tdRate = document.createElement('td');
+    tdRate.className = 'resp-rate';
+    tdRate.textContent = (l.status === 'ok') ? l.responseRatePct + '%' : '—';
+    tr.appendChild(tdRate);
+
+    const tdStatus = document.createElement('td');
+    tdStatus.appendChild(buildReviewStatusTag(l));
+    tr.appendChild(tdStatus);
+
+    return tr;
+  }
+
+  function buildReviewStatusTag(l){
+    const tag = document.createElement('span');
+    if (l.status === 'no_reviews'){ tag.className = 'tag neutral'; tag.textContent = 'No reviews yet'; return tag; }
+    if (l.status === 'access_denied'){ tag.className = 'tag coral'; tag.textContent = 'Access denied'; return tag; }
+    if (l.status === 'error'){ tag.className = 'tag coral'; tag.textContent = 'Error loading'; return tag; }
+    if (l.pendingReplies > 0){
+      tag.className = 'tag gold clickable';
+      tag.textContent = l.pendingReplies === 1 ? '1 pending reply' : l.pendingReplies + ' pending replies';
+      tag.addEventListener('click', () => openReplyModal(l));
+      return tag;
+    }
+    tag.className = 'tag sage';
+    tag.textContent = 'All clear';
+    return tag;
+  }
+
+  // ---------- Reviews: reply workflow (local-state only — see 7.4 scope note) ----------
+  let currentReplyListing = null;
+  function openReplyModal(l){
+    currentReplyListing = l;
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>Reply to review — ' + escapeHtml(l.venue) + '</h4>' +
+      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + escapeHtml(l.rating.toFixed(1) + ' ★ · ' + l.pendingReplies + ' pending') + '</div>' +
+      '<textarea id="replyText" placeholder="Write a reply…"></textarea>' +
+      '<div style="display:flex;gap:8px;margin-top:14px;">' +
+      '<button class="btn-mini primary" id="modalSendReplyBtn">Send reply</button>' +
+      '<button class="btn-mini" onclick="closeModal()">Cancel</button>' +
+      '</div>'
+    );
+    const btn = document.getElementById('modalSendReplyBtn');
+    if (btn) btn.addEventListener('click', sendReply);
+  }
+
+  function sendReply(){
+    closeModal();
+    const l = currentReplyListing;
+    if (l && l.pendingReplies > 0){
+      const totalPending = l._totalPending || l.pendingReplies;
+      const baseRate = (l._baseResponseRatePct != null) ? l._baseResponseRatePct : l.responseRatePct;
+      l.pendingReplies -= 1;
+      if (l.pendingReplies === 0){
+        l.responseRatePct = 100;
+      } else {
+        // Fill the gap to 100% proportionally across the branch's original pending count (0.14's
+        // fix, preserved): each reply sent nudges the response rate up instead of jumping to 100%.
+        const repliesSent = totalPending - l.pendingReplies;
+        l.responseRatePct = Math.round(baseRate + ((100 - baseRate) / totalPending) * repliesSent);
+      }
+      renderReviewsTab();
+    }
+    currentReplyListing = null;
+    showToast('Reply sent' + (STATE.isDemoMode ? ' (demo)' : ' — not saved, write API not wired yet'));
+  }
+
+  function exportReviewsCSV(){
+    const rows = [['Listing', 'Rating', 'Reviews', 'Trend', 'Response rate', 'Status']];
+    document.querySelectorAll('#view-reviews table tbody tr').forEach(tr => {
+      const cells = [...tr.children].map(td => td.textContent.trim().replace(/\s+/g, ' '));
+      if (cells.length) rows.push(cells);
+    });
+    downloadCSV('remedy-pulse-reviews.csv', rows);
+  }
+
+  // =========================================================================
+  // Topics tab
+  // =========================================================================
+  function renderTopicsTab(){
+    const container = document.getElementById('topicsContainer');
+    if (!container) return;
+    if (STATE.tabError.topics){
+      renderStatePanel(container, 'error', "Couldn't load topics", STATE.tabError.topics, () => loadTopicsTab(true));
+      return;
+    }
+    if (!STATE.topics){
+      renderStatePanel(container, 'loading', 'Loading topics…', 'Grouping conversations into themes.');
+      return;
+    }
+    const topics = STATE.topics.topics;
+    container.innerHTML = '';
+    if (!topics.length){
+      renderStatePanel(container, 'empty', 'No topics yet', 'Not enough tagged mentions yet to group into themes.');
+      return;
+    }
+    topics.forEach((t, i) => container.appendChild(buildTopicCardEl(t, i === topics.length - 1)));
+  }
+
+  function buildTopicCardEl(t, isLast){
+    const card = document.createElement('div');
+    card.className = 'card topic-card';
+    if (!isLast) card.style.marginBottom = '14px';
+    card.title = 'Click to see constituent mentions';
+    card.addEventListener('click', () => openTopicModal(t));
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+    const left = document.createElement('div');
+    const h3 = document.createElement('h3'); h3.textContent = t.label;
+    const sub = document.createElement('div'); sub.className = 'card-sub'; sub.textContent = t.mentionCountThisWeek + ' mentions this week';
+    left.appendChild(h3); left.appendChild(sub);
+    head.appendChild(left);
+    // tag is watch|needs-attention|null per the contract — null renders no badge rather than
+    // inventing a status like the old mockup's hardcoded "Trending" on untagged cards.
+    if (t.tag === 'needs-attention' || t.tag === 'watch'){
+      const tag = document.createElement('span');
+      tag.className = t.tag === 'needs-attention' ? 'tag coral' : 'tag gold';
+      tag.textContent = t.tag === 'needs-attention' ? 'Needs attention' : 'Watch';
+      head.appendChild(tag);
+    }
+    card.appendChild(head);
+
+    const bar = document.createElement('div');
+    bar.className = 'sentiment-bar';
+    const split = t.sentimentSplit || { positivePct: 0, neutralPct: 0, negativePct: 0 };
+    const segPos = document.createElement('div'); segPos.className = 'seg pos'; segPos.style.width = split.positivePct + '%';
+    const segNeu = document.createElement('div'); segNeu.className = 'seg neu'; segNeu.style.width = split.neutralPct + '%';
+    const segNeg = document.createElement('div'); segNeg.className = 'seg neg'; segNeg.style.width = split.negativePct + '%';
+    bar.appendChild(segPos); bar.appendChild(segNeu); bar.appendChild(segNeg);
+    card.appendChild(bar);
+
+    const quote = document.createElement('div');
+    quote.className = 'topic-quote';
+    quote.textContent = t.sampleQuote ? ('"' + t.sampleQuote + '"') : '';
+    card.appendChild(quote);
+
+    return card;
+  }
+
+  async function openTopicModal(t){
+    openModal(
+      '<button class="modal-close" onclick="closeModal()">×</button>' +
+      '<h4>' + escapeHtml(t.label) + '</h4>' +
+      '<div id="topicModalIntro" style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Loading constituent mentions…</div>' +
+      '<div id="topicModalResults"></div>'
+    );
+    let mentions = null;
+    let errorMsg = null;
+    if (!STATE.isDemoMode){
+      try {
+        const res = await fetchTopicMentions(t.key);
+        mentions = res.items || [];
+      } catch (err){
+        if (err.status === 401){ handleUnauthorized(); return; }
+        errorMsg = "Couldn't load mentions for this topic.";
+      }
+    }
+    if (mentions === null && !errorMsg){
+      mentions = (SAMPLE_DATA.topicMentionsByKey[t.key] || []);
+    }
+    const introEl = document.getElementById('topicModalIntro');
+    const resultsEl = document.getElementById('topicModalResults');
+    if (!introEl || !resultsEl) return; // modal was closed before the fetch resolved
+    if (errorMsg){
+      introEl.textContent = '';
+      renderStatePanel(resultsEl, 'error', "Couldn't load", errorMsg, () => openTopicModal(t));
+      return;
+    }
+    if (!mentions.length){
+      introEl.textContent = 'No mentions tagged with this topic yet.';
+      return;
+    }
+    introEl.textContent = STATE.isDemoMode ? 'Sample mentions tagged with this topic (demo)' : 'Mentions tagged with this topic';
+    mentions.forEach(m => {
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:10px 0;border-top:1px solid var(--line);';
+      const who = document.createElement('div');
+      who.style.cssText = 'font-size:12.5px;font-weight:500;color:var(--ink);';
+      who.textContent = m.author || 'Unknown';
+      const src = document.createElement('span');
+      src.style.cssText = 'color:var(--ink-faint);font-weight:400;';
+      src.textContent = ' · ' + (m.venue || '');
+      who.appendChild(src);
+      const text = document.createElement('div');
+      text.style.cssText = 'font-size:12px;color:var(--ink-dim);margin-top:4px;';
+      text.textContent = m.text || '';
+      const sent = document.createElement('div');
+      sent.style.cssText = 'font-size:11px;color:var(--ink-faint);margin-top:4px;';
+      sent.textContent = 'Sentiment: ' + (m.sentiment || 'Unknown');
+      row.appendChild(who); row.appendChild(text); row.appendChild(sent);
+      resultsEl.appendChild(row);
+    });
+  }
+
+  // =========================================================================
+  // Competitors tab
+  // =========================================================================
+  const PIE_COLORS = ['#A99C89', '#F5A623', '#2F8FE0', '#16A863', '#8B7EC8', '#D9C9A3', '#4A4038'];
+
+  function renderPie(chartEl, legendEl, rows, centerLabel){
+    if (!chartEl || !legendEl) return;
+    legendEl.innerHTML = '';
+    if (!rows.length){
+      chartEl.style.background = 'var(--surface-2)';
+      chartEl.setAttribute('data-center', '');
+      renderStatePanel(legendEl, 'empty', 'No data yet', 'Nothing to show for this view yet.');
+      return;
+    }
+    let otherIndex = 0;
+    let cursor = 0;
+    const stops = [];
+    const colored = rows.map(r => {
+      const color = r.isOwn ? '#FF5A3C' : PIE_COLORS[(otherIndex++) % PIE_COLORS.length];
+      const start = cursor;
+      cursor += r.pct;
+      stops.push(color + ' ' + start + '% ' + cursor + '%');
+      return Object.assign({}, r, { color });
+    });
+    chartEl.style.background = 'conic-gradient(' + stops.join(', ') + ')';
+    chartEl.setAttribute('data-center', centerLabel || '');
+
+    colored.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'src-row';
+      const icon = document.createElement('div');
+      icon.className = 'src-icon';
+      icon.style.background = r.color;
+      row.appendChild(icon);
+      const name = document.createElement('div');
+      name.className = 'src-name' + (r.isOwn ? ' us' : '');
+      if (r.isOwn) name.style.cssText = 'font-weight:600; color:var(--coral-text);';
+      name.appendChild(document.createTextNode(r.name));
+      if (r.badge){
+        name.appendChild(document.createTextNode(' '));
+        const badge = document.createElement('span');
+        if (r.badge === 'New'){ badge.className = 'tag gold'; badge.style.cssText = 'font-size:9px; padding:1px 5px;'; }
+        else { badge.className = 'spike-badge'; }
+        badge.textContent = r.badge;
+        name.appendChild(badge);
+      }
+      row.appendChild(name);
+      const pct = document.createElement('div');
+      pct.className = 'src-pct';
+      if (r.isOwn) pct.style.color = 'var(--coral-text)';
+      pct.textContent = r.pct + '%';
+      row.appendChild(pct);
+      legendEl.appendChild(row);
+    });
+  }
+
+  function buildCompetitorSentimentRow(c){
+    const wrap = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'sov-name' + (c.isOwn ? ' us' : '');
+    name.style.marginBottom = '6px';
+    name.appendChild(document.createTextNode(c.name));
+    if (c.spike){
+      name.appendChild(document.createTextNode(' '));
+      const badge = document.createElement('span');
+      badge.className = 'spike-badge';
+      badge.textContent = '▲ spike';
+      name.appendChild(badge);
+    }
+    wrap.appendChild(name);
+    const bar = document.createElement('div');
+    bar.className = 'sentiment-bar';
+    const pos = document.createElement('div'); pos.className = 'seg pos'; pos.style.width = c.positivePct + '%';
+    const neu = document.createElement('div'); neu.className = 'seg neu'; neu.style.width = c.neutralPct + '%';
+    const neg = document.createElement('div'); neg.className = 'seg neg'; neg.style.width = c.negativePct + '%';
+    bar.appendChild(pos); bar.appendChild(neu); bar.appendChild(neg);
+    wrap.appendChild(bar);
+    return wrap;
+  }
+
+  function buildTopVoiceRow(v){
+    const row = document.createElement('div');
+    row.className = 'src-row';
+    const icon = document.createElement('div');
+    icon.className = 'src-icon';
+    icon.style.cssText = v.icon === 'IG' ? 'background:var(--coral-tint); color:var(--coral-text)' : 'background:var(--surface-2); color:var(--ink)';
+    icon.textContent = v.icon;
+    const name = document.createElement('div');
+    name.className = 'src-name';
+    name.textContent = v.name;
+    const tag = document.createElement('span');
+    tag.className = 'tag ' + v.tagClass;
+    tag.textContent = v.tag;
+    row.appendChild(icon); row.appendChild(name); row.appendChild(tag);
+    return row;
+  }
+
+  function buildCategoryWatchRow(c){
+    const row = document.createElement('div');
+    row.className = 'src-row';
+    const icon = document.createElement('div');
+    icon.className = 'src-icon';
+    icon.style.cssText = 'background:var(--surface-2); color:var(--ink)';
+    icon.textContent = 'H';
+    const name = document.createElement('div');
+    name.className = 'src-name';
+    name.appendChild(document.createTextNode(c.name));
+    if (c.note){
+      const note = document.createElement('span');
+      note.style.color = 'var(--ink-faint)';
+      note.textContent = ' ' + c.note;
+      name.appendChild(note);
+    }
+    const tag = document.createElement('span');
+    tag.className = 'tag neutral';
+    tag.textContent = 'Boolean query pending';
+    row.appendChild(icon); row.appendChild(name); row.appendChild(tag);
+    return row;
+  }
+
+  function renderCompetitorsTab(){
+    const sovLegend = document.getElementById('sovLegend');
+    const sourceLegend = document.getElementById('sourceLegend');
+    const sentimentContainer = document.getElementById('competitorSentimentRows');
+    const topVoicesContainer = document.getElementById('topVoicesContainer');
+    const categoryContainer = document.getElementById('categoryWatchContainer');
+
+    if (STATE.tabError.competitors){
+      [sovLegend, sourceLegend, sentimentContainer].forEach(c => c && renderStatePanel(c, 'error', "Couldn't load", STATE.tabError.competitors, () => loadCompetitorsTab(true)));
+      return;
+    }
+    if (!STATE.competitors){
+      [sovLegend, sourceLegend, sentimentContainer].forEach(c => c && renderStatePanel(c, 'loading', 'Loading…', 'Fetching competitive data.'));
+      return;
+    }
+    const data = STATE.competitors;
+    const ownSov = data.shareOfVoice.find(s => s.isOwn);
+    renderPie(
+      document.getElementById('sovPieChart'), sovLegend,
+      data.shareOfVoice.map(s => ({ name: s.name, pct: s.pct, isOwn: s.isOwn, badge: s.spike ? '▲ spike' : (s.isNew ? 'New' : null) })),
+      ownSov ? (ownSov.name + ' ' + ownSov.pct + '%') : ''
+    );
+
+    const totalMentions = (STATE.overview && STATE.overview.totalMentions) ? STATE.overview.totalMentions.value : null;
+    renderPie(
+      document.getElementById('sourcePieChart'), sourceLegend,
+      data.sourceBreakdown.map(s => ({ name: s.platform, pct: s.pct, badge: s.isNew ? 'New' : null })),
+      totalMentions != null ? (totalMentions + ' mentions') : ''
+    );
+
+    if (sentimentContainer){
+      sentimentContainer.innerHTML = '';
+      if (!data.competitorSentiment.length){
+        renderStatePanel(sentimentContainer, 'empty', 'No sentiment data yet', 'Not enough classified mentions yet to compare sentiment across competitors.');
+      } else {
+        data.competitorSentiment.forEach(c => sentimentContainer.appendChild(buildCompetitorSentimentRow(c)));
+      }
+    }
+    if (topVoicesContainer){
+      topVoicesContainer.innerHTML = '';
+      SAMPLE_DATA.topVoices.forEach(v => topVoicesContainer.appendChild(buildTopVoiceRow(v)));
+    }
+    if (categoryContainer){
+      categoryContainer.innerHTML = '';
+      SAMPLE_DATA.categoryWatch.forEach(c => categoryContainer.appendChild(buildCategoryWatchRow(c)));
+    }
+  }
+
+  // =========================================================================
+  // EMV tab
+  // =========================================================================
+  function emvValText(v){ return (v == null) ? 'Not yet priced' : '₱' + v.toLocaleString('en-US'); }
+
+  function buildEmvRowEls(a){
+    const row = document.createElement('tr');
+    row.className = 'emv-row';
+    row.dataset.outlet = a.outlet;
+    row._article = a;
+    if (a.publishedAt){
+      const d = new Date(a.publishedAt);
+      if (!isNaN(d.getTime())) row.dataset.date = d.toISOString().slice(0, 10);
+    }
+    row.addEventListener('click', () => toggleEmvDetail(row));
+
+    const tdOutlet = document.createElement('td');
+    const chevron = document.createElement('span'); chevron.className = 'chevron'; chevron.textContent = '▸';
+    tdOutlet.appendChild(chevron);
+    tdOutlet.appendChild(document.createTextNode(a.outlet));
+    row.appendChild(tdOutlet);
+
+    const tdHeadline = document.createElement('td'); tdHeadline.textContent = a.headline; row.appendChild(tdHeadline);
+    const tdTier = document.createElement('td'); tdTier.textContent = a.tier; row.appendChild(tdTier);
+
+    const tdSentiment = document.createElement('td');
+    const sTag = document.createElement('span');
+    sTag.className = 'tag ' + (a.sentiment === 'Positive' ? 'sage' : a.sentiment === 'Negative' ? 'coral' : 'sky');
+    sTag.textContent = a.sentiment || 'Unknown';
+    tdSentiment.appendChild(sTag);
+    row.appendChild(tdSentiment);
+
+    const tdGross = document.createElement('td');
+    tdGross.className = 'emv-val';
+    if (a.grossEmv == null) tdGross.style.color = 'var(--ink-faint)';
+    tdGross.textContent = emvValText(a.grossEmv);
+    row.appendChild(tdGross);
+
+    const tdNet = document.createElement('td');
+    tdNet.className = 'emv-val';
+    if (a.netEmv == null) tdNet.style.color = 'var(--ink-faint)';
+    tdNet.textContent = emvValText(a.netEmv);
+    row.appendChild(tdNet);
+
+    const tdLink = document.createElement('td');
+    const link = document.createElement('a');
+    link.className = 'source-link';
+    link.textContent = 'View ↗';
+    link.addEventListener('click', (ev) => { ev.stopPropagation(); viewSource(a.outlet, a.headline, a.url); });
+    tdLink.appendChild(link);
+    row.appendChild(tdLink);
+
+    const detail = document.createElement('tr');
+    detail.className = 'emv-detail';
+    detail.style.display = 'none';
+    const detailTd = document.createElement('td');
+    detailTd.colSpan = 7;
+    detailTd.textContent = (a.grossEmv == null && a.netEmv == null)
+      ? 'EMV not yet priced — needs a human-entered prominence/PubScore step (see docs/api-contract.md’s EMV section). The API exposes the raw ingested article; the calculation is future work, not guessed here.'
+      : (a.calcNote || 'No calculation breakdown available for this article.');
+    detail.appendChild(detailTd);
+
+    return { row, detail };
+  }
+
+  function toggleEmvDetail(row){
+    const detail = row.nextElementSibling;
+    if (!detail) return;
+    const isOpen = detail.style.display === 'table-row';
+    document.querySelectorAll('.emv-detail').forEach(d => d.style.display = 'none');
+    document.querySelectorAll('.emv-row .chevron').forEach(c => c.textContent = '▸');
+    if (!isOpen){
+      detail.style.display = 'table-row';
+      const chev = row.querySelector('.chevron');
+      if (chev) chev.textContent = '▾';
+    }
+  }
+
+  function renderEmvTab(){
+    const tbody = document.getElementById('emvTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (STATE.tabError.emv){
+      const { tr, td } = tableEmptyCell(7);
+      tbody.appendChild(tr);
+      renderStatePanel(td, 'error', "Couldn't load EMV", STATE.tabError.emv, () => loadEmvTab(true));
+      updateEmvTotals(null);
+      return;
+    }
+    if (!STATE.emv){
+      const { tr, td } = tableEmptyCell(7);
+      tbody.appendChild(tr);
+      renderStatePanel(td, 'loading', 'Loading EMV…', 'Fetching earned media coverage.');
+      return;
+    }
+    const articles = STATE.emv.articles;
+    if (!articles.length){
+      const { tr, td } = tableEmptyCell(7);
+      tbody.appendChild(tr);
+      renderStatePanel(td, 'empty', 'No coverage yet', 'No earned media articles have been ingested for this period.');
+      updateEmvTotals([]);
+      return;
+    }
+    articles.forEach(a => {
+      const { row, detail } = buildEmvRowEls(a);
+      tbody.appendChild(row);
+      tbody.appendChild(detail);
+    });
+    applyEmvFilters();
+  }
+
   let emvOutlet = 'All';
-  // Canonical "no filter" sentinel is the literal menu option string 'All time' — the same
-  // value the date chip's menu assigns on selection — so the default and every comparison
-  // site agree (implements 0.15; previously the default was the lowercase 'all', which never
-  // matched the 'All time' the menu actually assigns, so the Filtered label stuck permanently).
   let emvDateMode = 'All time';
   let emvDateFrom = null;
   let emvDateTo = null;
@@ -1768,7 +2683,7 @@
     closeAllChipMenus();
     if (already) return;
     const options = type === 'outlet'
-      ? ['All', 'Rappler', 'Philippine Star', 'PeopleAsia', 'When In Manila', 'Manila Bulletin', 'ANC']
+      ? ['All'].concat(STATE.emv ? Array.from(new Set(STATE.emv.articles.map(a => a.outlet))) : [])
       : ['All time', 'Last 7 days', 'Last 30 days', 'Last 90 days', 'Custom range…'];
     const menu = document.createElement('div');
     menu.className = 'chip-menu';
@@ -1807,8 +2722,25 @@
     chip.appendChild(menu);
   }
 
+  function updateEmvTotals(visibleArticles){
+    const grossTag = document.getElementById('emvGrossTag');
+    const netTag = document.getElementById('emvNetTag');
+    if (!grossTag || !netTag) return;
+    if (visibleArticles == null){ grossTag.textContent = 'Gross —'; netTag.textContent = 'Net Favorable —'; return; }
+    let grossSum = 0, netSum = 0, anyGross = false, anyNet = false;
+    visibleArticles.forEach(a => {
+      if (a.grossEmv != null){ grossSum += a.grossEmv; anyGross = true; }
+      if (a.netEmv != null){ netSum += a.netEmv; anyNet = true; }
+    });
+    const filtered = emvOutlet !== 'All' || emvDateMode !== 'All time';
+    grossTag.textContent = (filtered ? 'Filtered Gross ' : 'Gross ') + (anyGross ? '₱' + grossSum.toLocaleString('en-US') : 'Not yet priced');
+    netTag.textContent = (filtered ? 'Filtered Net ' : 'Net Favorable ') + (anyNet ? '₱' + netSum.toLocaleString('en-US') : 'Not yet priced');
+  }
+
   function applyEmvFilters(){
+    if (!STATE.emv) return;
     let anyVisible = false;
+    const visibleArticles = [];
     document.querySelectorAll('#emvTableBody tr.emv-row').forEach(row => {
       const matchesOutlet = emvOutlet === 'All' || row.dataset.outlet === emvOutlet;
       let matchesDate = true;
@@ -1825,140 +2757,51 @@
       if (detail && detail.classList.contains('emv-detail')) detail.style.display = 'none';
       const chevron = row.querySelector('.chevron');
       if (chevron) chevron.textContent = '▸';
-      if (visible) anyVisible = true;
+      if (visible){
+        anyVisible = true;
+        if (row._article) visibleArticles.push(row._article);
+      }
     });
-    const emptyRow = document.getElementById('emvEmptyRow');
-    if (emptyRow) emptyRow.style.display = anyVisible ? 'none' : '';
-    recomputeEmvTotals();
-  }
+    updateEmvTotals(visibleArticles);
 
-  function recomputeEmvTotals(){
-    let grossSum = 0, netSum = 0;
-    document.querySelectorAll('#emvTableBody tr.emv-row').forEach(row => {
-      if (row.style.display === 'none') return;
-      const vals = row.querySelectorAll('td.emv-val');
-      if (vals.length < 2) return;
-      grossSum += parseInt(vals[0].textContent.replace(/[^0-9]/g, ''), 10) || 0;
-      netSum += parseInt(vals[1].textContent.replace(/[^0-9]/g, ''), 10) || 0;
-    });
-    const filtered = emvOutlet !== 'All' || emvDateMode !== 'All time';
-    const grossTag = document.getElementById('emvGrossTag');
-    const netTag = document.getElementById('emvNetTag');
-    if (grossTag) grossTag.textContent = (filtered ? 'Filtered Gross ₱' : 'Gross ₱') + grossSum.toLocaleString('en-US');
-    if (netTag) netTag.textContent = (filtered ? 'Filtered Net ₱' : 'Net Favorable ₱') + netSum.toLocaleString('en-US');
-  }
-
-  function downloadCSV(filename, rows){
-    const csv = rows.map(r => r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\r\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('Downloaded ' + filename);
-  }
-
-  // ---------- EMV row expand ----------
-  function toggleEmvDetail(row){
-    const detail = row.nextElementSibling;
-    if (!detail) return;
-    const isOpen = detail.style.display === 'table-row';
-    document.querySelectorAll('.emv-detail').forEach(d => d.style.display = 'none');
-    document.querySelectorAll('.emv-row .chevron').forEach(c => c.textContent = '▸');
-    if (!isOpen){
-      detail.style.display = 'table-row';
-      row.querySelector('.chevron').textContent = '▾';
+    let emptyRow = document.getElementById('emvFilterEmptyRow');
+    if (!anyVisible && STATE.emv.articles.length){
+      if (!emptyRow){
+        emptyRow = document.createElement('tr');
+        emptyRow.id = 'emvFilterEmptyRow';
+        const td = document.createElement('td');
+        td.colSpan = 7;
+        td.style.cssText = 'text-align:center; color:var(--ink-faint); padding:20px 10px;';
+        td.textContent = 'No coverage matches these filters.';
+        emptyRow.appendChild(td);
+        const tbody = document.getElementById('emvTableBody');
+        if (tbody) tbody.appendChild(emptyRow);
+      }
+    } else if (emptyRow){
+      emptyRow.remove();
     }
   }
 
-  // ---------- Topics: drill-down to constituent mentions (implements 0.19b) ----------
-  const topicMentions = {
-    'facial-results': {
-      label: 'Facial Results & Glow',
-      mentions: [
-        { author: '@glowwithsab', source: 'Instagram comment on @remedy.ph', sentiment: 'Positive', text: 'Best facial I’ve had in BGC, the clinic feels so clean and the staff actually explain what they’re doing 🤍' },
-        { author: 'Google Review · verified patient', source: 'Remedy — Vertis North', sentiment: 'Positive', text: 'Left with an actual glow, not just red skin. Booking again next month.' },
-        { author: 'TikTok comment · patient', source: '@remedy.ph on TikTok', sentiment: 'Positive', text: 'The skin routine video was so helpful, saving this before my next Pico laser session.' }
-      ]
-    },
-    'staff-service': {
-      label: 'Staff & Service Experience',
-      mentions: [
-        { author: 'Facebook comment · patient', source: 'facebook.com/remedyph', sentiment: 'Positive', text: 'Club Remedy’s wellness room is such a nice touch after a facial, did not expect that at a derma clinic.' },
-        { author: 'Google Review · verified patient', source: 'Remedy BGC', sentiment: 'Positive', text: 'Front desk remembered my name on my second visit, small thing but it matters.' }
-      ]
-    },
-    'rejuran': {
-      label: 'Rejuran Specifically',
-      mentions: [
-        { author: 'u/skinseeker_mnl', source: 'r/PhilippinesSkincare', sentiment: 'Neutral', text: 'Comparing Remedy vs Aivee for Rejuran, anyone tried both? Remedy’s reviews look consistent but Aivee has more posts.' },
-        { author: 'Google Review · anonymous patient', source: 'Remedy BGC', sentiment: 'Negative', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.' }
-      ]
-    },
-    'pricing': {
-      label: 'Pricing & Packages',
-      mentions: [
-        { author: 'Facebook comment · prospective patient', source: 'facebook.com/remedyph', sentiment: 'Neutral', text: 'Anyone know if Remedy has package deals for Pico laser? Price isn’t listed on their page.' },
-        { author: 'Instagram DM excerpt · prospective patient', source: '@remedy.ph', sentiment: 'Neutral', text: 'Asked about Rejuran pricing, still waiting to hear back on package rates.' }
-      ]
-    },
-    'booking': {
-      label: 'Booking & Follow-up Response',
-      mentions: [
-        { author: 'Google Review · anonymous patient', source: 'Remedy BGC', sentiment: 'Negative', text: 'Second time booking Rejuran with Dra. April’s team, still waiting on a follow-up call back — service used to be faster.' },
-        { author: 'Facebook comment · patient', source: 'facebook.com/remedyph', sentiment: 'Negative', text: 'Called twice about rescheduling and never got a callback, had to just show up.' }
-      ]
-    }
-  };
-
-  function openTopicModal(topicKey){
-    const topic = topicMentions[topicKey];
-    if (!topic) return;
-    let html = '<button class="modal-close" onclick="closeModal()">×</button>' +
-      '<h4>' + escapeHtml(topic.label) + '</h4>' +
-      '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">Sample mentions tagged with this topic (demo)</div>';
-    topic.mentions.forEach(m => {
-      html += '<div style="padding:10px 0;border-top:1px solid var(--line);">' +
-        '<div style="font-size:12.5px;font-weight:500;color:var(--ink);">' + escapeHtml(m.author) +
-        '<span style="color:var(--ink-faint);font-weight:400;"> · ' + escapeHtml(m.source) + '</span></div>' +
-        '<div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">' + escapeHtml(m.text) + '</div>' +
-        '<div style="font-size:11px;color:var(--ink-faint);margin-top:4px;">Sentiment: ' + escapeHtml(m.sentiment) + '</div>' +
-        '</div>';
+  function exportEmvCSV(){
+    const rows = [['Outlet', 'Article', 'Tier', 'Sentiment', 'Gross EMV', 'Net Favorable EMV']];
+    document.querySelectorAll('#view-emv table tbody tr.emv-row').forEach(tr => {
+      if (tr.style.display === 'none') return;
+      const cells = [...tr.children].slice(0, 6).map(td => td.textContent.trim().replace(/\s+/g, ' '));
+      rows.push(cells);
     });
-    openModal(html);
+    downloadCSV('remedy-pulse-emv.csv', rows);
   }
 
-  // ---------- Clarity Index (implements 0.10 — see docs/decisions/clarity-index-formula.md) ----------
-  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
-
+  // =========================================================================
+  // Clarity Index (Phase 0 / 0.10 — reused verbatim; see docs/decisions/clarity-index-formula.md)
+  // =========================================================================
   /**
    * computeClarityIndex(inputs) -> integer 0-100
-   *
-   * Formula (full writeup: docs/decisions/clarity-index-formula.md):
-   *   ClarityIndex = round(
-   *     0.15 * ratingScore        +   // Avg. Google Rating, normalized: (rating / 5) * 100
-   *     0.40 * sentimentScore     +   // Net Sentiment KPI, clamped to 0-100 (a -100..100 scale)
-   *     0.20 * responseRateScore  +   // Average review response rate across branches (0-100)
-   *     0.25 * volumeTrendScore       // Mention-volume trend around a 50 baseline:
-   *                                   //   clamp(50 + weekOverWeekMentionChangePct, 0, 100)
-   *   )
-   *
-   * Weight rationale:
-   *   - Sentiment mix (40%, heaviest): the only input spanning every tracked platform (Google,
-   *     Reddit, Instagram, Facebook, News, TikTok), so it is the closest single number to
-   *     "what people are actually saying" — the thing the index exists to summarize.
-   *   - Mention-volume trend (25%): a swing in how much people are talking changes how much
-   *     the sentiment reading matters this week, so it earns real weight — but it's a volume
-   *     signal, not a quality signal, so it stays below sentiment and response rate.
-   *   - Review response rate (20%): the one input entirely inside the clinic's own control —
-   *     rewards actually closing the loop on reviews, the core workflow this tool exists to
-   *     drive (P0-6).
-   *   - Avg. Google Rating (15%, lightest): high-intent and public, but the narrowest channel
-   *     (Google only, and only patients who chose to leave a rating), so it does not dominate.
+   * ClarityIndex = round(0.15*ratingScore + 0.40*sentimentScore + 0.20*responseRateScore + 0.25*volumeTrendScore)
+   * Full weight rationale: docs/decisions/clarity-index-formula.md. The real API ports this same
+   * formula server-side (per docs/api-contract.md); this client copy is used only to compute the
+   * demo/sample gauge value from SAMPLE_DATA, so the demo stays internally consistent without a
+   * second hardcoded score.
    */
   function computeClarityIndex(inputs){
     const ratingScore = clamp((inputs.avgGoogleRating / 5) * 100, 0, 100);
@@ -1968,59 +2811,30 @@
     const score = (0.15 * ratingScore) + (0.40 * sentimentScore) + (0.20 * responseRateScore) + (0.25 * volumeTrendScore);
     return Math.round(score);
   }
-
-  // Pulls the raw inputs from the same sample data already rendered elsewhere on the page,
-  // rather than re-hardcoding a second copy of each number.
-  function getClarityIndexInputs(){
-    const responseRates = [...document.querySelectorAll('#view-reviews .resp-rate')]
-      .map(td => parseFloat(td.textContent))
-      .filter(n => !isNaN(n));
-    const avgResponseRatePct = responseRates.length
-      ? responseRates.reduce((a, b) => a + b, 0) / responseRates.length
-      : 0;
-    const totalMentionsNow = 342;   // matches the Total Mentions KPI
-    const totalMentionsPrior = 291; // matches the KPI's "291 last week" delta text
+  function getClarityIndexInputsFromSample(){
+    const rates = SAMPLE_DATA.reviews.listings.map(l => l.responseRatePct).filter(n => typeof n === 'number');
+    const avgResponseRatePct = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
     return {
-      avgGoogleRating: 5.0,   // matches the "Avg. Google Rating" KPI card
-      netSentiment: 62,       // matches the "Net Sentiment" KPI card (+62)
+      avgGoogleRating: SAMPLE_DATA.overview.avgGoogleRating.value,
+      netSentiment: SAMPLE_DATA.overview.netSentiment.value,
       avgResponseRatePct: avgResponseRatePct,
-      mentionVolumeTrendPct: Math.round(((totalMentionsNow - totalMentionsPrior) / totalMentionsPrior) * 100)
+      mentionVolumeTrendPct: SAMPLE_DATA.overview.totalMentions.deltaPct
     };
   }
 
-  // ---------- AI weekly summary ----------
-  const summaries = [
-    'Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.',
-    'Net sentiment held steady at plus 62 this week despite a slower than usual follow-up call flagged in a Google review. Facial results and staff experience remain the most discussed topics, both strongly positive. Worth watching: a Reddit thread comparing Remedy to Aivee on Rejuran pricing is quietly gaining traction.',
-    'Earned media had a strong week. Rappler and Philippine Star coverage alone add up to more than 1.2 million pesos in gross EMV. Club Remedy wellness coverage is starting to show up in lifestyle press. There is no new negative coverage in news or PR; the only open item is a single unresolved Google review.'
-  ];
+  // ---------- AI weekly summary (demo-only regenerate — 7.7) ----------
   let summaryIndex = 0;
   function regenerateSummary(){
+    if (!STATE.isDemoMode){ showToast("Live data — this is the API's own summary already"); return; }
     const el = document.getElementById('aiSummaryText');
     if (!el) return;
     el.style.transition = 'opacity .25s ease';
     el.style.opacity = '0.3';
     setTimeout(() => {
-      summaryIndex = (summaryIndex + 1) % summaries.length;
-      el.textContent = summaries[summaryIndex];
+      summaryIndex = (summaryIndex + 1) % SAMPLE_DATA.aiSummaryVariants.length;
+      el.textContent = SAMPLE_DATA.aiSummaryVariants[summaryIndex];
       el.style.opacity = '1';
     }, 550);
-  }
-
-  // ---------- Header sync simulation ----------
-  function simulateSync(){
-    const pill = document.getElementById('syncPill');
-    const label = document.getElementById('syncLabel');
-    if (pill.classList.contains('syncing')) return;
-    pill.classList.add('syncing');
-    document.body.classList.add('syncing-data');
-    label.textContent = 'Syncing…';
-    setTimeout(() => {
-      label.textContent = 'Last synced ' + formatPHTime();
-      pill.classList.remove('syncing');
-      document.body.classList.remove('syncing-data');
-      showToast('Data refreshed (demo)');
-    }, 900);
   }
 
   // ---------- Count-up animation on load ----------
@@ -2042,20 +2856,147 @@
     requestAnimationFrame(frame);
   }
 
-  // ---------- One-time demo notice + load animations ----------
+  // =========================================================================
+  // Init / data loading (7.2 step 3 + 7.7): auth-gate at startup decides
+  // demo vs. live; a 401 at any point during live use falls all the way back
+  // to demo mode (handleUnauthorized()); a per-tab failure once already live
+  // shows that tab's own error+retry state instead of silently reverting to
+  // sample data (so real and sample data are never shown side by side).
+  // =========================================================================
+  function loadAllFromSample(){
+    STATE.overview = JSON.parse(JSON.stringify(SAMPLE_DATA.overview));
+    STATE.overview.clarityIndex.score = computeClarityIndex(getClarityIndexInputsFromSample());
+    STATE.mentions = JSON.parse(JSON.stringify(SAMPLE_DATA.mentions));
+    STATE.reviews = normalizeReviews(JSON.parse(JSON.stringify(SAMPLE_DATA.reviews)));
+    STATE.topics = SAMPLE_DATA.topics;
+    STATE.competitors = SAMPLE_DATA.competitors;
+    STATE.emv = SAMPLE_DATA.emv;
+    STATE.roster = SAMPLE_DATA.roster;
+    STATE.status = SAMPLE_DATA.status;
+    STATE.tabError = {};
+    renderAll();
+  }
+
+  function renderAll(){
+    renderOverviewTab();
+    renderSyncPill();
+    renderMentionsTab();
+    renderReviewsTab();
+    renderTopicsTab();
+    renderCompetitorsTab();
+    renderEmvTab();
+  }
+
+  async function loadReviewsTab(isRetry){
+    if (isRetry) STATE.tabError.reviews = null;
+    if (!STATE.reviews || isRetry) renderReviewsTab(); // show the loading state immediately, not just once the fetch settles
+    try {
+      STATE.reviews = normalizeReviews(await fetchReviews());
+      STATE.tabError.reviews = null;
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      STATE.tabError.reviews = (err.status === 0) ? "Couldn't reach the API." : 'The server returned an error.';
+    }
+    renderReviewsTab();
+  }
+  async function loadTopicsTab(isRetry){
+    if (isRetry) STATE.tabError.topics = null;
+    if (!STATE.topics || isRetry) renderTopicsTab();
+    try {
+      STATE.topics = await fetchTopics();
+      STATE.tabError.topics = null;
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      STATE.tabError.topics = (err.status === 0) ? "Couldn't reach the API." : 'The server returned an error.';
+    }
+    renderTopicsTab();
+  }
+  async function loadCompetitorsTab(isRetry){
+    if (isRetry) STATE.tabError.competitors = null;
+    if (!STATE.competitors || isRetry) renderCompetitorsTab();
+    try {
+      STATE.competitors = await fetchCompetitors();
+      STATE.tabError.competitors = null;
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      STATE.tabError.competitors = (err.status === 0) ? "Couldn't reach the API." : 'The server returned an error.';
+    }
+    renderCompetitorsTab();
+  }
+  async function loadEmvTab(isRetry){
+    if (isRetry) STATE.tabError.emv = null;
+    if (!STATE.emv || isRetry) renderEmvTab();
+    try {
+      STATE.emv = await fetchEmv();
+      STATE.tabError.emv = null;
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      STATE.tabError.emv = (err.status === 0) ? "Couldn't reach the API." : 'The server returned an error.';
+    }
+    renderEmvTab();
+  }
+  async function loadMentionsTab(isRetry){
+    if (isRetry) STATE.tabError.mentions = null;
+    if (!STATE.mentions || isRetry){ renderMentionsTab(); renderAlertsPanel(); }
+    try {
+      STATE.mentions = await fetchMentions();
+      STATE.tabError.mentions = null;
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      STATE.tabError.mentions = (err.status === 0) ? "Couldn't reach the API." : 'The server returned an error.';
+    }
+    renderMentionsTab();
+    renderAlertsPanel();
+  }
+
+  async function initApp(){
+    STATE.tabError = {};
+    const token = getAuthToken();
+    if (!token){
+      setDemoMode(true, 'not logged in');
+      loadAllFromSample();
+      return;
+    }
+    STATE.user = getAuthUser();
+    try {
+      // Overview + status + mentions + roster gate startup: Overview needs mentions (for the
+      // alerts panel, since alertCategory lives on mention items — see 7.2's data-module note)
+      // and roster (for the alert Assign dropdown) immediately, so all four are fetched together
+      // before the app commits to live mode.
+      const [overview, status, mentions, roster] = await Promise.all([
+        fetchOverview(), fetchStatus(), fetchMentions(), fetchRoster()
+      ]);
+      setDemoMode(false);
+      STATE.overview = overview;
+      STATE.status = status;
+      STATE.mentions = mentions;
+      STATE.roster = roster;
+      renderOverviewTab();
+      renderSyncPill();
+      renderMentionsTab();
+      // Remaining tabs load independently in the background — a single endpoint failing here
+      // shows that tab's own error+retry state (7.6) rather than pulling the whole app back into
+      // demo mode.
+      loadReviewsTab();
+      loadTopicsTab();
+      loadCompetitorsTab();
+      loadEmvTab();
+    } catch (err){
+      if (err.status === 401){
+        clearAuth();
+        setDemoMode(true, 'not logged in');
+      } else {
+        setDemoMode(true, 'offline');
+      }
+      loadAllFromSample();
+    }
+  }
+
   window.addEventListener('load', () => {
-    // Compute the Clarity Index from the page's own sample data (implements 0.10) rather than
-    // rendering a bare hardcoded 75, then sweep the gauge arc to match — dashoffset scales
-    // linearly from 235.6 (0/100) to 0 (100/100), synced with the number counting up beside it.
-    const clarityScore = computeClarityIndex(getClarityIndexInputs());
-    const gaugePath = document.getElementById('gaugeValuePath');
-    const gaugeOffset = 235.6 * (1 - clarityScore / 100);
-    if (gaugePath) requestAnimationFrame(() => { gaugePath.style.strokeDashoffset = String(gaugeOffset); });
-    countUp('clarityNum', clarityScore, { duration: 1000 });
-    countUp('kpiTotalMentionsValue', 342, { duration: 1000 });
-    countUp('kpiNetSentimentValue', 62, { prefix: '+', duration: 1000 });
-    countUp('kpiActiveAlertsValue', 4, { duration: 700 });
-    setTimeout(() => showToast('Demo mode — sample data, actions are simulated. Press ⌘K for quick actions.'), 700);
+    initApp();
+    setTimeout(() => {
+      if (STATE.isDemoMode) showToast('Demo mode — sample data, actions are simulated. Press ⌘K for quick actions.');
+    }, 800);
   });
 </script>
 

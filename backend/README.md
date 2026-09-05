@@ -317,10 +317,79 @@ password" in its return value — both are just `None`. A successful login
 updates `User.last_login_at` and calls `repository.log_login()`, so
 Phase 3's `EventType.LOGIN` finally has a caller.
 
-This is schema/logic only — **there is no HTTP framework or login route
-anywhere in this repo**, so "add authentication to the dashboard" isn't
-fully done by this alone. Phase 7 (the API layer) is what actually calls
-into this.
+This was schema/logic only when it landed (no HTTP framework existed
+yet) — the Phase 7 API layer below is what now actually calls into it
+via `POST /api/auth/login`.
+
+## Sentiment classification and alert routing (Phase 6)
+
+`app/classification.py` — one Claude API call per item does both
+sentiment classification (6.1) and crisis/digest alert routing (6.3)
+together, since the five crisis / five digest conditions (copied
+verbatim from the mockup's `openAlertRulesModal()`, citing spec §9.2)
+are qualitative judgment calls, not independent of sentiment. Model:
+`claude-opus-5` — this project's standing default per the `claude-api`
+skill's policy (see `docs/decisions/sentiment-classifier-choice.md`,
+which also proposes a concrete recall bar for the team to ratify: the
+PRD's own open question about "what precision/recall bar is acceptable
+before this drives the alert workflow unsupervised"). A missing
+`ANTHROPIC_API_KEY` raises `ClassifierNotConfiguredError` (a whole batch
+would fail identically, so stop immediately rather than degrade N times
+in a row); a transient API failure or an unparseable response degrades
+to a low-confidence result instead, so one bad item never crashes
+`classify_unclassified_batch()`.
+
+6.2 (the two conflicting definitions of `Mention.sentiment` — one
+star-derived, one text-derived) is resolved here too: a review's
+star-derived placeholder sentiment stays until `classify_and_store()`
+overwrites it with the real classifier's output; `classified_at IS NULL`
+is the queryable seam between the two populations.
+
+`app/topic_tagging.py` — 6.5, scoped honestly as LLM **tagging** against
+the mockup's fixed five-topic taxonomy, not true unsupervised
+*clustering* (the checklist's literal title for this item) — see
+`docs/decisions/topic-tagging-approach.md` for why: real clustering
+needs real data volume no adapter has live yet. Shares
+`ClassifierNotConfiguredError` with `classification.py` (not a
+duplicate) so a missing key stops a tagging batch the same way it stops
+a classification batch.
+
+`docs/decisions/assignment-roster.md` (6.4) — the `User` table (5.5) is
+the roster, replacing the mockup's hardcoded Gian/Paul/Boom/Mixi list;
+who's responsible for keeping it current is named as still unresolved,
+not invented.
+
+## API layer (Phase 7)
+
+`app/api/` — a FastAPI app implementing every endpoint in
+`docs/api-contract.md`, the contract both this and
+`remedy-pulse-mockup.html`'s data-driven refactor were built against in
+parallel. Run it with:
+```
+uvicorn app.api.main:app
+```
+Every route except `POST /api/auth/login` requires
+`Authorization: Bearer <token>` (from `app.auth.verify_session_token()`).
+CORS is wide open (`allow_origins=["*"]`) since the mockup's `apiFetch()`
+sends the token as a header, not a cookie, so there's no credentialed-
+request/wildcard-origin risk here — see `app/api/main.py`'s comment for
+why that would be different with cookie-based auth, and restrict this
+before a real production deployment.
+
+Notable deviations from the contract, documented in the route code too:
+`GET /api/emv` returns `grossEmv`/`netEmv`/`grossTotal`/`netTotal` as
+`null` on every article — summing nulls can't honestly produce a number,
+and this project has no real EMV formula inputs yet (see
+`fetch_news_articles.py`'s own docstring). `GET /api/reviews` fills in
+`no_reviews` placeholders for configured branches with zero ingested
+reviews by cross-referencing `config.OWNED_LISTINGS`, since the
+aggregation query alone can't distinguish "no data yet" from "not a
+tracked branch." 7.4's write endpoints (`assign`/`resolve`/`reply`) are
+implemented and tested; the mockup wires `assign`/`resolve` to them but
+**not** `reply` — that one's local-only, a real product/API design gap
+(the mockup's reply flow is branch-level, the endpoint is per-review)
+documented where the mockup's fetch layer defines it, not silently
+papered over.
 
 ## Compliance and security documentation (Phase 5)
 
