@@ -501,29 +501,31 @@
         <div class="card-head">
           <div>
             <h3>Sentiment Trend</h3>
-            <div class="card-sub">Net sentiment score, owned entities, last 14 days (sample trend — no timeseries endpoint in the API contract yet)</div>
+            <div class="card-sub" id="sentimentTrendSub">Net sentiment score, owned entities, last 14 days</div>
           </div>
           <div class="chart-legend">
             <span><i class="swatch" style="background:var(--gold)"></i>Net score</span>
           </div>
         </div>
-        <svg viewBox="0 0 820 180" width="100%" height="170">
-          <line x1="0" y1="90" x2="820" y2="90" stroke="#E9E1D3" stroke-width="1" stroke-dasharray="3 4"/>
-          <polyline points="20,118 80,113.3 140,125 200,108.7 260,104 320,113.3 380,99.3 440,90 500,94.7 560,85.3 620,92.3 680,80 740,76 800,73.3"
-                    fill="none" stroke="#F5A623" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-          <polygon points="20,118 80,113.3 140,125 200,108.7 260,104 320,113.3 380,99.3 440,90 500,94.7 560,85.3 620,92.3 680,80 740,76 800,73.3 800,180 20,180"
-                   fill="url(#areaFade)" opacity="0.30"/>
-          <defs>
-            <linearGradient id="areaFade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#F5A623"/>
-              <stop offset="100%" stop-color="#F5A623" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <circle cx="800" cy="73.3" r="4" fill="#F5A623"/>
-          <text x="20" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif">Jun 18</text>
-          <text x="410" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="middle">Jun 24</text>
-          <text x="800" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="end">Jul 1</text>
-        </svg>
+        <div id="sentimentTrendContainer">
+          <svg viewBox="0 0 820 180" width="100%" height="170">
+            <line x1="0" y1="90" x2="820" y2="90" stroke="#E9E1D3" stroke-width="1" stroke-dasharray="3 4"/>
+            <polyline points="20,118 80,113.3 140,125 200,108.7 260,104 320,113.3 380,99.3 440,90 500,94.7 560,85.3 620,92.3 680,80 740,76 800,73.3"
+                      fill="none" stroke="#F5A623" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <polygon points="20,118 80,113.3 140,125 200,108.7 260,104 320,113.3 380,99.3 440,90 500,94.7 560,85.3 620,92.3 680,80 740,76 800,73.3 800,180 20,180"
+                     fill="url(#areaFade)" opacity="0.30"/>
+            <defs>
+              <linearGradient id="areaFade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#F5A623"/>
+                <stop offset="100%" stop-color="#F5A623" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <circle cx="800" cy="73.3" r="4" fill="#F5A623"/>
+            <text x="20" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif">Jun 18</text>
+            <text x="410" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="middle">Jun 24</text>
+            <text x="800" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="end">Jul 1</text>
+          </svg>
+        </div>
       </div>
 
       <div class="card">
@@ -810,6 +812,28 @@
       aiSummaryText: 'Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a 40 percent jump in mention volume, but it has not yet moved Remedy share of voice.',
       lastSyncedAt: '2026-07-01T09:15:00+00:00'
     },
+    // GET /api/overview/trend shape (added Phase 8, 8.1). Oldest-first, 14 days ending on
+    // DEMO_TODAY (2026-07-01) so the demo chart's x-axis labels ("Jun 18"/"Jun 24"/"Jul 1")
+    // stay meaningful. Shaped to draw a plausible rising-sentiment curve, same idea as every
+    // other SAMPLE_DATA block — not a real backtest of any actual week.
+    overviewTrend: {
+      days: [
+        { date: '2026-06-18', mentionCount: 22, positiveCount: 9, neutralCount: 8, negativeCount: 5 },
+        { date: '2026-06-19', mentionCount: 25, positiveCount: 10, neutralCount: 9, negativeCount: 6 },
+        { date: '2026-06-20', mentionCount: 21, positiveCount: 7, neutralCount: 8, negativeCount: 6 },
+        { date: '2026-06-21', mentionCount: 27, positiveCount: 12, neutralCount: 9, negativeCount: 6 },
+        { date: '2026-06-22', mentionCount: 24, positiveCount: 12, neutralCount: 8, negativeCount: 4 },
+        { date: '2026-06-23', mentionCount: 23, positiveCount: 10, neutralCount: 9, negativeCount: 4 },
+        { date: '2026-06-24', mentionCount: 26, positiveCount: 13, neutralCount: 9, negativeCount: 4 },
+        { date: '2026-06-25', mentionCount: 28, positiveCount: 15, neutralCount: 9, negativeCount: 4 },
+        { date: '2026-06-26', mentionCount: 25, positiveCount: 13, neutralCount: 9, negativeCount: 3 },
+        { date: '2026-06-27', mentionCount: 29, positiveCount: 16, neutralCount: 10, negativeCount: 3 },
+        { date: '2026-06-28', mentionCount: 27, positiveCount: 15, neutralCount: 10, negativeCount: 2 },
+        { date: '2026-06-29', mentionCount: 30, positiveCount: 17, neutralCount: 10, negativeCount: 3 },
+        { date: '2026-06-30', mentionCount: 31, positiveCount: 18, neutralCount: 11, negativeCount: 2 },
+        { date: '2026-07-01', mentionCount: 33, positiveCount: 20, neutralCount: 11, negativeCount: 2 }
+      ]
+    },
     // "Regenerate" cycle — demo-only affordance (7.7). The contract keeps this canned/templated
     // for the real API too (no live LLM call this phase); only the demo's cycling UI is gated.
     aiSummaryVariants: [
@@ -1029,6 +1053,27 @@
     return res.json();
   }
 
+  // Same auth/error handling as apiFetch(), but returns the raw response body as text instead of
+  // parsing JSON — for POST /api/exports/{type} (8.3), whose response IS the CSV file, not JSON.
+  async function apiFetchRaw(path, options){
+    options = options || {};
+    const token = getAuthToken();
+    const headers = Object.assign({}, options.headers || {});
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    let res;
+    try {
+      res = await fetch(API_BASE + path, Object.assign({}, options, { headers }));
+    } catch (networkErr){
+      throw new ApiError(0, 'network error');
+    }
+    if (res.status === 401) throw new ApiError(401, 'unauthorized');
+    if (!res.ok) throw new ApiError(res.status, 'request failed (' + res.status + ')');
+    return res.text();
+  }
+  function exportCSVLive(type, params){
+    return apiFetchRaw('/exports/' + encodeURIComponent(type) + toQuery(params), { method: 'POST' });
+  }
+
   // ---------- Fetch layer (7.2 step 3) — one function per GET endpoint the render code below
   // needs, plus the assign/resolve write endpoints (7.4) reconciled in after both the read layer
   // and the API layer landed. Wired into handleAssign()/resolveAlertItem() below — best-effort:
@@ -1049,6 +1094,7 @@
     return apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
   }
   function fetchOverview(params){ return apiFetch('/overview' + toQuery(params)); }
+  function fetchOverviewTrend(params){ return apiFetch('/overview/trend' + toQuery(params)); }
   function fetchMentions(params){ return apiFetch('/mentions' + toQuery(params)); }
   function fetchReviews(){ return apiFetch('/reviews'); }
   function fetchTopics(){ return apiFetch('/topics'); }
@@ -1073,9 +1119,9 @@
     isDemoMode: true,
     demoReason: 'not logged in', // 'not logged in' | 'offline' | null
     user: null,
-    overview: null, mentions: null, reviews: null, topics: null,
+    overview: null, overviewTrend: null, mentions: null, reviews: null, topics: null,
     competitors: null, emv: null, roster: null, status: null,
-    tabError: {} // { mentions, reviews, topics, competitors, emv } -> message string | null
+    tabError: {} // { mentions, reviews, topics, competitors, emv, overviewTrend } -> message string | null
   };
 
   function setDemoMode(isDemo, reason){
@@ -1501,6 +1547,67 @@
     if (summaryEl) summaryEl.textContent = ov.aiSummaryText || '';
 
     renderAlertsPanel();
+    renderSentimentTrendChart();
+  }
+
+  // Wires the Sentiment Trend chart to the real GET /api/overview/trend (8.1) — separate
+  // load/error lifecycle from the rest of the Overview tab (STATE.overviewTrend /
+  // STATE.tabError.overviewTrend), same split as renderAlertsPanel vs. renderOverviewTab, since
+  // this endpoint can fail or still be loading independently of the main /overview call.
+  function renderSentimentTrendChart(){
+    const container = document.getElementById('sentimentTrendContainer');
+    const subEl = document.getElementById('sentimentTrendSub');
+    if (!container) return;
+
+    if (STATE.tabError.overviewTrend){
+      renderStatePanel(container, 'error', "Couldn't load the sentiment trend", STATE.tabError.overviewTrend, () => loadOverviewTrendTab(true));
+      return;
+    }
+    const trend = STATE.overviewTrend;
+    if (!trend){
+      renderStatePanel(container, 'loading', 'Loading trend…', 'Fetching daily sentiment counts.');
+      return;
+    }
+
+    const days = trend.days || [];
+    if (subEl) subEl.textContent = 'Net sentiment score, owned entities, last ' + days.length + ' days';
+
+    if (!days.length){
+      renderStatePanel(container, 'empty', 'No trend data yet', 'Sentiment counts will appear here once mentions start coming in.');
+      return;
+    }
+
+    // Net score per day mirrors the API's own _clarity_and_net_sentiment() formula
+    // (app/api/routes/overview.py): 100 * (positive - negative) / totalClassified, 0 if nothing
+    // classified yet that day - same null-safety the contract specifies for this endpoint.
+    const scores = days.map(d => {
+      const total = (d.positiveCount || 0) + (d.neutralCount || 0) + (d.negativeCount || 0);
+      return total ? Math.round((100 * ((d.positiveCount || 0) - (d.negativeCount || 0))) / total) : 0;
+    });
+
+    const W = 820, H = 180, xPad = 20, yTop = 15, yBase = 90, yScale = 70; // yBase=90 matches the dashed zero-line below
+    const n = days.length;
+    const xAt = i => (n === 1) ? xPad : xPad + (i * (W - 2 * xPad)) / (n - 1);
+    const yAt = s => clamp(yBase - (clamp(s, -100, 100) / 100) * yScale, yTop, H - 10);
+    const points = scores.map((s, i) => xAt(i).toFixed(1) + ',' + yAt(s).toFixed(1));
+    const last = points[points.length - 1].split(',');
+
+    const fmtDate = iso => new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const mid = Math.floor((n - 1) / 2);
+
+    container.innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="170">' +
+        '<line x1="0" y1="' + yBase + '" x2="' + W + '" y2="' + yBase + '" stroke="#E9E1D3" stroke-width="1" stroke-dasharray="3 4"/>' +
+        '<polyline points="' + points.join(' ') + '" fill="none" stroke="#F5A623" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+        '<polygon points="' + points.join(' ') + ' ' + (W - xPad) + ',' + H + ' ' + xPad + ',' + H + '" fill="url(#sentimentTrendAreaFade)" opacity="0.30"/>' +
+        '<defs><linearGradient id="sentimentTrendAreaFade" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="#F5A623"/><stop offset="100%" stop-color="#F5A623" stop-opacity="0"/>' +
+        '</linearGradient></defs>' +
+        '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="4" fill="#F5A623"/>' +
+        '<text x="' + xAt(0).toFixed(1) + '" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif">' + fmtDate(days[0].date) + '</text>' +
+        '<text x="' + xAt(mid).toFixed(1) + '" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="middle">' + fmtDate(days[mid].date) + '</text>' +
+        '<text x="' + xAt(n - 1).toFixed(1) + '" y="176" font-size="10" fill="#A99C89" font-family="Inter, sans-serif" text-anchor="end">' + fmtDate(days[n - 1].date) + '</text>' +
+      '</svg>';
   }
 
   // Sample-data-only "Trending" label mirrors the pre-refactor mockup's two hardcoded "Trending"
@@ -1665,8 +1772,20 @@
       // honestly rather than silently swallowed (the local state stays changed either
       // way — reverting it on failure would fight the user's own click, so the failure
       // toast asks them to retry instead).
+      //
+      // 8.4: on success, overwrite m.assignedAt/assignedTo from the API's own response body
+      // (POST /api/mentions/{id}/assign returns "the updated mention") rather than leaving only
+      // the client's new Date().toISOString() guess in place - the server's timestamp is the
+      // real one (and is what CSV exports/other clients will see), so STATE should end up
+      // matching it exactly, not just "close enough."
       assignMention(m.id, assignee)
-        .then(() => showToast('Assigned to ' + assignee))
+        .then(updated => {
+          if (updated && typeof updated === 'object'){
+            if (updated.assignedTo != null) m.assignedTo = updated.assignedTo;
+            if (updated.assignedAt != null) m.assignedAt = updated.assignedAt;
+          }
+          showToast('Assigned to ' + assignee);
+        })
         .catch(() => showToast('Assigned to ' + assignee + ' locally — save failed, try again'));
     });
     btn.replaceWith(select);
@@ -1691,8 +1810,12 @@
       showToast('Alert resolved (demo)');
       return;
     }
+    // 8.4: same real-timestamp reconciliation as handleAssign() above.
     resolveMention(m.id)
-      .then(() => showToast('Alert resolved'))
+      .then(updated => {
+        if (updated && typeof updated === 'object' && updated.resolvedAt != null) m.resolvedAt = updated.resolvedAt;
+        showToast('Alert resolved');
+      })
       .catch(() => showToast('Alert resolved locally — save failed, try again'));
   }
 
@@ -1708,6 +1831,12 @@
       return;
     }
     Promise.allSettled(open.map(m => resolveMention(m.id))).then(results => {
+      // 8.4: same real-timestamp reconciliation, per-item (results[i] lines up with open[i]).
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value && typeof r.value === 'object' && r.value.resolvedAt != null){
+          open[i].resolvedAt = r.value.resolvedAt;
+        }
+      });
       const failed = results.filter(r => r.status === 'rejected').length;
       showToast(failed ? (failed + ' of ' + open.length + ' failed to save — try again') : 'All alerts resolved');
     });
@@ -2091,7 +2220,21 @@
     showToast(el.style.display === 'none' ? 'New mention added but hidden by current filters (demo)' : 'New mention detected (demo)');
   }
 
-  function exportMentionsCSV(){
+  // 8.3: live mode calls the real POST /api/exports/mentions_csv with the feed's current filter
+  // state as query params (currentMentionsExportParams()) and downloads its CSV response body
+  // directly; the pre-existing DOM-scrape (reading only currently-visible .feed-item rows) is
+  // kept as the demo-mode path, since sample data has no real API behind it to call.
+  async function exportMentionsCSV(){
+    if (!STATE.isDemoMode){
+      try {
+        const csvText = await exportCSVLive('mentions_csv', currentMentionsExportParams());
+        downloadCSVText('remedy-pulse-mentions.csv', csvText);
+      } catch (err){
+        if (err.status === 401) return handleUnauthorized();
+        showToast("Couldn't export — the server returned an error.");
+      }
+      return;
+    }
     const card = document.getElementById('mentionsFeedCard');
     const items = [...card.querySelectorAll('.feed-item')].filter(it => it.style.display !== 'none');
     const rows = [['Author', 'Source', 'Text', 'Sentiment', 'Reach']];
@@ -2109,7 +2252,13 @@
 
   function downloadCSV(filename, rows){
     const csv = rows.map(r => r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\r\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    downloadCSVText(filename, csv);
+  }
+
+  // Shared by the live-mode export path (8.3, already-formatted CSV text straight from the API
+  // response body) and downloadCSV() above (rows built client-side from the DOM).
+  function downloadCSVText(filename, csvText){
+    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -2119,6 +2268,36 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     showToast('Downloaded ' + filename);
+  }
+
+  // Converts a tab's date-filter chip state (dateMode/dateFrom/dateTo - the same three variables
+  // each of the Mentions/EMV tabs already track for their own client-side dataset filtering, see
+  // applyMentionFilters()/applyEmvFilters()) into {from, to} ISO params for the real export
+  // endpoint. Returns {} for 'all'/'All time' (no bound) - matches GET /api/mentions and
+  // GET /api/emv's own "omit for unbounded" convention (toQuery() drops null/undefined values).
+  function dateFilterToParams(dateMode, dateFrom, dateTo){
+    if (dateMode === 'custom' && dateFrom && dateTo){
+      return { from: dateFrom + 'T00:00:00Z', to: dateTo + 'T23:59:59Z' };
+    }
+    const days = { 'Last 7 days': 7, 'Last 30 days': 30, 'Last 90 days': 90 }[dateMode];
+    return days ? { from: cutoffDate(days).toISOString() } : {};
+  }
+
+  // Reverse of PLATFORM_DISPLAY, scoped to the Mentions tab's filter chip options only (the
+  // second raw value PLATFORM_DISPLAY maps to "Google", google_places_competitor, is a
+  // Competitors-tab-only kind that never appears in GET /api/mentions - see 7.2's kind='mention'
+  // default - so this reverse mapping is lossless for this one use).
+  const PLATFORM_FILTER_TO_SOURCE = {
+    Google: 'google_reviews', Reddit: 'reddit', Instagram: 'instagram',
+    Facebook: 'facebook', News: 'news_articles', TikTok: 'tiktok', X: 'x'
+  };
+
+  function currentMentionsExportParams(){
+    return Object.assign({
+      keyword: mentionSearchQuery.trim() || null,
+      platform: mentionPlatform === 'All' ? null : (PLATFORM_FILTER_TO_SOURCE[mentionPlatform] || null),
+      sentiment: mentionSentiment === 'All' ? null : mentionSentiment
+    }, dateFilterToParams(mentionDateMode, mentionDateFrom, mentionDateTo));
   }
 
   // =========================================================================
@@ -2265,7 +2444,20 @@
     showToast('Reply sent' + (STATE.isDemoMode ? ' (demo)' : ' — not saved, write API not wired yet'));
   }
 
-  function exportReviewsCSV(){
+  // 8.3: reviews_csv takes no filter params server-side (docs/api-contract.md - it's always
+  // every owned listing), so live mode is just a plain call + download; demo mode keeps the
+  // DOM-scrape since sample data has no API behind it.
+  async function exportReviewsCSV(){
+    if (!STATE.isDemoMode){
+      try {
+        const csvText = await exportCSVLive('reviews_csv');
+        downloadCSVText('remedy-pulse-reviews.csv', csvText);
+      } catch (err){
+        if (err.status === 401) return handleUnauthorized();
+        showToast("Couldn't export — the server returned an error.");
+      }
+      return;
+    }
     const rows = [['Listing', 'Rating', 'Reviews', 'Trend', 'Response rate', 'Status']];
     document.querySelectorAll('#view-reviews table tbody tr').forEach(tr => {
       const cells = [...tr.children].map(td => td.textContent.trim().replace(/\s+/g, ' '));
@@ -2782,7 +2974,25 @@
     }
   }
 
-  function exportEmvCSV(){
+  function currentEmvExportParams(){
+    return Object.assign({
+      outlet: emvOutlet === 'All' ? null : emvOutlet
+    }, dateFilterToParams(emvDateMode, emvDateFrom, emvDateTo));
+  }
+
+  // 8.3: same live/demo split as exportMentionsCSV() above, using the EMV tab's own filter chip
+  // state (emvOutlet/emvDateMode/...) via currentEmvExportParams().
+  async function exportEmvCSV(){
+    if (!STATE.isDemoMode){
+      try {
+        const csvText = await exportCSVLive('emv_csv', currentEmvExportParams());
+        downloadCSVText('remedy-pulse-emv.csv', csvText);
+      } catch (err){
+        if (err.status === 401) return handleUnauthorized();
+        showToast("Couldn't export — the server returned an error.");
+      }
+      return;
+    }
     const rows = [['Outlet', 'Article', 'Tier', 'Sentiment', 'Gross EMV', 'Net Favorable EMV']];
     document.querySelectorAll('#view-emv table tbody tr.emv-row').forEach(tr => {
       if (tr.style.display === 'none') return;
@@ -2866,6 +3076,7 @@
   function loadAllFromSample(){
     STATE.overview = JSON.parse(JSON.stringify(SAMPLE_DATA.overview));
     STATE.overview.clarityIndex.score = computeClarityIndex(getClarityIndexInputsFromSample());
+    STATE.overviewTrend = JSON.parse(JSON.stringify(SAMPLE_DATA.overviewTrend));
     STATE.mentions = JSON.parse(JSON.stringify(SAMPLE_DATA.mentions));
     STATE.reviews = normalizeReviews(JSON.parse(JSON.stringify(SAMPLE_DATA.reviews)));
     STATE.topics = SAMPLE_DATA.topics;
@@ -2948,6 +3159,18 @@
     renderMentionsTab();
     renderAlertsPanel();
   }
+  async function loadOverviewTrendTab(isRetry){
+    if (isRetry) STATE.tabError.overviewTrend = null;
+    if (!STATE.overviewTrend || isRetry) renderSentimentTrendChart();
+    try {
+      STATE.overviewTrend = await fetchOverviewTrend();
+      STATE.tabError.overviewTrend = null;
+    } catch (err){
+      if (err.status === 401) return handleUnauthorized();
+      STATE.tabError.overviewTrend = (err.status === 0) ? "Couldn't reach the API." : 'The server returned an error.';
+    }
+    renderSentimentTrendChart();
+  }
 
   async function initApp(){
     STATE.tabError = {};
@@ -2981,6 +3204,7 @@
       loadTopicsTab();
       loadCompetitorsTab();
       loadEmvTab();
+      loadOverviewTrendTab();
     } catch (err){
       if (err.status === 401){
         clearAuth();

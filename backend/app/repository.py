@@ -45,6 +45,7 @@ from app.models import (
     RunStatus,
     Sentiment,
 )
+from config import BACKFILL_WINDOW_DAYS
 
 
 def _upsert_insert(session: Session, values: dict[str, Any]):
@@ -580,10 +581,13 @@ def get_overview_stats(
     `source` filter says, matching the Clarity Index formula's own
     "Avg. Google Rating" input.
 
-    active_alerts_* counts Mention rows with alert_category set and
-    resolved_at IS NULL (still open) within the current period/filters -
-    "active" meaning "routed and not yet resolved," not merely "ever
-    routed.\""""
+    active_alerts_* counts kind=mention Mention rows with alert_category
+    set and resolved_at IS NULL (still open) within the current period/
+    filters - "active" meaning "routed and not yet resolved," not merely
+    "ever routed." Restricted to kind=mention so this count always
+    matches what the one alerts-list UI surface (GET /api/mentions, which
+    defaults to kind=mention) can actually show and resolve - see the
+    kind filter's own comment below for why."""
     base_conditions: list = []
     _apply_source_category(base_conditions, source_category)
     _apply_entity(base_conditions, entity)
@@ -629,7 +633,19 @@ def get_overview_stats(
     response_rates = [listing.response_rate_pct for listing in listings if listing.review_count > 0]
     avg_response_rate = sum(response_rates) / len(response_rates) if response_rates else 0.0
 
-    alert_conditions = now_conditions + [Mention.alert_category.isnot(None), Mention.resolved_at.is_(None)]
+    # Restricted to kind=mention (8.4 fix): classify_and_store() (app/classification.py) sets
+    # alert_category on ANY classified row with text, reviews included - but the one and only
+    # UI surface that lists/resolves alerts (GET /api/mentions, and therefore the mockup's alerts
+    # panel derived from it) defaults to kind=mention and can never show a kind=review row. Left
+    # unrestricted, a classified-negative review would silently inflate this KPI forever with no
+    # way to see or resolve it - reviews already have their own attention mechanism (the Reviews
+    # tab's pending-reply indicator, see docs/decisions/review-reply-flow.md), so this count
+    # matches exactly what's actually visible/actionable rather than diverging from it.
+    alert_conditions = now_conditions + [
+        Mention.kind == MentionKind.MENTION,
+        Mention.alert_category.isnot(None),
+        Mention.resolved_at.is_(None),
+    ]
     alert_rows = session.execute(
         select(Mention.alert_category, func.count()).where(*alert_conditions).group_by(Mention.alert_category)
     ).all()
@@ -831,7 +847,32 @@ def get_competitors_data(session: Session) -> CompetitorsData:
     google_places_competitor rows for one venue (the competitor's name,
     per fetch_competitor_ratings.py's own normalization - see 4.2).
     shareOfVoice/competitorSentiment use this same grouping so the two
-    cards are internally consistent with each other."""
+    cards are internally consistent with each other.
+
+    8.8's alias matching (config.BRAND_ALIASES, recovered from the
+    mockup's pre-refactor tooltips) is NOT applied inside this query, and
+    that is a real, deliberate scope boundary, not an oversight: alias
+    matching means "does this mention's TEXT contain one of these brand
+    variant strings," which only makes sense for a source that was
+    keyword-searched for brand mentions in the first place. Today, that
+    is exactly two sources - fetch_news_articles.py and
+    fetch_reddit_mentions.py, both of which now search
+    config.NEWS_SEARCH_TERMS / config.REDDIT_SEARCH_TERMS (already
+    extended with the recovered Remedy aliases) - so alias matching is
+    already doing its job at ingestion time for those two, by shaping
+    which items get ingested as Remedy mentions to begin with. It is NOT
+    yet applied the other direction - searching for COMPETITOR aliases so
+    a stray "just tried Aivee Skin Spa" mention gets correctly attributed
+    to Aivee's share of voice rather than going uningested entirely -
+    because no adapter currently keyword-searches for competitor names at
+    all (competitor data today is Google Places RATINGS only, matched by
+    place_id, never by text). Building that would mean extending the
+    news/Reddit adapters to also search config.BRAND_ALIASES's competitor
+    entries and tagging the resulting Mention rows with which brand they
+    matched - a real adapter-behavior change, not a query-layer fix, and
+    out of this pass's scope. Flagged here so the gap is visible at the
+    point someone would next touch this function, not just in a checklist
+    entry."""
     total = session.execute(select(func.count()).select_from(Mention)).scalar_one()
     remedy_condition = Mention.source != "google_places_competitor"
     remedy_count = session.execute(
@@ -952,3 +993,104 @@ def get_baseline_summary(session: Session) -> dict:
         "median_hours": statistics.median(with_reply) if with_reply else None,
         "mean_hours": statistics.mean(with_reply) if with_reply else None,
     }
+
+
+def is_within_backfill_window(published_at: datetime | None, *, now: datetime | None = None) -> bool:
+    """The v1 backfill policy (9.2, config.BACKFILL_WINDOW_DAYS): True if
+    `published_at` is recent enough to ingest, False if it's older than
+    the window and should be skipped entirely.
+
+    Lives here, not in app.jobs (the more obviously-named home), to avoid
+    a circular import: app/jobs/__init__.py imports every job submodule
+    (news_job.py, reddit_job.py, ...), and those same submodules need to
+    call this - putting it in app.jobs.__init__ would mean a job module
+    importing from a package whose own __init__.py hasn't finished
+    importing that job module yet.
+
+    A None `published_at` (some ingestion edge case where a source didn't
+    give one) is treated as within-window - excluding an item just
+    because its date is unknown would be a stranger policy than ingesting
+    it, and get_overview_stats()/get_reviews_listings() etc. already fall
+    back to ingested_at for rows with no published_at, so an undated item
+    still lands somewhere sensible downstream rather than needing a
+    second special case here.
+
+    Deliberately NOT applied to owned Google reviews (google_reviews_job.py
+    documents why at its own call site: a branch's Reviews-tab rating is
+    its TRUE, all-time Google rating, and filtering it would silently
+    understate that for no cost/volume benefit) or to competitor ratings
+    (google_places_job.py - a current-state snapshot, not a stream, so
+    "how far back" doesn't apply). Applied to the keyword-searched
+    discovery sources instead (news_job.py, reddit_job.py, meta_job.py),
+    where "how far back do we search" is the actual cost/volume question
+    the PRD's Non-Goal is about.
+
+    Every job that DOES apply this should call it per-item and skip (not
+    count toward items_seen/items_ingested) anything outside the window,
+    BEFORE calling record_ingestion() - not inside record_ingestion()
+    itself, because start_run()'s items_seen/items_ingested-based status
+    inference would otherwise read an intentional, expected exclusion as
+    a PARTIAL failure. An item genuinely outside the window was never a
+    candidate for this run in the first place."""
+    if published_at is None:
+        return True
+    now = now or datetime.now(timezone.utc)
+    if published_at.tzinfo is None:
+        published_at = published_at.replace(tzinfo=timezone.utc)
+    return published_at >= now - timedelta(days=BACKFILL_WINDOW_DAYS)
+
+
+def get_overview_trend(session: Session, *, days: int = 30) -> list[dict]:
+    """Backs GET /api/overview/trend (8.1 - closes the Overview tab's
+    Sentiment Trend chart, which had no backing endpoint at all when
+    Phase 7 shipped). See docs/api-contract.md for the exact response
+    shape this returns.
+
+    Bucketed by COALESCE(published_at, ingested_at) date, in Python
+    rather than SQL date-truncation, deliberately: this project's
+    established pattern (get_median_time_to_assignment(),
+    get_baseline_summary()) is to do this kind of aggregation in Python
+    when it keeps the logic identical across SQLite (tests) and Postgres
+    (production) rather than reaching for a dialect-specific date
+    function, and this project's stated volume (a few hundred items a
+    week) makes pulling the window's rows into Python genuinely cheap,
+    not a real performance concern.
+
+    A row with sentiment IS NULL (never classified) counts toward that
+    day's mentionCount but none of the three sentiment buckets - it must
+    not be silently forced into "Neutral," which would misrepresent an
+    unclassified item as a real judgment call the classifier never
+    actually made."""
+    days = min(days, 90)  # matches the PRD's own 90-day backfill cap (9.2)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    rows = session.execute(
+        select(Mention.published_at, Mention.ingested_at, Mention.sentiment).where(
+            func.coalesce(Mention.published_at, Mention.ingested_at) >= since
+        )
+    ).all()
+
+    buckets: dict[Any, dict[str, int]] = {}
+    for published_at, ingested_at, sentiment in rows:
+        effective = published_at or ingested_at
+        if effective is None:
+            continue  # shouldn't happen (ingested_at is NOT NULL), but never crash the chart over one bad row
+        day = effective.date()
+        bucket = buckets.setdefault(
+            day, {"mentionCount": 0, "positiveCount": 0, "neutralCount": 0, "negativeCount": 0}
+        )
+        bucket["mentionCount"] += 1
+        sentiment_str = _sentiment_value(sentiment)
+        if sentiment_str == Sentiment.POSITIVE:
+            bucket["positiveCount"] += 1
+        elif sentiment_str == Sentiment.NEUTRAL:
+            bucket["neutralCount"] += 1
+        elif sentiment_str == Sentiment.NEGATIVE:
+            bucket["negativeCount"] += 1
+        # else: sentiment is None (never classified) - counted in
+        # mentionCount above, deliberately not forced into any bucket.
+
+    return [
+        {"date": day.isoformat(), **counts}
+        for day, counts in sorted(buckets.items())
+    ]

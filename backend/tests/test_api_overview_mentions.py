@@ -150,6 +150,31 @@ def test_overview_active_alerts_excludes_resolved(client, auth_headers, sqlite_s
     assert body["activeAlerts"]["crisis"] == 1
 
 
+def test_overview_active_alerts_excludes_review_kind_rows(client, auth_headers, sqlite_session):
+    """8.4 regression: classify_and_store() (app/classification.py) sets alert_category on ANY
+    classified row with text, reviews included - but GET /api/mentions (the only UI surface that
+    lists/resolves alerts) defaults to kind=mention and can never show a kind=review row. Before
+    this fix, a classified-negative review here would have counted toward activeAlerts.total with
+    no way to ever see or resolve it through the alerts panel."""
+    sqlite_session.add_all(
+        [
+            Mention(
+                source="google_reviews", kind="review", external_id="rev-crisis",
+                alert_category="crisis", resolved_at=None, published_at=_now(),
+            ),
+            Mention(
+                source="reddit", kind="mention", external_id="t3_open",
+                alert_category="crisis", resolved_at=None, published_at=_now(),
+            ),
+        ]
+    )
+    sqlite_session.commit()
+
+    body = client.get("/api/overview", headers=auth_headers).json()
+    assert body["activeAlerts"]["total"] == 1  # only the kind=mention row
+    assert body["activeAlerts"]["crisis"] == 1
+
+
 def test_overview_custom_period_without_from_to_is_400(client, auth_headers):
     response = client.get("/api/overview", params={"period": "custom"}, headers=auth_headers)
     assert response.status_code == 400
@@ -167,6 +192,77 @@ def test_overview_no_data_yet_returns_zeroed_shape_not_error(client, auth_header
     body = response.json()
     assert body["totalMentions"]["value"] == 0
     assert body["lastSyncedAt"] is None
+
+
+# --- GET /api/overview/trend (8.1) ---
+
+
+def test_overview_trend_requires_auth(client):
+    response = client.get("/api/overview/trend")
+    assert response.status_code == 401
+
+
+def test_overview_trend_buckets_by_day_and_sentiment(client, auth_headers, sqlite_session):
+    today = _now()
+    yesterday = today - timedelta(days=1)
+    sqlite_session.add_all(
+        [
+            Mention(source="google_reviews", kind="review", external_id="r1", published_at=today, sentiment="Positive"),
+            Mention(source="google_reviews", kind="review", external_id="r2", published_at=today, sentiment="Negative"),
+            Mention(source="reddit", kind="mention", external_id="m1", published_at=yesterday, sentiment="Neutral"),
+            # Never classified - must count toward mentionCount but no sentiment bucket.
+            Mention(source="reddit", kind="mention", external_id="m2", published_at=yesterday, sentiment=None),
+        ]
+    )
+    sqlite_session.commit()
+
+    response = client.get("/api/overview/trend", headers=auth_headers)
+    assert response.status_code == 200
+    days = {d["date"]: d for d in response.json()["days"]}
+
+    today_bucket = days[today.date().isoformat()]
+    assert today_bucket["mentionCount"] == 2
+    assert today_bucket["positiveCount"] == 1
+    assert today_bucket["negativeCount"] == 1
+    assert today_bucket["neutralCount"] == 0
+
+    yesterday_bucket = days[yesterday.date().isoformat()]
+    assert yesterday_bucket["mentionCount"] == 2
+    assert yesterday_bucket["neutralCount"] == 1
+    # The unclassified row counts toward mentionCount but not any sentiment
+    # bucket - 1 (Neutral) + 0 + 0 = 1, not 2, even though mentionCount is 2.
+    assert yesterday_bucket["positiveCount"] == 0
+    assert yesterday_bucket["negativeCount"] == 0
+
+
+def test_overview_trend_excludes_rows_older_than_the_days_param(client, auth_headers, sqlite_session):
+    old = _now() - timedelta(days=40)
+    sqlite_session.add(
+        Mention(source="google_reviews", kind="review", external_id="old1", published_at=old, sentiment="Positive")
+    )
+    sqlite_session.commit()
+
+    response = client.get("/api/overview/trend", params={"days": 30}, headers=auth_headers)
+    assert response.status_code == 200
+    assert old.date().isoformat() not in {d["date"] for d in response.json()["days"]}
+
+
+def test_overview_trend_days_param_rejects_over_90(client, auth_headers):
+    # Query(30, ge=1, le=90) makes FastAPI reject out-of-range values with its
+    # standard 422, rather than silently clamping - matches this project's
+    # existing convention for other bounded query params, and the contract's
+    # "days (int, default 30, max 90)" doesn't call for clamping instead.
+    response = client.get("/api/overview/trend", params={"days": 365}, headers=auth_headers)
+    assert response.status_code == 422
+
+    response = client.get("/api/overview/trend", params={"days": 90}, headers=auth_headers)
+    assert response.status_code == 200
+
+
+def test_overview_trend_no_data_yet_returns_empty_list_not_error(client, auth_headers):
+    response = client.get("/api/overview/trend", headers=auth_headers)
+    assert response.status_code == 200
+    assert response.json()["days"] == []
 
 
 # --- GET /api/mentions ---

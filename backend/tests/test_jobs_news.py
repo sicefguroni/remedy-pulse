@@ -8,7 +8,7 @@ http_utils.get_with_retry — nothing in this file makes a real network
 call.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -16,13 +16,21 @@ import app.jobs.news_job as news_job
 from app.models import IngestionRun, Mention, RunStatus
 from http_utils import RetryExhaustedError
 
+# A relative "5 days ago" timestamp, computed at import time - NOT a
+# hardcoded absolute date. Phase 8's 9.2 backfill window
+# (is_within_backfill_window(), 90 days) filters items by real wall-clock
+# time, so a fixture pinned to a fixed calendar date silently ages out of
+# that window the longer this test suite exists (see the identical fix
+# in test_jobs_meta.py, where a hardcoded date HAD already aged out).
+_RECENT_PUBLISHED_AT = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 def _raw_article(outlet="Rappler", url="https://rappler.com/a1", title="Remedy BGC clinic review"):
     return {
         "title": title,
         "description": "A look at the new Rejuran treatment.",
         "url": url,
-        "publishedAt": "2026-06-29T09:03:00Z",
+        "publishedAt": _RECENT_PUBLISHED_AT,
         "source": {"name": outlet, "url": "https://rappler.com"},
     }
 
@@ -65,7 +73,11 @@ def test_run_success_ingests_articles_and_records_success_run(sqlite_session, mo
     # SQLite doesn't round-trip tzinfo on a DateTime(timezone=True) column
     # (Postgres does — see test_app_repository_postgres.py), so compare the
     # naive value here; the job itself builds a tz-aware datetime either way.
-    assert rappler.published_at.replace(tzinfo=None) == datetime(2026, 6, 29, 9, 3, 0)
+    # Compared against _RECENT_PUBLISHED_AT (not a hardcoded literal) since
+    # that's what _raw_article() actually put on this article - see that
+    # fixture's own comment for why it's relative-to-now, not fixed.
+    expected_published_at = datetime.strptime(_RECENT_PUBLISHED_AT, "%Y-%m-%dT%H:%M:%SZ")
+    assert rappler.published_at.replace(tzinfo=None) == expected_published_at
     assert rappler.raw_payload["url"] == "https://rappler.com/a1"
 
     philstar = next(m for m in mentions if m.url == "https://philstar.com/a2")

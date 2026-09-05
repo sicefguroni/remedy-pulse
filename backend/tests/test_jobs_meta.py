@@ -9,7 +9,7 @@ meta_job imports, so only the job-wrapper logic (ledger writes,
 record_ingestion calls, dedup key selection) is under test.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -23,13 +23,26 @@ ALL_LEDGER_SOURCES = (
     meta_job.LEDGER_SOURCE_FACEBOOK_COMMENTS,
 )
 
+# A relative "5 days ago" timestamp, computed at import time - NOT a
+# hardcoded absolute date. Phase 8's 9.2 backfill window
+# (is_within_backfill_window(), 90 days) filters items by real wall-clock
+# time, so a fixture pinned to a fixed calendar date silently ages out of
+# that window the longer this test suite exists (exactly what happened
+# here on review: an original "2026-06-01" default had already aged past
+# 90 days from the actual date this fixture was checked against, breaking
+# 4 previously-passing tests for a reason with nothing to do with what
+# they were actually testing).
+_RECENT_DATE = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 def _result(status, items=None, error=None):
     return {"status": status, "items": items or [], "error": error}
 
 
 def _item(*, comment_id=None, media_id=None, author="masked", text="hello",
-          url="https://instagram.com/p/x", venue="comment_on_own_post", date="2026-06-01T00:00:00Z"):
+          url="https://instagram.com/p/x", venue="comment_on_own_post", date=None):
+    if date is None:
+        date = _RECENT_DATE
     raw = {}
     if comment_id:
         raw["comment_id"] = comment_id
@@ -146,8 +159,12 @@ def test_run_records_independent_ledger_rows_per_capability(sqlite_session, monk
     # published_at must land as a real datetime, not the raw ISO string -
     # Mention.published_at is a DateTime column. SQLite (unlike Postgres)
     # doesn't round-trip tzinfo, so compare naive - same pattern
-    # test_jobs_news.py already uses for the identical reason.
-    assert mentions[0].published_at.replace(tzinfo=None) == datetime(2026, 6, 1)
+    # test_jobs_news.py already uses for the identical reason. Compared
+    # against _RECENT_DATE (not a hardcoded literal) since that's what
+    # _item()'s default actually put on this item - see that fixture's
+    # own comment for why it's relative-to-now, not fixed.
+    expected_published_at = datetime.strptime(_RECENT_DATE, "%Y-%m-%dT%H:%M:%SZ")
+    assert mentions[0].published_at.replace(tzinfo=None) == expected_published_at
 
 
 # --- Mention.source split: both IG capabilities share "instagram" ---

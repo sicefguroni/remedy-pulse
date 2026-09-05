@@ -72,3 +72,12 @@ JOBS = [
     meta_instagram_mentions_job,
     meta_facebook_comments_job,
 ]
+
+# 9.2's is_within_backfill_window() lives in app.repository, NOT here,
+# despite this being the more obviously-named home for it - a job module
+# (e.g. news_job.py) importing it from here would be a circular import,
+# since this __init__.py imports that same job module a few lines above
+# (Python can't finish initializing app.jobs before news_job.py's own
+# `from app.jobs import is_within_backfill_window` could resolve). See
+# app.repository.is_within_backfill_window's docstring for the function
+# itself.

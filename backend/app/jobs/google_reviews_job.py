@@ -134,6 +134,22 @@ def run(session: Session) -> None:
                     retry_errors.append(f"{listing_name}: {exc}")
                     continue
 
+                # 9.2's backfill policy (config.BACKFILL_WINDOW_DAYS) is
+                # deliberately NOT applied to owned reviews here - see
+                # app.jobs.is_within_backfill_window's own docstring for
+                # the general rule, but this source is the documented
+                # exception to it: a branch's Reviews-tab rating/count is
+                # the branch's TRUE, all-time Google rating, matching what
+                # a customer sees on the actual listing page. Filtering
+                # reviews older than 90 days would silently understate
+                # both, for no cost/volume benefit (this endpoint already
+                # returns the full history in one bounded paginated call
+                # regardless of any filter applied after the fact). The
+                # PRD's "no deep historical backfill" Non-Goal reads as
+                # being about search/discovery-volume sources (Reddit,
+                # news, Meta) where "how far back do we search" is a real
+                # cost/volume question - not about truncating a known
+                # entity's own current-state data.
                 normalized = normalize_reviews(listing_name, raw_reviews)
                 for raw_review, item in zip(raw_reviews, normalized):
                     run_recorder.items_seen += 1
