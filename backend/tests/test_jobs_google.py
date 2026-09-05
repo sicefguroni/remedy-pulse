@@ -88,7 +88,7 @@ def test_reviews_job_happy_path_ingests_and_marks_success(sqlite_session, monkey
     assert mention.raw_payload == raw
     # SQLite has no native tz-aware storage - DateTime(timezone=True) round-
     # trips as a naive datetime on this backend (Postgres keeps the offset;
-    # see docs/decisions/persistence-choice.md), so compare the naive value.
+    # see docs/decisions/05-persistence-choice.md), so compare the naive value.
     assert mention.published_at.replace(tzinfo=None) == datetime(2026, 8, 1, 10, 0, 0)
 
     run_row = sqlite_session.execute(select(IngestionRun)).scalar_one()

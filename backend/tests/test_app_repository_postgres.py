@@ -3,7 +3,7 @@ a REAL Postgres database — the SQLite-backed tests in
 test_app_repository.py cover the same logic through a different SQL
 dialect (see app.repository._upsert_insert), and Postgres is the only
 dialect this project actually ships against (see
-docs/decisions/persistence-choice.md). This file is what actually proves
+docs/decisions/05-persistence-choice.md). This file is what actually proves
 the Postgres ON CONFLICT DO UPDATE statement works, not just that an
 analogous SQLite statement does.
 

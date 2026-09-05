@@ -16,7 +16,7 @@ Repo verification (this session, case-insensitive grep across the whole repo exc
 - `reddit` (any case): the only repo hits are (a) documentation/checklist text describing the gap, (b) the mockup rendering a single static Reddit feed item (`remedy-pulse-mockup.html:679-686`, `u/skinseeker_mnl` in `r/PhilippinesSkincare`), and (c) the disclaimer text in `docs/README-Remedy-Pulse-Demo.md` ("Nothing is connected to real Google, Instagram, X, Reddit, or news data yet").
 - No Reddit ingestion code, no schema field for a stored source ID, no scheduled job, and no deletion-check logic exist anywhere in the repo.
 
-There is consequently **no Reddit ingestion pipeline to attach a deletion job to today** — see `docs/decisions/reddit-integration-status.md` for that gap in full. This document is scoped only to the retention/deletion obligation itself.
+There is consequently **no Reddit ingestion pipeline to attach a deletion job to today** — see `docs/decisions/04-reddit-integration-status.md` for that gap in full. This document is scoped only to the retention/deletion obligation itself.
 
 ## The nature of the obligation
 
@@ -47,7 +47,7 @@ Between A and B, the reasoning turns on how tightly the team can commit to and h
 
 ## Recommendation
 
-Recommend **Option A or a tightly-dated Option B** — the team should pick between these two, not treat the deletion worker as generically lower priority than ingestion. Whichever is chosen, the commitment must be dated and tracked in the roadmap (today's roadmap has no Reddit line item at all — see `docs/decisions/reddit-integration-status.md`), and no production Reddit ingestion run should occur before the retention mechanism (or its committed, dated follow-up) exists, per the roadmap's own Phase 5 hard constraint.
+Recommend **Option A or a tightly-dated Option B** — the team should pick between these two, not treat the deletion worker as generically lower priority than ingestion. Whichever is chosen, the commitment must be dated and tracked in the roadmap (today's roadmap has no Reddit line item at all — see `docs/decisions/04-reddit-integration-status.md`), and no production Reddit ingestion run should occur before the retention mechanism (or its committed, dated follow-up) exists, per the roadmap's own Phase 5 hard constraint.
 
 ## What would change this recommendation
 

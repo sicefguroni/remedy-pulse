@@ -4,7 +4,7 @@ GNews API and writes a normalized JSON file:
   news_articles.json -> {"fetchedAt": <ISO-8601 UTC>, "articles": [...]}
 
 This is the engineering half of checklist item 1.5 / decision doc
-docs/decisions/news-press-ingestion-path.md: the EMV tab in
+docs/decisions/02-news-press-ingestion-path.md: the EMV tab in
 remedy-pulse-mockup.html is built entirely on press coverage, and before
 this script there was no code, key, or config for any news source at all
 — the decision doc recommends a time-boxed GNews evaluation, and this
@@ -22,7 +22,7 @@ IMPORTANT — what this script does and does NOT do:
   calls, not facts a connector can fetch. Computing EMV from these raw
   articles is separate downstream work, the same way Clarity Index is
   computed from inputs rather than fetched (see
-  docs/decisions/clarity-index-formula.md for the same pattern).
+  docs/decisions/01-clarity-index-formula.md for the same pattern).
 - It maps each outlet to a Rate Card tier (National News / Lifestyle Mag
   / Broadcast TV) ONLY for the six outlets already hardcoded in the
   mockup's sample EMV rows (config.OUTLET_TIER_MAP) — matching business

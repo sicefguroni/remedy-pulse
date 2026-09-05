@@ -47,7 +47,7 @@ def _cadence_for(source: str) -> float:
 def _as_aware_utc(dt: datetime) -> datetime:
     """Mention/IngestionRun's timestamp columns are declared
     DateTime(timezone=True), but SQLite (the test backend - see
-    docs/decisions/persistence-choice.md) has no native tz-aware storage
+    docs/decisions/05-persistence-choice.md) has no native tz-aware storage
     and silently hands back a naive datetime, while Postgres (production)
     correctly round-trips the UTC offset. Every timestamp this project
     writes is UTC regardless of dialect, so a naive value read back is

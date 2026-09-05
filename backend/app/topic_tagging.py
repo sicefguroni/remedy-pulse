@@ -1,6 +1,6 @@
 """topic_tagging.py — LLM-based topic TAGGING against a fixed taxonomy (6.5).
 
-Read docs/decisions/topic-tagging-approach.md before touching this file —
+Read docs/decisions/11-topic-tagging-approach.md before touching this file —
 it explains the scoping decision this module implements: tagging each
 item against a known, fixed five-topic list (facial-results,
 staff-service, rejuran, pricing, booking — the mockup's own

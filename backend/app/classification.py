@@ -2,7 +2,7 @@
 routing (Phase 6: 6.1 the classifier, 6.2 reconciling the two sentiment
 definitions, 6.3 the alert-routing rules).
 
-See `docs/decisions/sentiment-classifier-choice.md` for the model choice,
+See `docs/decisions/09-sentiment-classifier-choice.md` for the model choice,
 the proposed precision/recall bar, and why this is a *recommendation* for
 the team to ratify — same status as every other `docs/decisions/*.md` in
 this repo — not a unilateral technical decision that also happens to bind
@@ -92,7 +92,7 @@ load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
-# See docs/decisions/sentiment-classifier-choice.md for why this model.
+# See docs/decisions/09-sentiment-classifier-choice.md for why this model.
 MODEL_ID = "claude-opus-5"
 MAX_TOKENS = 1024
 # Opus 5 runs adaptive thinking ON by default (unlike Opus 4.8/4.7) - "low"

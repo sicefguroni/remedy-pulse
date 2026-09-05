@@ -21,7 +21,7 @@ Where to find each ID:
   wrong location.
 
 - GNews API key (news/press ingestion — see
-  docs/decisions/news-press-ingestion-path.md for why GNews specifically):
+  docs/decisions/02-news-press-ingestion-path.md for why GNews specifically):
   Sign up at https://gnews.io — the free tier is self-serve (no approval
   wait, unlike Business Profile/Places), capped at 100 requests/day and
   articles from roughly the last month. Paste the key into .env as
@@ -181,8 +181,8 @@ OUTLET_TIER_MAP = {
 # ---------------------------------------------------------------------------
 # Reddit mentions ingestion (checklist 4.3, 5.1, 5.2, 5.3 — see
 # backend/fetch_reddit_mentions.py's module docstring for the connector
-# itself, docs/decisions/reddit-integration-status.md and
-# docs/decisions/reddit-deletion-propagation.md for why this exists and
+# itself, docs/decisions/04-reddit-integration-status.md and
+# docs/decisions/03-reddit-deletion-propagation.md for why this exists and
 # what it does/doesn't cover yet). This block is additive only — nothing
 # above this line was changed to add it.
 #
