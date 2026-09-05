@@ -131,3 +131,11 @@ def test_protected_endpoint_with_wrong_scheme_returns_401_unauthorized(client, s
     response = client.get("/api/overview", headers={"Authorization": f"Token {token}"})
     assert response.status_code == 401
     assert response.json() == {"error": "unauthorized"}
+
+
+def test_health_needs_no_auth(client):
+    # Deploy runbook's liveness probe (docs/runbook-deploy-free-tier.md) - no
+    # Authorization header, and not under /api like every real resource.
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

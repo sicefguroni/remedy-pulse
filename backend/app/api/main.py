@@ -58,6 +58,19 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content=exc.payload)
 
 
+@app.get("/health")
+def health():
+    """No auth, no DB touch, not under /api - a plain liveness probe for
+    whatever's watching this process (an uptime pinger keeping a
+    free-tier host from sleeping, a platform's own health check before
+    routing traffic to it). Deliberately this simple: this project's own
+    "say so in the code, or someone will over-build it" rule (4.6) - a
+    /ready variant that also checks the database is a real option later
+    if a genuine need for it shows up, not preemptively. See
+    docs/runbook-deploy-free-tier.md."""
+    return {"status": "ok"}
+
+
 for _router in (
     auth_routes.router,
     overview_routes.router,

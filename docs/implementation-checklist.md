@@ -4,7 +4,7 @@
 
 **Generated:** 2026-09-03 · fresh run
 **Sources:** `remedy-pulse-prd.md`, `remedy-pulse-roadmap.md`, `remedy-pulse-mockup.html`, `backend/`, `docs/Remedy Pulse_Reddit Data Access_Use Case.pdf`
-**Progress:** 62 / 79
+**Progress:** 64 / 79
 
 ---
 
@@ -326,7 +326,7 @@ One thing caught and fixed during review, worth recording as an example of why c
 
 ## Phase 4 — Ingestion adapters
 
-**Status (2026-09-04): 4.1, 4.2, 4.3, 4.4, 4.5, 4.6 closed on branch `phase-3-instrumentation`; 4.7 is a stopgap, left open.** `backend/app/jobs/` wires every connector (Google reviews, Google Places, GNews, Reddit, Instagram ×2, Facebook) into the Phase 2/3 ledger/repository via a shared contract (`SOURCE_NAME` + `run(session)`, documented in `app/jobs/__init__.py`), plus `scheduler.py` (4.6, deliberately simple per this phase's own instruction) and `status_report.py`. **Reddit and Meta adapters are built and tested against mocks but not live-verified** — no credentials exist for either (Phase 1's Reddit commercial-tier and Meta App Review approvals are both still open) — see `backend/README.md`'s "Ingestion adapters" section for exactly what's pending before either goes live. 4.7 (`status_report.py`) is an explicit stopgap, not the real fix — that needs Phase 7's API layer to exist first, so it stays unchecked below. 214 tests pass (`pytest backend/tests/`), ruff clean, migration verified against real Postgres (new `users` table from 5.5, see Phase 5's status note).
+**Status (2026-09-04, updated 2026-09-05): 4.1–4.7 all closed.** `backend/app/jobs/` wires every connector (Google reviews, Google Places, GNews, Reddit, Instagram ×2, Facebook) into the Phase 2/3 ledger/repository via a shared contract (`SOURCE_NAME` + `run(session)`, documented in `app/jobs/__init__.py`), plus `scheduler.py` (4.6, deliberately simple per this phase's own instruction) and `status_report.py`. **Reddit and Meta adapters are built and tested against mocks but not live-verified** — no credentials exist for either (Phase 1's Reddit commercial-tier and Meta App Review approvals are both still open) — see `backend/README.md`'s "Ingestion adapters" section for exactly what's pending before either goes live. 4.7's real fix (not `status_report.py`'s stopgap) needed Phase 7's API layer to exist first; once Phase 7/8 built `GET /api/status` and the mockup's data layer, 4.7 closed by wiring a real per-source-failure banner into the mockup (see 4.7's own status note). 313 tests pass (`pytest backend/tests/`), ruff clean, migration verified against real Postgres.
 
 - [x] **4.1 · Harden the Google owned-reviews connector into a scheduled job**
   Depends on 0.2, 0.3, 0.6, and 1.1. The normalize/aggregate logic is sound and reusable; the runner around it is not.
@@ -351,9 +351,10 @@ One thing caught and fixed during review, worth recording as an example of why c
   The PRD scopes v1 at same-day/next-day freshness, not real-time — so this can be simple. Say so in the code, or someone will over-build it.
   **Effort:** M · **Requirement:** P0-1 · **Skip risk:** Ingestion runs when someone remembers to run it · HIGH
 
-- [ ] **4.7 · Surface per-source failures in the UI, not just in logs**
+- [x] **4.7 · Surface per-source failures in the UI, not just in logs**
   The other half of 0.2. A failed source must be visible to the marketing team, not only to whoever reads stderr.
   **Effort:** M · **Requirement:** P0-11 · **Skip risk:** Silent partial outages presented as complete data · HIGH
+  **Status:** Done. `GET /api/status` (Phase 7) already returned `lastStatus`/`lastError` per source, but nothing in the mockup ever surfaced it beyond computing the sync pill's timestamp — `renderDataSourceBanner()` now shows a coral banner (visible on every tab, same element the demo-mode notice already used, mutually exclusive with it) naming the failing source(s) and the real error text when any source's `lastStatus` is `error`/`access_denied`, and a softer note for `partial`. Verified against a real API + Postgres with a genuinely errored ingestion run.
 
 ---
 
@@ -361,7 +362,7 @@ One thing caught and fixed during review, worth recording as an example of why c
 
 **Hard constraint: nothing in this phase may be deferred past the first production ingestion run against real data.** Not past launch — past the first real run. Once third-party content is in your store, 5.1 is already overdue and 5.3 has already happened.
 
-**Status (2026-09-04): 5.1, 5.2, 5.3, 5.7, 5.8 closed; 5.4, 5.5, 5.6 left open — each genuinely blocked on something this session cannot produce.** 5.1/5.2 (`reddit_deletion_job.py`, the User-Agent format) and 5.3 (masking extended to Reddit/Instagram/Facebook — see `backend/README.md`) are built and tested, same live-credential caveat as Phase 4. 5.7: `pip-audit` is now a CI step, and it found and fixed 3 real CVEs in `requests`/`python-dotenv` during this pass — not just wired in, actually used (the "whatever the frontend build ends up being" half doesn't apply — the mockup has no build step per Phase 0's findings). 5.8: `docs/decisions/07-reddit-c4-no-resale-control.md` is the documented control this item asks for. **Left open, with reasoning documented in each area:** 5.4 needs the actual `RemedyPulseSpec_1` document, which doesn't exist in this repo — `docs/decisions/06-ph-data-privacy-act-review.md` documents the gap precisely rather than fabricating a legal review. 5.5's auth *primitives* are built and verified against real Postgres (`app/auth.py`, a new `users` table) but there's no HTTP framework yet for a login route to attach to (Phase 7) — "add authentication to the dashboard" isn't fully true until that exists. 5.6's `docs/decisions/08-secrets-at-rest.md` recommends an approach but stays generic pending the still-undecided hosting/vendor choice.
+**Status (2026-09-04, updated 2026-09-05): 5.1, 5.2, 5.3, 5.5, 5.7, 5.8 closed; 5.4, 5.6 left open — each genuinely blocked on something this session cannot produce.** 5.1/5.2 (`reddit_deletion_job.py`, the User-Agent format) and 5.3 (masking extended to Reddit/Instagram/Facebook — see `backend/README.md`) are built and tested, same live-credential caveat as Phase 4. 5.7: `pip-audit` is now a CI step, and it found and fixed 3 real CVEs in `requests`/`python-dotenv` during this pass — not just wired in, actually used (the "whatever the frontend build ends up being" half doesn't apply — the mockup has no build step per Phase 0's findings). 5.8: `docs/decisions/07-reddit-c4-no-resale-control.md` is the documented control this item asks for. **5.5 (updated 2026-09-05):** left open at the time of this note because "there's no HTTP framework yet for a login route to attach to (Phase 7)" — Phase 7 subsequently built exactly that, so this is now genuinely done; the checkbox below was simply never revisited until now. **Left open, with reasoning documented in each area:** 5.4 needs the actual `RemedyPulseSpec_1` document, which doesn't exist in this repo — `docs/decisions/06-ph-data-privacy-act-review.md` documents the gap precisely rather than fabricating a legal review. 5.6's `docs/decisions/08-secrets-at-rest.md` recommends an approach but stays generic pending the still-undecided hosting/vendor choice.
 
 - [x] **5.1 · Reddit deletion-propagation worker (implements 0.7)**
   Scheduled re-check of stored source IDs; delete local copies of content deleted upstream, within 48 hours.
@@ -379,9 +380,10 @@ One thing caught and fixed during review, worth recording as an example of why c
   `mask_reviewer_name()` cites *"spec §11."* That spec (`RemedyPulseSpec_1`, referenced in the mockup footer and in §§5.5, 6.3, 6.4, 9.2, 10, 18) **is not in this repo.** Get it into `docs/` — several code comments are traceable only to a document nobody working from this repo can read.
   **Effort:** M·risky · **Requirement:** — · **Skip risk:** Legal exposure, and code decisions justified by a document that cannot be checked · CRITICAL
 
-- [ ] **5.5 · Add authentication to the dashboard**
+- [x] **5.5 · Add authentication to the dashboard**
   There is none, and the PRD never mentions it. The success metrics assume login events exist to count (3.1).
   **Effort:** M · **Requirement:** — · **Skip risk:** Competitor intelligence, unpublished press valuations, and patient review content readable by anyone with the URL · CRITICAL
+  **Status:** Done — checkbox retroactively corrected. This item's own Phase 5 status note explained it was left open only because "there's no HTTP framework yet for a login route to attach to (Phase 7)" — Phase 7 built exactly that (`POST /api/auth/login`, `Authorization: Bearer` on every other route, the mockup's login modal), closing the one thing this was waiting on. Not new work this pass; the checkbox was simply never revisited when Phase 7 shipped.
 
 - [ ] **5.6 · Secrets at rest: `token.json` is a live refresh token**
   `oauth_setup.py:54` says so explicitly — *"Keep this file out of version control — it's a live credential."* `.gitignore` covers it correctly today. Decide where it lives in production, because a file next to the code is not it.
