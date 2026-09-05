@@ -8,12 +8,17 @@ the team to ratify — same status as every other `docs/decisions/*.md` in
 this repo — not a unilateral technical decision that also happens to bind
 the team's acceptable-risk threshold for the alert workflow.
 
-Model provider: Groq (`llama-3.3-70b-versatile`), switched from Claude
-Opus 5 on explicit user direction — see the decision doc's "Update
+Model provider: Groq (`openai/gpt-oss-120b`), switched from Claude Opus
+5 on explicit user direction — see the decision doc's "Update
 (2026-09-05)" section for why (cost: Anthropic has no real free tier,
 unlike everything else this project runs on) and what that trade-off
 actually costs in classification quality, honestly, rather than assumed
-away.
+away. `llama-3.3-70b-versatile` (the model this switch first landed
+with) was deprecated/removed from Groq's lineup by the time a real API
+key existed to test against — caught by a live smoke test (a 404
+`model_not_found`), not assumed working from documentation. See the
+same "Update" section for the real Taglish crisis/digest test cases
+that verified `openai/gpt-oss-120b` in its place.
 
 --- 6.1: one call does both sentiment AND crisis/digest routing ---
 
@@ -100,7 +105,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # See docs/decisions/09-sentiment-classifier-choice.md for why this model.
-MODEL_ID = "llama-3.3-70b-versatile"
+MODEL_ID = "openai/gpt-oss-120b"
 MAX_TOKENS = 1024
 
 VALID_SENTIMENTS = {"Positive", "Neutral", "Negative"}

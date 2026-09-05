@@ -41,7 +41,7 @@ set on an already-working deployment), not a redo.
 | News/press | **GNews** | Free tier, self-serve, no approval wait | Already the 1.5 decision's pick |
 | Reddit | **Reddit "script" app** | Free, self-serve, no approval wait | Distinct from the elevated commercial tier 1.2 is still waiting on |
 | Competitor ratings | **Google Places API** | Free monthly credit | Needs a Cloud **billing account attached** even though usage stays inside the free credit — §3 |
-| Sentiment/topic classification | **Groq API** (`llama-3.3-70b-versatile`) | Free, generous at this project's volume | Self-serve, no approval wait — see §3 |
+| Sentiment/topic classification | **Groq API** (`openai/gpt-oss-120b`) | Free tier: 30 RPM / 8K TPM / 1K RPD | Self-serve, no approval wait — see §3 |
 | Owned reviews | Google Business Profile API | — | Stage 2, gated on 1.1 |
 | Instagram/Facebook | Meta Graph API | — | Stage 2, gated on 1.3 |
 
@@ -125,12 +125,18 @@ repo secrets) is in the table at the end of this section.
    comfortably inside Groq's free-tier rate limits at this project's
    stated volume (a few hundred items a week).
 
-   > ⚠️ **The free tier still has real rate limits** (requests/tokens
-   > per minute, and per day) — generous for this project's stated
-   > volume, not unlimited. If `app/scheduler.py`'s hourly run ever logs
-   > a `RateLimitError` from `classify_unclassified_batch()`, that's the
-   > signal to either space the schedule out further or move to a paid
-   > Groq tier — not a sign anything is broken.
+   > ⚠️ **The free tier still has real rate limits.** `openai/gpt-oss-120b`
+   > (`app/classification.py`'s `MODEL_ID`) is on Groq's free plan at
+   > **30 requests/min, 8K tokens/min, 1K requests/day** — confirmed
+   > against a real key's own rate-limit response headers, not just
+   > Groq's docs. At this project's stated volume (a few hundred items a
+   > week) that's comfortably inside the daily cap; it's the per-minute
+   > caps a burst of unclassified items (a backlog after downtime, say)
+   > could actually hit. If `app/scheduler.py`'s hourly run ever logs a
+   > `RateLimitError` from `classify_unclassified_batch()`, that's the
+   > signal to lower its `limit` argument, space the schedule out
+   > further, or move to a paid Groq tier — not a sign anything is
+   > broken.
 
 6. **Generate `SESSION_SECRET_KEY`.**
    ```

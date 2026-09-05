@@ -20,11 +20,42 @@ a different model"): an explicit user instruction naming a different provider is
 named exception, not an override to push back on.
 
 **What changed:** `app/classification.py` and `app/topic_tagging.py` now call Groq's API
-(`llama-3.3-70b-versatile`) instead of Claude Opus 5, via the official `groq` Python SDK
+(`openai/gpt-oss-120b`) instead of Claude Opus 5, via the official `groq` Python SDK
 (`groq==1.7.0`, installed and its client shape — `Groq`, `chat.completions.create`,
 `APIError` — inspected directly against that exact pin before wiring it in, not guessed
 from documentation). `GROQ_API_KEY` replaces `ANTHROPIC_API_KEY` everywhere this project
 reads it (`.env.example`, the GitHub Actions scheduler workflow, `backend/README.md`).
+
+**Model correction, found by a live test, not assumed working:** this switch first landed
+with `llama-3.3-70b-versatile` — a real, currently-documented Groq model at the time this
+was written, picked as the closest equivalent to a "flagship" tier. The moment a real
+`GROQ_API_KEY` existed and this code was actually run against it, that call failed with a
+live `404 model_not_found` — Groq had deprecated/removed that model from this account's
+available lineup since. `client.models.list()` against the real key showed what's actually
+available today; `openai/gpt-oss-120b` (the largest general-purpose instruction model in
+that list) was verified — not assumed — to work correctly with this module's exact JSON-mode
+call shape, then re-tested against the module's own real code path (not a standalone script)
+on four realistic cases spanning the full range this classifier has to handle:
+
+| Input | Sentiment | `alert_category` | Correct? |
+|---|---|---|---|
+| Taglish, infection + pus after a Rejuran treatment | Negative (0.98) | crisis | Yes — patient safety |
+| English, glowing praise for staff and results | Positive (0.98) | digest | Yes |
+| English, mild wait-time complaint, still returning | Neutral (0.78) | digest | Yes — correctly NOT escalated to crisis |
+| Taglish, routine pricing question | Neutral (0.96) | digest | Yes |
+
+`tag_topics()` was verified the same way (multi-topic, single-topic, and zero-topic cases
+against the module's real code, not a mock). This is a real, live end-to-end verification —
+the kind the original PR (before a `GROQ_API_KEY` existed) could not do, and explicitly
+flagged as still owed.
+
+**Confirmed free-tier, not accidentally paid:** `openai/gpt-oss-120b` is on Groq's published
+free plan (30 RPM / 8K TPM / 1K RPD, per Groq's own rate-limits documentation) — and the real
+account's own rate-limit response headers (`x-ratelimit-limit-tokens: 8000`,
+`x-ratelimit-limit-requests: 1000`) match those exact free-tier numbers, not some elevated
+paid-tier allocation. At this project's stated volume (a few hundred short classification
+calls a week), that's comfortably inside the free tier — see
+`docs/runbook-deploy-free-tier.md`'s own note on the real rate-limit ceiling this implies.
 
 **Why, in the terms this document itself already used:** the "Cost, for context (not the
 deciding factor)" section below was written when every option on the table was a paid
@@ -41,7 +72,7 @@ on free-tier infrastructure end to end.
 **What this costs, honestly, not assumed away:** the "Model tier" and bar-setting sections
 below argued for Opus specifically because this is "qualitative, judgment-heavy
 classification" — patient safety vs. routine complaint, sarcasm in code-switched Taglish,
-a ten-condition crisis/digest call in one pass. `llama-3.3-70b-versatile` is a real,
+a ten-condition crisis/digest call in one pass. `openai/gpt-oss-120b` is a real,
 capable instruction-following model, but it is not Claude Opus, and this document made an
 honest case for why the strongest available tier mattered specifically for this task. That
 case doesn't stop being true because the provider changed — it means the recall/precision

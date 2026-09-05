@@ -24,12 +24,15 @@ Design notes:
   (`max_completion_tokens=256` — a fixed-list membership check doesn't
   need deep reasoning), same reasoning 6.1 already accepted for cost at
   this project's stated per-week item volume.
-- Model provider: Groq (`llama-3.3-70b-versatile`), same as
+- Model provider: Groq (`openai/gpt-oss-120b`), same as
   `app.classification` — switched from Claude on explicit user
   direction; see `docs/decisions/09-sentiment-classifier-choice.md`'s
-  "Update (2026-09-05)" section. `_call_model()` below mirrors
-  `app.classification._call_model()`'s shape deliberately, including the
-  same `ClassifierNotConfiguredError`/`_ApiCallError` split, so the two
+  "Update (2026-09-05)" section (including why the model landed on
+  `openai/gpt-oss-120b` and not the originally-picked
+  `llama-3.3-70b-versatile`, which a live smoke test found deprecated).
+  `_call_model()` below mirrors `app.classification._call_model()`'s
+  shape deliberately, including the same
+  `ClassifierNotConfiguredError`/`_ApiCallError` split, so the two
   sibling modules stay aligned on how they talk to the same provider
   rather than each growing its own copy that drifts.
 - `classification.py` does not exist yet on this branch (checked before
@@ -87,7 +90,7 @@ TOPIC_TAXONOMY: dict[str, str] = {
 
 # Same provider/model as app.classification - see that module's docstring
 # and docs/decisions/09-sentiment-classifier-choice.md.
-_MODEL = "llama-3.3-70b-versatile"
+_MODEL = "openai/gpt-oss-120b"
 
 _SYSTEM_PROMPT = (
     "You are a topic-tagging assistant for Remedy Skin Clinic's reputation "
