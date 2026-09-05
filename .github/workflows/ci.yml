@@ -7,6 +7,27 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      # Backs the Phase 2 foundations (backend/app/) — the migration and
+      # test_app_repository_postgres.py's real-Postgres checks run against
+      # this on every push, not just locally. Without it those tests skip
+      # cleanly rather than fail (see that file's docstring) — this
+      # service is what upgrades "skip" to "actually verified in CI".
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: remedy_pulse
+          POSTGRES_PASSWORD: remedy_pulse_dev
+          POSTGRES_DB: remedy_pulse
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U remedy_pulse -d remedy_pulse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://remedy_pulse:remedy_pulse_dev@localhost:5434/remedy_pulse
     steps:
       - uses: actions/checkout@v4
 
@@ -19,6 +40,13 @@ jobs:
 
       - name: Lint
         run: ruff check backend/
+
+      - name: Dependency audit (5.7)
+        run: pip-audit -r backend/requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
 
       - name: Test
         run: pytest backend/tests/
