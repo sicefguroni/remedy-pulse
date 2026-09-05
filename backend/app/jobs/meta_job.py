@@ -96,7 +96,12 @@ if _BACKEND_ROOT not in sys.path:
     sys.path.insert(0, _BACKEND_ROOT)
 
 from app.models import RunStatus  # noqa: E402
-from app.repository import IngestionRunRecorder, record_ingestion, start_run  # noqa: E402
+from app.repository import (  # noqa: E402
+    IngestionRunRecorder,
+    is_within_backfill_window,
+    record_ingestion,
+    start_run,
+)
 from fetch_meta_mentions import (  # noqa: E402
     fetch_facebook_comments,
     fetch_instagram_comments,
@@ -171,6 +176,22 @@ def _record_items(
     session: Session, recorder: IngestionRunRecorder, items: list[dict], *, mention_source: str
 ) -> None:
     for item in items:
+        published_at = _parse_published_at(item.get("date"))
+
+        # 9.2 backfill policy: excluded entirely (not counted toward
+        # items_seen either). Applied uniformly across all three Meta
+        # capabilities for simplicity, even though the own-post-comments
+        # ones are already volume-bounded a different way (MAX_OWN_MEDIA/
+        # MAX_OWN_POSTS/MAX_COMMENTS_PER_ITEM in fetch_meta_mentions.py) -
+        # instagram_mentions specifically is a real discovery/search
+        # capability (who tagged Remedy), where "how far back" is exactly
+        # the cost/volume question the PRD's Non-Goal is about, and
+        # treating all three consistently is simpler to reason about than
+        # splitting hairs between them. See
+        # app.repository.is_within_backfill_window's docstring.
+        if not is_within_backfill_window(published_at):
+            continue
+
         # items_ingested counts "successfully upserted", not "newly
         # inserted" - matches news_job.py/google_reviews_job.py/
         # reddit_job.py, which all increment it unconditionally after a
@@ -187,7 +208,7 @@ def _record_items(
             source=mention_source,
             kind="mention",
             external_id=_external_id(item),
-            published_at=_parse_published_at(item.get("date")),
+            published_at=published_at,
             author=item.get("author"),
             text=item.get("text"),
             url=item.get("sourceUrl"),

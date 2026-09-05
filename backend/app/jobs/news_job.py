@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 
 import fetch_news_articles
 from app.models import RunStatus
-from app.repository import record_ingestion, start_run
+from app.repository import is_within_backfill_window, record_ingestion, start_run
 from config import NEWS_SEARCH_TERMS
 from fetch_news_articles import dedupe_by_url, fetch_articles_for_term, normalize
 from http_utils import RetryExhaustedError
@@ -85,6 +85,16 @@ def run(session: Session) -> None:
 
         for raw_article in all_raw:
             article = normalize(raw_article)
+            published_at = _parse_published_at(article["publishedAt"])
+
+            # 9.2 backfill policy: an article older than the window is
+            # excluded entirely (not counted toward items_seen either) -
+            # unlike the missing-url case below, this isn't a data-quality
+            # problem worth a PARTIAL status, it's the policy working as
+            # intended. See app.jobs.is_within_backfill_window's docstring.
+            if not is_within_backfill_window(published_at):
+                continue
+
             recorder.items_seen += 1
 
             if not article["url"]:
@@ -103,7 +113,7 @@ def run(session: Session) -> None:
                 headline=article["headline"],
                 text=article["description"],
                 url=article["url"],
-                published_at=_parse_published_at(article["publishedAt"]),
+                published_at=published_at,
                 venue=article["outlet"],
                 tier=article["tier"],
                 sentiment=article["sentiment"],
