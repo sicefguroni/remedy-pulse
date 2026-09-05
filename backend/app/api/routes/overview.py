@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import ApiError, get_current_user, get_db
 from app.jobs import JOBS
 from app.models import User
-from app.repository import OverviewStats, get_overview_stats, get_source_freshness
+from app.repository import OverviewStats, get_overview_stats, get_overview_trend, get_source_freshness
 
 router = APIRouter(tags=["overview"])
 
@@ -177,3 +177,17 @@ def get_overview(
         "aiSummaryText": _AI_SUMMARIES[0],
         "lastSyncedAt": last_synced_at.isoformat() if last_synced_at else None,
     }
+
+
+@router.get("/overview/trend")
+def get_overview_trend_route(
+    days: int = Query(30, ge=1, le=90),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Added in Phase 8 (8.1) - closes the Overview tab's Sentiment Trend
+    chart, which had no backing endpoint at all when Phase 7 shipped (see
+    docs/api-contract.md's own note on this route). No period/source/
+    entity filter - this is the whole-brand trend the chart is about, per
+    the contract; extend if a real filtered use ever needs it."""
+    return {"days": get_overview_trend(db, days=days)}

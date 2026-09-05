@@ -62,6 +62,35 @@ as part of this phase; that's explicitly out of scope (see
 live needs its own compliance gate first). Mark the field's source
 clearly in a code comment either way.
 
+### `GET /api/overview/trend` (added in Phase 8 — closes 8.1's "volume
+trend"; the mockup's Sentiment Trend chart had no backing endpoint at
+all when Phase 7 shipped, left explicitly as a known gap in that
+agent's own final report)
+
+Query params: `days` (int, default 30, max 90 — matches the PRD's
+90-day backfill cap, 9.2). Daily-bucketed counts, oldest first, over
+every `Mention` row (all kinds, all sources — this is the whole-brand
+trend the Overview tab is about, not scoped to one source/entity; if a
+real `period`/`source`/`entity` filter turns out to matter here later,
+extend the query params then, don't over-build it now for a chart with
+one current consumer).
+
+```json
+{
+  "days": [
+    {"date": "2026-06-01", "mentionCount": 12, "positiveCount": 8, "neutralCount": 3, "negativeCount": 1}
+  ]
+}
+```
+
+Bucket by `COALESCE(published_at, ingested_at)::date` (a Mention with no
+`published_at` — e.g. some ingestion edge case — still belongs in the
+trend on the day it was actually ingested, rather than being silently
+dropped from the chart). Sentiment counts are `null`-safe: a row with
+`sentiment IS NULL` (never classified) counts toward `mentionCount` but
+none of the three sentiment buckets — don't force it into "Neutral",
+that would misrepresent unclassified as a real judgment.
+
 ---
 
 ## Mentions — `GET /api/mentions`
