@@ -29,9 +29,15 @@ router = APIRouter(tags=["mentions"])
 
 
 def _parse_dt(value: str | None) -> datetime | None:
+    """Raises a clean ApiError(400), not an uncaught ValueError, for a
+    malformed date - matches app/api/routes/overview.py's own
+    from_param/to_param handling."""
     if not value:
         return None
-    dt = datetime.fromisoformat(value)
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        raise ApiError(400, {"error": "'from'/'to' must be ISO-8601 dates"}) from None
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 

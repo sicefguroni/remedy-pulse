@@ -408,6 +408,16 @@ def test_mentions_pagination_cursor(client, auth_headers, sqlite_session):
     assert len(seen_ids) == 3
 
 
+def test_mentions_malformed_from_date_is_400_not_500(client, auth_headers):
+    """_parse_dt() previously let datetime.fromisoformat()'s ValueError
+    escape uncaught - a malformed `from` query param 500'd instead of
+    cleanly 400'ing, unlike GET /api/overview's own from_param/to_param
+    handling, which already did this correctly."""
+    response = client.get("/api/mentions", params={"from": "not-a-date"}, headers=auth_headers)
+    assert response.status_code == 400
+    assert "ISO-8601" in response.json()["error"]
+
+
 # --- POST /api/mentions/{id}/assign, /resolve ---
 
 
