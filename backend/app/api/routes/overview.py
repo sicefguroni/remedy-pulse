@@ -6,15 +6,22 @@ remedy-pulse-mockup.html's computeClarityIndex()) to Python against real
 aggregate data, per docs/api-contract.md's own instruction not to invent
 a second formula.
 
-AI summary: SOURCE - static/templated string, not a real LLM call. The
-mockup's regenerateSummary() cycles the same 3 canned strings today
-(P1-1, not real); this endpoint reuses those verbatim and always returns
-the first one (deterministic, easy to test) rather than picking one at
-random or rotating server-side state nothing else in this project
-persists. Wiring this to a real LLM is explicitly out of scope for this
-phase (see docs/decisions/07-reddit-c4-no-resale-control.md's note that
-P1-1 going live needs its own compliance gate first) - not attempted
-here.
+AI summary: `aiSummaryText` is `null` (updated 2026-09-11 - "remove mock
+data from logged-in sessions" pass). This endpoint previously returned a
+canned/templated string (one of the mockup's own 3 sample summaries,
+verbatim) on every call, real data or not - docs/api-contract.md
+originally blessed that explicitly ("this endpoint may keep returning a
+canned/templated string for now"), but every caller of this endpoint is,
+by construction, an authenticated session (get_current_user is a required
+dependency) - there is no server-side "demo" mode to gate a fake summary
+behind, so that canned string was presented as if it summarized the
+caller's own real data on every single real login. Wiring this to a real
+LLM is still explicitly out of scope (see
+docs/decisions/07-reddit-c4-no-resale-control.md's note that P1-1 going
+live needs its own compliance gate first) - the honest interim state is
+null, not an invented paragraph. The mockup's own demo-mode-only sample
+summaries (SAMPLE_DATA.aiSummaryVariants, cycled by regenerateSummary())
+are unaffected - those never call this endpoint at all.
 """
 
 from __future__ import annotations
@@ -32,22 +39,6 @@ from app.repository import OverviewStats, get_overview_stats, get_overview_trend
 router = APIRouter(tags=["overview"])
 
 _PERIOD_DAYS = {"7d": 7, "30d": 30, "90d": 90}
-
-# Verbatim from remedy-pulse-mockup.html's `summaries` array (regenerateSummary()).
-# SOURCE: static/templated - see module docstring. Not wired to an LLM.
-_AI_SUMMARIES = [
-    "Clarity Index climbed to 75, up 6 points this week, driven by strong positive coverage from Rappler and "
-    "Philippine Star. Total mentions rose 18 percent week over week, mostly from Google reviews and Instagram. "
-    "One 2-star review at Remedy BGC still needs a response, and is flagged as the top priority. Aivee posted a "
-    "40 percent jump in mention volume, but it has not yet moved Remedy share of voice.",
-    "Net sentiment held steady at plus 62 this week despite a slower than usual follow-up call flagged in a "
-    "Google review. Facial results and staff experience remain the most discussed topics, both strongly "
-    "positive. Worth watching: a Reddit thread comparing Remedy to Aivee on Rejuran pricing is quietly gaining "
-    "traction.",
-    "Earned media had a strong week. Rappler and Philippine Star coverage alone add up to more than 1.2 million "
-    "pesos in gross EMV. Club Remedy wellness coverage is starting to show up in lifestyle press. There is no "
-    "new negative coverage in news or PR; the only open item is a single unresolved Google review.",
-]
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -183,7 +174,9 @@ def get_overview(
             "crisis": stats.active_alerts_crisis,
             "digest": stats.active_alerts_digest,
         },
-        "aiSummaryText": _AI_SUMMARIES[0],
+        # See module docstring's "AI summary" section - null, not a
+        # canned string, until a real LLM summary exists.
+        "aiSummaryText": None,
         "lastSyncedAt": last_synced_at.isoformat() if last_synced_at else None,
     }
 

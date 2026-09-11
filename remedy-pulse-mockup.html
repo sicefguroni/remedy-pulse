@@ -493,7 +493,7 @@
       <div class="card-head">
         <div>
           <h3>✨ This Week, Summarized</h3>
-          <div class="card-sub">Auto-generated exec narrative — preview of the planned AI weekly summary feature. The API keeps this templated/canned for now (no live LLM call), same as the demo.</div>
+          <div class="card-sub">Auto-generated exec narrative — preview of the planned AI weekly summary feature. Not built yet against real data (no live LLM call) — the demo tab shows sample summary text so the feature is previewable; a real session shows nothing until it's built.</div>
         </div>
         <button class="btn-mini" id="regenerateBtn" onclick="regenerateSummary()">Regenerate</button>
       </div>
@@ -1594,8 +1594,17 @@
     if (ratingVal) ratingVal.textContent = (typeof rating.value === 'number') ? (rating.value.toFixed(1) + ' ★') : '—';
     if (ratingDelta) ratingDelta.textContent = '— steady, ' + (rating.reviewCount != null ? rating.reviewCount : 0) + ' reviews';
 
+    // "Remove mock data from logged-in sessions" pass (2026-09-11): GET /api/overview's
+    // aiSummaryText is null now (no server-side canned string), so a real session shows an
+    // honest placeholder here instead of either a blank div or invented text. Demo mode never
+    // reaches this - loadAllFromSample() sets STATE.overview.aiSummaryText from
+    // SAMPLE_DATA.aiSummaryVariants directly.
     const summaryEl = document.getElementById('aiSummaryText');
-    if (summaryEl) summaryEl.textContent = ov.aiSummaryText || '';
+    if (summaryEl){
+      summaryEl.textContent = ov.aiSummaryText || 'AI summary isn’t built yet — nothing to show here for real data.';
+      summaryEl.style.fontStyle = ov.aiSummaryText ? 'normal' : 'italic';
+      summaryEl.style.color = ov.aiSummaryText ? 'var(--ink-dim)' : 'var(--ink-faint)';
+    }
 
     renderAlertsPanel();
     renderSentimentTrendChart();
@@ -1796,7 +1805,10 @@
   function handleAssign(btn, m){
     const select = document.createElement('select');
     select.className = 'assign-select';
-    const roster = (STATE.roster && STATE.roster.assignees) || SAMPLE_DATA.roster.assignees;
+    // Only fall back to SAMPLE_DATA's fake roster in demo mode - a live session whose real
+    // roster somehow came back empty/unset must show an empty list, never invented teammate
+    // names in the Assign dropdown of a tool people actually use to route real work.
+    const roster = (STATE.roster && STATE.roster.assignees) || (STATE.isDemoMode ? SAMPLE_DATA.roster.assignees : []);
     const blank = document.createElement('option');
     blank.value = ''; blank.textContent = 'Assign to…';
     select.appendChild(blank);
@@ -2844,13 +2856,26 @@
         data.competitorSentiment.forEach(c => sentimentContainer.appendChild(buildCompetitorSentimentRow(c)));
       }
     }
+    // Top Voices and Category Watch have no backing endpoint (see this file's own "Not covered
+    // by docs/api-contract.md" note) - rendering SAMPLE_DATA for them regardless of isDemoMode
+    // meant a logged-in, live session still saw fabricated names/reach numbers presented as real.
+    // Demo mode keeps the labeled sample content (the card-sub already says "Sample data"); a
+    // real session gets an honest "not built yet" empty state instead of invented data.
     if (topVoicesContainer){
       topVoicesContainer.innerHTML = '';
-      SAMPLE_DATA.topVoices.forEach(v => topVoicesContainer.appendChild(buildTopVoiceRow(v)));
+      if (STATE.isDemoMode){
+        SAMPLE_DATA.topVoices.forEach(v => topVoicesContainer.appendChild(buildTopVoiceRow(v)));
+      } else {
+        renderStatePanel(topVoicesContainer, 'empty', 'Not built yet', 'Top Voices has no backing API endpoint yet.');
+      }
     }
     if (categoryContainer){
       categoryContainer.innerHTML = '';
-      SAMPLE_DATA.categoryWatch.forEach(c => categoryContainer.appendChild(buildCategoryWatchRow(c)));
+      if (STATE.isDemoMode){
+        SAMPLE_DATA.categoryWatch.forEach(c => categoryContainer.appendChild(buildCategoryWatchRow(c)));
+      } else {
+        renderStatePanel(categoryContainer, 'empty', 'Not built yet', 'Category Watch has no backing API endpoint yet.');
+      }
     }
   }
 

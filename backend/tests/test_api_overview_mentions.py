@@ -123,7 +123,13 @@ def test_overview_response_shape_matches_contract(client, auth_headers, sqlite_s
     assert body["activeAlerts"]["crisis"] == 1
     assert body["activeAlerts"]["digest"] == 0
 
-    assert isinstance(body["aiSummaryText"], str) and body["aiSummaryText"]
+    # "Remove mock data from logged-in sessions" pass (2026-09-11): this
+    # endpoint no longer returns a canned/templated summary string - every
+    # caller is, by construction, an authenticated real session
+    # (get_current_user is a required dependency), so there is no
+    # server-side "demo" mode to gate a fake summary behind. null until a
+    # real LLM summary exists.
+    assert body["aiSummaryText"] is None
     assert body["lastSyncedAt"] is not None
     # ISO-8601 UTC - must round-trip through fromisoformat.
     datetime.fromisoformat(body["lastSyncedAt"])
