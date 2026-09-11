@@ -4,14 +4,29 @@ A real-time reputation monitoring dashboard for Remedy, replacing Media Meter/Me
 
 ## Status
 
-This is a **demo/mockup stage** project. The dashboard UI is built and interactive, but running on sample data — nothing is connected to live Google, Instagram, X, or Reddit feeds yet. The backend connector for pulling real Google review data exists but requires Google API access approval before it can go live.
+The backend, API, and dashboard frontend are fully built and tested (345 backend tests passing, CI green) — well past demo/mockup stage. `index.html` shows sample data if you're not logged in, and real data pulled from the sources below once you are.
+
+**Live today, no approval needed:**
+
+- The full FastAPI backend (`backend/app/api/`) — real Postgres persistence, real authentication, every endpoint in [`docs/api-contract.md`](docs/api-contract.md).
+- Real ingestion: news/press coverage via GNews, and competitor rating benchmarks via Google Places (both self-serve — a Places API key with billing enabled is the only setup step).
+- Real sentiment classification and crisis/digest alert routing (Groq), running on a schedule.
+- A free-tier deploy runbook ([`docs/runbook-deploy-free-tier.md`](docs/runbook-deploy-free-tier.md)) — Cloudflare Pages + Render + Neon + GitHub Actions.
+
+**Built and tested, but not yet live against real data** — each blocked on an external party's approval, not on code (see [`backend/README.md`](backend/README.md) for exactly where each stands):
+
+- **Remedy's own Google reviews** — Google gates the reviews endpoint behind a Business Profile API access request with no SLA.
+- **Reddit mentions, and the 48-hour deletion-propagation job that access commits to** — needs real Reddit credentials, plus a separate pending approval for the commercial Data Access tier this project committed to in writing.
+- **Instagram/Facebook mentions and comments** — needs Meta App Review approval, separately, for each of three permission scopes.
+
+The EMV (earned media value) formula is deliberately not computed — it needs an editorial-judgment sign-off from Marketing/Finance that hasn't happened yet; every article's `grossEmv`/`netEmv` is honestly `null` rather than invented. See [`docs/implementation-checklist.md`](docs/implementation-checklist.md) for the full, itemized status of every requirement.
 
 ## Repo layout
 
 ```
 index.html   The dashboard frontend — sample data if you're not logged in, real data once you are
-backend/                   Google Business Profile / Places API connector for pulling real review data
-docs/                      Demo guide and supporting reference docs
+backend/     The FastAPI app, Postgres persistence, auth, ingestion adapters, scheduler, and classifier (see backend/README.md)
+docs/        API contract, decision records, runbooks, and the implementation checklist
 ```
 
 `index.html` was renamed from `remedy-pulse-mockup.html` (checklist 0.26) once it started serving real, logged-in sessions too, not just the demo — a "mockup" filename in a real user's address bar was the wrong signal to send.
@@ -20,7 +35,7 @@ docs/                      Demo guide and supporting reference docs
 
 **To view the demo:** open [`index.html`](index.html) in any browser. See [`docs/README-Remedy-Pulse-Demo.md`](docs/README-Remedy-Pulse-Demo.md) for a full walkthrough of what's real vs. sample, and things to try.
 
-**To set up the review data connector:** see [`backend/README.md`](backend/README.md) for the Google Cloud setup steps, API access requirements, and known limitations.
+**To set up the backend** (ingestion connectors, Google Cloud steps, API access requirements, and known limitations for each source): see [`backend/README.md`](backend/README.md).
 
 **To run the dashboard against a real local backend (not sample data):** see [`docs/local-dev-setup.md`](docs/local-dev-setup.md).
 
@@ -28,4 +43,4 @@ docs/                      Demo guide and supporting reference docs
 
 ## What's next
 
-Connecting the dashboard to live data sources (Google, Meta, Reddit, X) is the next phase of work, gated on Business Profile API access approval from Google. See `backend/README.md` for details on that blocker.
+Going live against real Google reviews, Reddit, and Meta data is gated on three separate external approvals (see "Status" above) — chasing those is calendar time, not engineering work. Everything else that's actually buildable without an approval or a payment has been built; see [`docs/implementation-checklist.md`](docs/implementation-checklist.md) for what's left and why each remaining item is blocked.
