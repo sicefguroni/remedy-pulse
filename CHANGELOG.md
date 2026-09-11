@@ -12,6 +12,16 @@ instead.
 
 ---
 
+## 2026-09-12 — [#20](https://github.com/sicefguroni/remedy-pulse/pull/20) Update README's Status section
+
+The root README was frozen at Phase 0 ("demo/mockup stage... nothing
+connected to live feeds yet") while `backend/README.md` stayed accurate
+through every phase. Rewrote Status to name what's live today (GNews,
+Google Places, Groq classification, the full API/auth layer, the
+free-tier deploy runbook), what's built but blocked on an external
+approval (Google's own reviews, Reddit, Meta), and what's deliberately
+not computed pending a business sign-off (EMV). Docs-only.
+
 ## 2026-09-12 — [#19](https://github.com/sicefguroni/remedy-pulse/pull/19) API: malformed date query params now 400, not 500
 
 `GET /api/mentions`, `GET /api/emv`, and `POST /api/exports/{type}` each
