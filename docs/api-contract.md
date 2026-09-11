@@ -43,7 +43,7 @@ Query params: `period` (`7d` default | `30d` | `90d` | `custom` with
   "netSentiment": {"value": 62, "deltaPts": 4},
   "avgGoogleRating": {"value": 5.0, "reviewCount": 128},
   "activeAlerts": {"total": 4, "crisis": 1, "digest": 3},
-  "aiSummaryText": "string — see 'AI summary' note below",
+  "aiSummaryText": "null — see 'AI summary' note below (updated 2026-09-11: previously a canned string on every call)",
   "lastSyncedAt": "iso8601 or null — the most recent successful run across every registered EXTERNAL DATA source, per repository.get_source_freshness() (see the Status section's isDataSource note below — updated 2026-09-11, checklist 0.24: previously every registered source, unqualified)"
 }
 ```
@@ -54,13 +54,21 @@ Query params: `period` (`7d` default | `30d` | `90d` | `custom` with
 against real aggregate data (rating, sentiment mix, response rate,
 mention-volume trend) rather than inventing a second formula.
 
-**AI summary**: the mockup's `regenerateSummary()` cycles 3 canned
-strings today (P1-1, not real). This endpoint may keep returning a
-canned/templated string for now — **do not** wire it to a real LLM call
-as part of this phase; that's explicitly out of scope (see
-`docs/decisions/07-reddit-c4-no-resale-control.md`'s note that P1-1 going
-live needs its own compliance gate first). Mark the field's source
-clearly in a code comment either way.
+**AI summary** (updated 2026-09-11 — "remove mock data from logged-in
+sessions" pass): `aiSummaryText` is `null`. This endpoint previously
+returned a canned/templated string (one of the mockup's own 3 sample
+summaries) on *every* call — that was fine as a mockup-stage placeholder,
+but every caller of this endpoint is, by construction, an authenticated
+real session (`get_current_user` is a required dependency), so there is
+no server-side "demo" mode to gate a fake summary behind; that string was
+presented as if it summarized the caller's own real data on every real
+login. Wiring this to a real LLM call is still explicitly out of scope
+(see `docs/decisions/07-reddit-c4-no-resale-control.md`'s note that P1-1
+going live needs its own compliance gate first) — the honest interim
+state is `null`, not an invented paragraph. The mockup's own demo-mode-
+only sample summaries (`SAMPLE_DATA.aiSummaryVariants`, cycled by
+`regenerateSummary()`) are unaffected — demo mode never calls this
+endpoint at all.
 
 ### `GET /api/overview/trend` (added in Phase 8 — closes 8.1's "volume
 trend"; the mockup's Sentiment Trend chart had no backing endpoint at
