@@ -12,6 +12,20 @@ instead.
 
 ---
 
+## 2026-09-12 — [#18](https://github.com/sicefguroni/remedy-pulse/pull/18) Rename remedy-pulse-mockup.html to index.html
+
+With real auth, a real API, and mock data removed from live sessions all
+shipped, this file is the production frontend for real sessions, not just a
+demo artifact — a filename containing "mockup" was the wrong signal in a
+real user's address bar or a shared link. `git mv`, history preserved;
+every reference updated across docs/comments/tests. `_redirects` removed
+(no longer needed — Cloudflare Pages serves `index.html` at the root
+automatically).
+
+## 2026-09-12 — [#17](https://github.com/sicefguroni/remedy-pulse/pull/17) Add CHANGELOG.md
+
+This file. Backfilled from all merged PRs to date.
+
 ## 2026-09-11 — [#16](https://github.com/sicefguroni/remedy-pulse/pull/16) Remove all mock data from logged-in sessions
 
 Four places still rendered fabricated content in a real, authenticated

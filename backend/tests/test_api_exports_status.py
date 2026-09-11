@@ -136,6 +136,17 @@ def test_exports_unknown_type_is_422(client, auth_headers):
     assert response.status_code == 422
 
 
+def test_exports_malformed_from_date_is_400_not_500(client, auth_headers):
+    """_parse_dt() previously let datetime.fromisoformat()'s ValueError
+    escape uncaught - see the identical fix/test in
+    test_api_overview_mentions.py::test_mentions_malformed_from_date_is_400_not_500."""
+    response = client.post(
+        "/api/exports/mentions_csv", params={"from": "not-a-date"}, headers=auth_headers
+    )
+    assert response.status_code == 400
+    assert "ISO-8601" in response.json()["error"]
+
+
 def test_exports_mentions_csv_returns_real_csv_and_logs_export(client, auth_headers, sqlite_session):
     sqlite_session.add(
         Mention(

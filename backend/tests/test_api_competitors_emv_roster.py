@@ -142,6 +142,15 @@ def test_emv_articles_and_totals_are_all_null(client, auth_headers, sqlite_sessi
     assert article["netEmv"] is None
 
 
+def test_emv_malformed_from_date_is_400_not_500(client, auth_headers):
+    """_parse_dt() previously let datetime.fromisoformat()'s ValueError
+    escape uncaught - see the identical fix/test in
+    test_api_overview_mentions.py::test_mentions_malformed_from_date_is_400_not_500."""
+    response = client.get("/api/emv", params={"from": "not-a-date"}, headers=auth_headers)
+    assert response.status_code == 400
+    assert "ISO-8601" in response.json()["error"]
+
+
 def test_emv_filtered_true_when_outlet_given(client, auth_headers, sqlite_session):
     sqlite_session.add(
         Mention(source="news_gnews", kind="article", external_id="a1", venue="Rappler", published_at=_now())
