@@ -12,6 +12,13 @@ instead.
 
 ---
 
+## 2026-09-12 — [#19](https://github.com/sicefguroni/remedy-pulse/pull/19) API: malformed date query params now 400, not 500
+
+`GET /api/mentions`, `GET /api/emv`, and `POST /api/exports/{type}` each
+let a malformed `from`/`to` date 500 instead of cleanly 400ing —
+`GET /api/overview` already handled this correctly; the other three now
+match it.
+
 ## 2026-09-12 — [#18](https://github.com/sicefguroni/remedy-pulse/pull/18) Rename remedy-pulse-mockup.html to index.html
 
 With real auth, a real API, and mock data removed from live sessions all
