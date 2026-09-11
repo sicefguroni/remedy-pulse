@@ -16,7 +16,7 @@ and again, in the contract's list of what v1 deliberately does not do:
 
 This decision doc ratifies that existing implementation choice going forward rather than proposing a change to it — it exists to make the reasoning explicit and recorded, since the checklist's HEADS-UP asked for it to be "worth recording in `docs/decisions/` either way."
 
-Note on scope: this session made no changes to `backend/` or `remedy-pulse-mockup.html` — both were read only, per this task's boundaries. `sendReply()` in the mockup is not wired to this endpoint at all yet; that wiring gap is documented separately, in the mockup's own fetch-layer comments (`remedy-pulse-mockup.html`, near line 1039), as a distinct, deliberate, out-of-scope gap — a mismatch between the mockup's branch-level "N pending replies" reply flow and the API's per-review `mention_id` endpoint. This document does not attempt to resolve that wiring gap; it only settles which direction ("post" vs. "deep-link") the eventual wiring should point.
+Note on scope: this session made no changes to `backend/` or `index.html` — both were read only, per this task's boundaries. `sendReply()` in the mockup is not wired to this endpoint at all yet; that wiring gap is documented separately, in the mockup's own fetch-layer comments (`index.html`, near line 1039), as a distinct, deliberate, out-of-scope gap — a mismatch between the mockup's branch-level "N pending replies" reply flow and the API's per-review `mention_id` endpoint. This document does not attempt to resolve that wiring gap; it only settles which direction ("post" vs. "deep-link") the eventual wiring should point.
 
 ## Options considered
 

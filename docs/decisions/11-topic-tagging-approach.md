@@ -6,7 +6,7 @@ The checklist titles item 6.5 **"Topic clustering."** What's built here (`backen
 
 Concretely:
 
-- `TOPIC_TAXONOMY` is the five topic keys and labels already hardcoded in `remedy-pulse-mockup.html`'s `topicMentions` object (`facial-results`, `staff-service`, `rejuran`, `pricing`, `booking`), copied verbatim — not rediscovered from data.
+- `TOPIC_TAXONOMY` is the five topic keys and labels already hardcoded in `index.html`'s `topicMentions` object (`facial-results`, `staff-service`, `rejuran`, `pricing`, `booking`), copied verbatim — not rediscovered from data.
 - `tag_topics(text)` makes one Claude API call per item and asks the model to classify that item against the known list, returning zero, one, or several matching keys (or `[]` if none apply).
 - The taxonomy is an **input** to the tagging function, not an **output** of it. Real clustering would be the reverse: the topics themselves would be discovered by analyzing the corpus, and the fixed five-item list wouldn't exist as a concept at all.
 

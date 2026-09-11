@@ -3,7 +3,7 @@
 Pulls real review data for Remedy's own listings, public rating
 benchmarks for competitors, and news/press coverage, and writes each out
 as JSON that is the *input* for the corresponding tab in
-`remedy-pulse-mockup.html` — not a byte-for-byte match of any of them.
+`index.html` — not a byte-for-byte match of any of them.
 See "What you get" below for exactly what is and isn't covered.
 
 ## Before you start: the one real blocker
@@ -368,7 +368,7 @@ not invented.
 
 `app/api/` — a FastAPI app implementing every endpoint in
 `docs/api-contract.md`, the contract both this and
-`remedy-pulse-mockup.html`'s data-driven refactor were built against in
+`index.html`'s data-driven refactor were built against in
 parallel. Run it with:
 ```
 uvicorn app.api.main:app

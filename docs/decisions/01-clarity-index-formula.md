@@ -5,7 +5,7 @@
 ## Decision
 
 The Clarity Index is a weighted composite of four inputs, each normalized to a 0–100 scale,
-implemented as `computeClarityIndex(inputs)` in `remedy-pulse-mockup.html`:
+implemented as `computeClarityIndex(inputs)` in `index.html`:
 
 ```
 ClarityIndex = round(

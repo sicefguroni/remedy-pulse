@@ -2,7 +2,7 @@
 
 ## Decision
 
-The `User` table (`backend/app/models.py`, built in 5.5) **is** the assignment roster. `is_active=True` rows are assignable; `display_name` is what's shown in an "Assign to…" control — replacing the hardcoded four-name list (`Gian`, `Paul`, `Boom`, `Mixi`) currently baked into `remedy-pulse-mockup.html`'s `handleAssign()`.
+The `User` table (`backend/app/models.py`, built in 5.5) **is** the assignment roster. `is_active=True` rows are assignable; `display_name` is what's shown in an "Assign to…" control — replacing the hardcoded four-name list (`Gian`, `Paul`, `Boom`, `Mixi`) currently baked into `index.html`'s `handleAssign()`.
 
 No new table, no new column, no schema change. The query an assignment UI needs is exactly:
 

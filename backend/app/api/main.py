@@ -32,7 +32,7 @@ from app.api.routes import topics as topics_routes
 
 app = FastAPI(title="Remedy Pulse API")
 
-# remedy-pulse-mockup.html (Phase 7's data-driven refactor) is a static
+# index.html (Phase 7's data-driven refactor) is a static
 # file opened via file:// or served from a different origin than this
 # API, and its apiFetch() sends the session token as an Authorization
 # header rather than a cookie (no `credentials: 'include'`) - so a

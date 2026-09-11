@@ -55,16 +55,20 @@ the repo:
 - `.github/workflows/scheduler.yml` — the scheduled ingestion workflow,
   already committed, just needs its secrets set (§7).
 - CORS is already wide open (`allow_origins=["*"]`, `app/api/main.py`) —
-  safe here specifically because `remedy-pulse-mockup.html`'s
+  safe here specifically because `index.html`'s
   `apiFetch()` sends the session token as an `Authorization` header, not
   a cookie, so there's no credentialed-request/wildcard-origin risk.
   This means the frontend and API can be **fully cross-origin** (Cloudflare
   Pages calling a `*.onrender.com` API directly) with no same-origin proxy
   needed — unlike a cookie-session app, which would need one.
-- `_redirects` (repo root) — the one Cloudflare Pages config file this
-  deploy needs, so the root URL serves `remedy-pulse-mockup.html`
-  (which isn't named `index.html`, since it has no build step to rename
-  it during).
+- No `_redirects` file needed — the frontend is literally named
+  `index.html` (renamed from `remedy-pulse-mockup.html` once the file
+  started serving real logged-in sessions too, not just the demo — see
+  `docs/implementation-checklist.md`'s 0.26), so Cloudflare Pages serves
+  it at the root URL automatically, no config file required. A prior
+  version of this repo kept the mockup-era filename and used `_redirects`
+  to rewrite the root URL to it instead of renaming; that file has been
+  removed as no longer needed.
 - `DATABASE_URL` is already declared with the `postgresql+psycopg://`
   scheme everywhere in this repo (`.env.example`, `docker-compose.yml`),
   matching Neon's own connection string shape exactly — no scheme
@@ -72,7 +76,7 @@ the repo:
   elsewhere.
 
 **One line needs editing before the frontend actually works against a
-real deployment**, covered in §6 — `remedy-pulse-mockup.html`'s
+real deployment**, covered in §6 — `index.html`'s
 `API_BASE` constant is hardcoded to `http://localhost:8000/api` for
 local dev (see `docs/local-dev-setup.md`), and Vite-style build-time env
 vars don't exist here (no build step, by this project's own design
@@ -215,7 +219,7 @@ schema change — never on Render's own boot (see §5's note on why).
    Pages → Create → Pages → **Connect to Git** → this repo.
 2. **Build command:** leave blank. **Build output directory:** `/`
    (the repo root — there is no build step and nothing to output).
-3. **Edit one line before this first deploy** — `remedy-pulse-mockup.html`,
+3. **Edit one line before this first deploy** — `index.html`,
    near the top of its `<script>` block:
    ```js
    const API_BASE = 'http://localhost:8000/api';
@@ -228,8 +232,9 @@ schema change — never on Render's own boot (see §5's note on why).
    environment-variable injection to configure instead, by design (see
    §2's note on why there's no build step to hook one into).
 4. Deploy. **You should see** the build log publish the repo root
-   as-is (no compile step to watch), and `_redirects` take effect so
-   the site's root URL serves `remedy-pulse-mockup.html` directly.
+   as-is (no compile step to watch), and the site's root URL serve
+   `index.html` directly — automatic, since Cloudflare Pages serves
+   `index.html` at the root by default (no `_redirects` file needed).
 
 ## 7 · Wire the ingestion scheduler
 

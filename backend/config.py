@@ -42,7 +42,7 @@ Where to find each ID:
 BACKFILL_WINDOW_DAYS = 90
 
 # Remedy's own branch listings — matches the four rows in the
-# Reviews tab of remedy-pulse-mockup.html exactly. Keep these keys in sync
+# Reviews tab of index.html exactly. Keep these keys in sync
 # if a branch is renamed there.
 #
 # `business_profile_url`, checklist 8.5 (see
@@ -175,7 +175,7 @@ NEWS_SEARCH_TERMS = list(dict.fromkeys(
 ))
 
 # Maps an outlet name (as returned in a GNews article's source.name) to the
-# Rate Card tier remedy-pulse-mockup.html's EMV tab uses to price a
+# Rate Card tier index.html's EMV tab uses to price a
 # placement (see the "Rate Card" card on that tab). This is a BUSINESS
 # JUDGMENT CALL — which publication counts as "National Newspaper" vs.
 # "Lifestyle Magazine" vs. "Broadcast TV" is Gian/Marketing's call per the
@@ -215,7 +215,7 @@ OUTLET_TIER_MAP = {
 # Subreddits searched for brand mentions, without the leading "r/". Seeded
 # with r/PhilippinesSkincare specifically because it's the mockup's own
 # existing sample Reddit mention (u/skinseeker_mnl in r/PhilippinesSkincare
-# — remedy-pulse-mockup.html); the other two are a plausible first pass for
+# — index.html); the other two are a plausible first pass for
 # where a PH skincare-clinic brand would actually get discussed. Owner:
 # Marketing should review/tune this list — same "first pass, not a
 # validated set" caveat NEWS_SEARCH_TERMS above already carries.

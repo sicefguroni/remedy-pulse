@@ -9,14 +9,16 @@ This is a **demo/mockup stage** project. The dashboard UI is built and interacti
 ## Repo layout
 
 ```
-remedy-pulse-mockup.html   The interactive dashboard demo (open directly in a browser, no install needed)
+index.html   The dashboard frontend — sample data if you're not logged in, real data once you are
 backend/                   Google Business Profile / Places API connector for pulling real review data
 docs/                      Demo guide and supporting reference docs
 ```
 
+`index.html` was renamed from `remedy-pulse-mockup.html` (checklist 0.26) once it started serving real, logged-in sessions too, not just the demo — a "mockup" filename in a real user's address bar was the wrong signal to send.
+
 ## Getting started
 
-**To view the demo:** open [`remedy-pulse-mockup.html`](remedy-pulse-mockup.html) in any browser. See [`docs/README-Remedy-Pulse-Demo.md`](docs/README-Remedy-Pulse-Demo.md) for a full walkthrough of what's real vs. sample, and things to try.
+**To view the demo:** open [`index.html`](index.html) in any browser. See [`docs/README-Remedy-Pulse-Demo.md`](docs/README-Remedy-Pulse-Demo.md) for a full walkthrough of what's real vs. sample, and things to try.
 
 **To set up the review data connector:** see [`backend/README.md`](backend/README.md) for the Google Cloud setup steps, API access requirements, and known limitations.
 

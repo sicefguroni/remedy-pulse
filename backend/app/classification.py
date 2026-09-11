@@ -157,7 +157,7 @@ class ClassificationResult:
 
 
 # The five crisis / five digest conditions below are copied verbatim from
-# remedy-pulse-mockup.html's openAlertRulesModal() (search that function
+# index.html's openAlertRulesModal() (search that function
 # name), which itself cites "Per Gian's update to §9.2." This is the
 # spec that already exists and is stakeholder-visible in the mockup's own
 # classification-rules modal — implemented here, not reinvented.
