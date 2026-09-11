@@ -154,8 +154,17 @@ def get_overview(
         else 0
     )
 
+    # Checklist 0.24 (docs/decisions/14-last-synced-excludes-non-data-sources.md):
+    # a job whose own success/failure has no bearing on external data
+    # freshness (app.jobs.classification_job, app.jobs.reddit_deletion_job -
+    # see each module's own IS_DATA_SOURCE = False) must not count toward
+    # "when was data last synced." getattr() defaults True so every
+    # ordinary ingestion job (which doesn't set this attribute at all)
+    # counts exactly as before.
     last_synced_at = None
     for job in JOBS:
+        if not getattr(job, "IS_DATA_SOURCE", True):
+            continue
         freshness = get_source_freshness(db, job.SOURCE_NAME)
         if freshness.last_success_at and (last_synced_at is None or freshness.last_success_at > last_synced_at):
             last_synced_at = freshness.last_success_at

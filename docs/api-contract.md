@@ -44,7 +44,7 @@ Query params: `period` (`7d` default | `30d` | `90d` | `custom` with
   "avgGoogleRating": {"value": 5.0, "reviewCount": 128},
   "activeAlerts": {"total": 4, "crisis": 1, "digest": 3},
   "aiSummaryText": "string — see 'AI summary' note below",
-  "lastSyncedAt": "iso8601 or null — the most recent successful run across every registered source, per repository.get_source_freshness()"
+  "lastSyncedAt": "iso8601 or null — the most recent successful run across every registered EXTERNAL DATA source, per repository.get_source_freshness() (see the Status section's isDataSource note below — updated 2026-09-11, checklist 0.24: previously every registered source, unqualified)"
 }
 ```
 
@@ -320,13 +320,23 @@ pending this endpoint existing):
 ```json
 {
   "sources": [
-    {"source": "google_reviews", "lastAttemptAt": "iso8601 or null", "lastSuccessAt": "iso8601 or null", "lastStatus": "success|partial|access_denied|error|null", "lastError": "string or null"}
+    {"source": "google_reviews", "lastAttemptAt": "iso8601 or null", "lastSuccessAt": "iso8601 or null", "lastStatus": "success|partial|access_denied|error|null", "lastError": "string or null", "isDataSource": true}
   ]
 }
 ```
 
 One entry per `app.jobs.JOBS` registry member, from
 `repository.get_source_freshness()`.
+
+`isDataSource` (checklist 0.24,
+`docs/decisions/14-last-synced-excludes-non-data-sources.md`) is `false`
+for a job that only re-processes rows some other job already ingested
+(`classification`, `reddit_deletion_check` today) — it never touches an
+external source itself, so its own success has no bearing on "is the
+data stale." Every source still gets a row here regardless — this is a
+label, not a filter — a UI computing something like `lastSyncedAt`
+itself (see below) should skip `isDataSource: false` entries; a UI
+surfacing per-source failures should not.
 
 ---
 

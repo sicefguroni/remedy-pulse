@@ -1334,11 +1334,22 @@
   function todayForFilters(){ return STATE.isDemoMode ? DEMO_TODAY : new Date(); }
 
   // Wires the sync pill to the REAL GET /api/status response (7.5): the most recent successful
-  // run across every registered source, per the contract's own definition of lastSyncedAt.
+  // run across every registered EXTERNAL DATA source, per the contract's own (updated 2026-09-11,
+  // checklist 0.24) definition of lastSyncedAt.
+  //
+  // Decided (checklist 0.24, docs/decisions/14-last-synced-excludes-non-data-sources.md):
+  // app/jobs/classification_job.py runs every ~15 minutes (re-processing already-ingested rows,
+  // not fetching external data) rather than the ~12h default every fetch-from-an-external-source
+  // job uses - so a source with s.isDataSource === false (classification, reddit_deletion_check)
+  // is excluded here, the same way GET /api/overview's own lastSyncedAt now excludes it
+  // server-side (see app/api/routes/overview.py). Without this, the pill could read "synced 3 min
+  // ago" while every real external data source (Google, Reddit, GNews, Meta) had been stale for
+  // half a day - classification's own success masking exactly the thing P0-11 exists to surface.
   function mostRecentSuccessAt(status, overview){
     let latest = null;
     if (status && Array.isArray(status.sources)){
       status.sources.forEach(s => {
+        if (s.isDataSource === false) return; // checklist 0.24 - see comment above
         if (s.lastSuccessAt){
           const t = new Date(s.lastSuccessAt);
           if (!isNaN(t.getTime()) && (!latest || t > latest)) latest = t;

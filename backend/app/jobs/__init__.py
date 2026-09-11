@@ -21,6 +21,21 @@ expose exactly two things:
         alone can't express (e.g. RunStatus.ACCESS_DENIED on a 403 - see
         google_reviews_job.run()).
 
+Optionally, a job module may also expose:
+
+    IS_DATA_SOURCE: bool
+        Checklist 0.24 (docs/decisions/14-last-synced-excludes-non-data-
+        sources.md). Defaults to True (via getattr(job, "IS_DATA_SOURCE",
+        True) at every call site that reads it - app/api/routes/
+        overview.py's lastSyncedAt and app/api/routes/status.py's
+        isDataSource field) for the common case: an adapter that fetches
+        from an external source and writes new Mention rows. Set to False
+        on a job that only re-processes rows some OTHER job already
+        wrote (reddit_deletion_job.py, classification_job.py) - such a
+        job's own success/failure has no bearing on "is the DATA stale,"
+        which is the one thing lastSyncedAt and the mockup's sync pill
+        exist to answer, so it must not count toward either.
+
 This is intentionally not a Protocol-enforced plugin system with
 discovery/registration machinery - there are 2-5 of these jobs total, and
 a plain module plus a list is all that scale needs. `JOBS` below is the

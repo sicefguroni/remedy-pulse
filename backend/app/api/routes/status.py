@@ -12,6 +12,15 @@ get_source_freshness() data now.
 
 One entry per app.jobs.JOBS registry member, exactly as the contract
 specifies.
+
+`isDataSource` (checklist 0.24, docs/decisions/14-last-synced-excludes-
+non-data-sources.md): every source still gets a row here (a failed
+classification or Reddit-deletion-check run must stay visible, e.g. to
+app/jobs/__init__.py's job contract note and the mockup's per-source
+failure banner) - this field only tells a consumer which ones represent
+external data freshness, for computing something like GET /api/overview's
+lastSyncedAt itself does. Not a filter on `sources`, just a label on each
+entry.
 """
 
 from __future__ import annotations
@@ -40,6 +49,7 @@ def status(db: Session = Depends(get_db), user: User = Depends(get_current_user)
                 "lastSuccessAt": iso(freshness.last_success_at),
                 "lastStatus": enum_value(freshness.last_status),
                 "lastError": freshness.last_error,
+                "isDataSource": getattr(job, "IS_DATA_SOURCE", True),
             }
         )
     return {"sources": sources}
