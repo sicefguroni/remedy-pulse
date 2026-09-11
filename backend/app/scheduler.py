@@ -37,7 +37,20 @@ from app.repository import get_source_freshness
 # Override a specific source here only once a real constraint shows up
 # (e.g. a stricter upstream rate limit), not preemptively.
 DEFAULT_CADENCE_HOURS = 12.0
-CADENCE_HOURS: dict[str, float] = {}
+CADENCE_HOURS: dict[str, float] = {
+    # app/jobs/classification_job.py (checklist 0.23) is not an external
+    # ingestion source with a rate limit to respect - it's enrichment
+    # work on rows other jobs already wrote, and the PRD's core v1
+    # success metric (median time from a negative mention APPEARING to
+    # being ASSIGNED, target under 4 business hours) can't be met if a
+    # mention sits unclassified - and therefore unrouted to the alert
+    # workflow - for up to 12 hours before this job even looks at it.
+    # 0.25h (15 minutes) leaves wide headroom under that 4-hour target
+    # while still not running on literally every scheduler tick; raise or
+    # lower once real classification volume/latency data exists to tune
+    # against, not preemptively further than this.
+    "classification": 0.25,
+}
 
 
 def _cadence_for(source: str) -> float:

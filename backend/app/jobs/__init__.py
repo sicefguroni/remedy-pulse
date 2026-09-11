@@ -32,6 +32,7 @@ those files' internals.
 from __future__ import annotations
 
 from app.jobs import (
+    classification_job,
     google_places_job,
     google_reviews_job,
     meta_facebook_comments_job,
@@ -62,6 +63,14 @@ from app.jobs import (
 # for upstream deletion, not ingesting new ones), but it's still exactly
 # "does this source's cadence say it's due? if so, run it," the same
 # shape every other entry in this list is.
+#
+# classification_job (checklist 0.23) is the same kind of exception as
+# reddit_deletion_job: it re-processes existing Mention rows rather than
+# ingesting new ones, but still fits this same "one SOURCE_NAME, one
+# is_due() cadence check" contract - see that module's own docstring for
+# why it was missing entirely until now, and app.scheduler.CADENCE_HOURS
+# for why its cadence is deliberately much shorter than everything else
+# here.
 JOBS = [
     google_reviews_job,
     google_places_job,
@@ -71,6 +80,7 @@ JOBS = [
     meta_instagram_comments_job,
     meta_instagram_mentions_job,
     meta_facebook_comments_job,
+    classification_job,
 ]
 
 # 9.2's is_within_backfill_window() lives in app.repository, NOT here,
