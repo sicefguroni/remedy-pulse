@@ -149,7 +149,9 @@ One row per owned branch, aggregated from `Mention` rows where
       "reviewCount": 42,
       "pendingReplies": 1,
       "responseRatePct": 88,
-      "status": "ok|no_reviews|access_denied|error — mirrors backend/app/models.py's IngestionRun/status conventions"
+      "status": "ok|no_reviews|access_denied|error — mirrors backend/app/models.py's IngestionRun/status conventions",
+      "aliases": ["Remedy Vertis", "Remedy Vertis North"],
+      "businessProfileUrl": null
     }
   ]
 }
@@ -160,12 +162,37 @@ that venue's rows — do not reintroduce the mockup's old bug (0.14) where
 one reply cleared a whole branch; this must reflect the real per-row
 `has_reply` count.
 
+`aliases` (checklist 8.8) is display-only reference data from
+`backend/config.py`'s `OWNED_LISTING_ALIASES` — the pre-refactor mockup's
+"Also matches: ..." tooltip on this branch's name, recovered from git
+history rather than reintroduced by guessing. Always an array, empty
+(`[]`) for the two branches with no documented aliases — never an omitted
+key.
+
 ### `POST /api/reviews/{mention_id}/reply`
 Marks that one review's `has_reply = true` in the database (this API does
 **not** post a real reply to Google — that would need the Business
 Profile write scope, out of scope here) and logs nothing further beyond
 the row update. `200` with the updated listing aggregate (same shape as
 one entry in `GET /api/reviews`'s `listings` array), `404` if not found.
+
+### `POST /api/reviews/by-venue/{venue}/reply`
+Checklist 7.4/8.5 — the endpoint the mockup's UI actually calls, since its
+reply flow is branch-level (`pendingReplies`, a count) rather than one
+specific review id. Marks the **oldest** not-yet-replied review at
+`venue` as `has_reply = true` (same "does not post to Google" scope as
+the by-id endpoint above — see
+`docs/decisions/13-review-reply-flow.md`). `200` with the updated listing
+aggregate, `404` if `venue` has no pending review right now. A caller
+should only invoke this when `GET /api/reviews` already shows
+`pendingReplies > 0` for that venue.
+
+`GET /api/reviews`'s `businessProfileUrl` is the companion piece: the
+deep link the UI's reply modal sends a human to, to post the actual reply
+text themselves on Google's own interface (this system never posts reply
+text anywhere). `null` until `backend/config.py`'s `OWNED_LISTINGS`
+placeholder for that branch is replaced with a real one — see that
+file's own comment for why a URL isn't fabricated here.
 
 ---
 
@@ -201,7 +228,10 @@ tagged with that topic key.
 
 ```json
 {
-  "shareOfVoice": [{"name": "Remedy", "pct": 14, "isOwn": true}, {"name": "Belo Medical Group", "pct": 40, "isOwn": false}],
+  "shareOfVoice": [
+    {"name": "Remedy", "pct": 14, "isOwn": true, "aliases": ["Remedy Skin Solutions", "Remedy BGC", "Skin Bar by Remedy"]},
+    {"name": "Belo Medical Group", "pct": 40, "isOwn": false, "aliases": []}
+  ],
   "sourceBreakdown": [{"platform": "google_reviews", "pct": 34}],
   "competitorSentiment": [{"name": "Remedy", "positivePct": 72, "neutralPct": 22, "negativePct": 6, "isOwn": true}]
 }
@@ -210,6 +240,14 @@ tagged with that topic key.
 Ratings come from `google_places_competitor` Mention rows (4.2);
 `competitorSentiment` needs sentiment classification per-competitor,
 same classifier as 6.1 — reuse it, don't build a second one.
+
+`shareOfVoice[].aliases` (checklist 8.8) is display-only reference data
+from `backend/config.py`'s `BRAND_ALIASES` — the pre-refactor mockup's
+"Also matches: ..." tooltip on the Share of Voice legend, recovered from
+git history. Always an array, empty (`[]`) for a name with no documented
+aliases — never an omitted key. Not to be confused with alias-based TEXT
+MATCHING during ingestion, which is a separate, still-open gap (see
+`app.repository.get_competitors_data()`'s own docstring).
 
 ---
 

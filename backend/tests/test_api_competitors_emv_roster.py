@@ -91,10 +91,17 @@ def test_competitors_shape_and_remedy_is_own(client, auth_headers, sqlite_sessio
 
     remedy_sov = next(row for row in body["shareOfVoice"] if row["name"] == "Remedy")
     assert remedy_sov["isOwn"] is True
-    assert set(remedy_sov.keys()) == {"name", "pct", "isOwn"}
+    assert set(remedy_sov.keys()) == {"name", "pct", "isOwn", "aliases"}
+    # checklist 8.8 — config.BRAND_ALIASES["Remedy"], recovered from the
+    # pre-refactor mockup's own "Also matches: ..." tooltip.
+    assert "Remedy BGC" in remedy_sov["aliases"]
+    assert "Skin Bar by Remedy" in remedy_sov["aliases"]
 
     belo_sov = next(row for row in body["shareOfVoice"] if row["name"] == "Belo Medical Group")
     assert belo_sov["isOwn"] is False
+    # Belo has no documented aliases (config.py's own comment) — empty
+    # list, not an omitted key.
+    assert belo_sov["aliases"] == []
 
     remedy_sentiment = next(row for row in body["competitorSentiment"] if row["name"] == "Remedy")
     assert set(remedy_sentiment.keys()) == {"name", "isOwn", "positivePct", "neutralPct", "negativePct"}

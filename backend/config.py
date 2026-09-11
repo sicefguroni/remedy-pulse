@@ -44,18 +44,33 @@ BACKFILL_WINDOW_DAYS = 90
 # Remedy's own branch listings — matches the four rows in the
 # Reviews tab of remedy-pulse-mockup.html exactly. Keep these keys in sync
 # if a branch is renamed there.
+#
+# `business_profile_url`, checklist 8.5 (see
+# docs/decisions/13-review-reply-flow.md): the link the Reviews tab's
+# reply modal sends a human to, to post an actual reply in their own
+# words on Google's own interface — this system never posts reply text to
+# Google itself. Left `None` deliberately, not guessed: a per-location
+# Business Profile deep link needs the real location_id above (still a
+# REPLACE_ME placeholder — Phase 1 item 1.1's access request is what
+# provides real IDs, not something fabricatable here). The UI falls back
+# to Business Profile's own stable top-level URL when this is `None`, per
+# app/api/routes/reviews.py.
 OWNED_LISTINGS = {
     "Remedy — BGC (One Uptown Residence)": {
         "location_id": "REPLACE_ME_BGC_LOCATION_ID",
+        "business_profile_url": None,
     },
     "Club Remedy — BGC": {
         "location_id": "REPLACE_ME_CLUB_REMEDY_LOCATION_ID",
+        "business_profile_url": None,
     },
     "Remedy — Vertis North": {
         "location_id": "REPLACE_ME_VERTIS_NORTH_LOCATION_ID",
+        "business_profile_url": None,
     },
     "Skin Bar by Remedy — Greenhills Mall": {
         "location_id": "REPLACE_ME_GREENHILLS_LOCATION_ID",
+        "business_profile_url": None,
     },
 }
 
