@@ -734,7 +734,7 @@ def get_reviews_listings(session: Session) -> list[ReviewListing]:
 
 
 # The five fixed topic keys/labels this project ships with today (6.5's
-# taxonomy), matching remedy-pulse-mockup.html's existing topicMentions
+# taxonomy), matching index.html's existing topicMentions
 # object exactly - see docs/api-contract.md's Topics section.
 FIXED_TOPICS: list[tuple[str, str]] = [
     ("facial-results", "Facial Results & Glow"),

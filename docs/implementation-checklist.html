@@ -767,7 +767,7 @@ const PHASES = [
      e:"S", r:"P0-11", risk:"The freshness indicator has no data source, so it either lies or is omitted — and stale data reads as current", sev:"high"},
 
     {id:"0.4", title:"Fix or retract the \"matches the mockup exactly\" claim on <code>reviews_aggregate.json</code>",
-     body:"<code>backend/README.md</code> says it <em>\"Matches the Reviews tab table exactly\"</em>; <code>fetch_owned_reviews.py:1-10</code> says <em>\"shaped to match remedy-pulse-mockup.html directly.\"</em> Verified false in three ways: the Reviews table has a <b>Trend (30d)</b> column <code>build_aggregate()</code> never produces; <code>responseRate</code> is a fraction (<code>0.88</code>) where the table renders <code>88%</code>; and there is no <code>status</code> field behind the \"All clear\" / \"N pending replies\" tag.",
+     body:"<code>backend/README.md</code> says it <em>\"Matches the Reviews tab table exactly\"</em>; <code>fetch_owned_reviews.py:1-10</code> says <em>\"shaped to match index.html directly.\"</em> Verified false in three ways: the Reviews table has a <b>Trend (30d)</b> column <code>build_aggregate()</code> never produces; <code>responseRate</code> is a fraction (<code>0.88</code>) where the table renders <code>88%</code>; and there is no <code>status</code> field behind the \"All clear\" / \"N pending replies\" tag.",
      e:"S", r:"P0-6", risk:"Whoever wires the tab trusts the claim, and finds the mismatch at render time instead of at read time", sev:"medium"},
 
     {id:"0.5", title:"Drop <code>google-auth-httplib2</code> or switch to the official client library",
@@ -795,7 +795,7 @@ const PHASES = [
      e:"S to decide, M to build", r:"P0-1, P0-9", risk:"The tab carrying the largest numbers leadership will quote has no identified data source", sev:"high"},
 
     {id:"0.10", title:"Define and document the Clarity Index formula",
-     body:"The composite health score (<code>remedy-pulse-mockup.html:417</code>) is the landing view's headline number and the one figure leadership is most likely to repeat. Its formula is documented <b>nowhere</b> — verified: zero hits for \"clarity\" across every Markdown file in the repo. The EMV tab deliberately shows its math on every row; the score above it shows none.",
+     body:"The composite health score (<code>index.html:417</code>) is the landing view's headline number and the one figure leadership is most likely to repeat. Its formula is documented <b>nowhere</b> — verified: zero hits for \"clarity\" across every Markdown file in the repo. The EMV tab deliberately shows its math on every row; the score above it shows none.",
      e:"S to define, M to implement", r:"P0-7", risk:"The number leadership acts on cannot be audited, reproduced, or defended when someone disagrees with it", sev:"medium"},
 
     {t:"concept", marker:"Understand first", h:"A composite score without a published formula gets argued with instead of acted on.",

@@ -5,7 +5,7 @@ GNews API and writes a normalized JSON file:
 
 This is the engineering half of checklist item 1.5 / decision doc
 docs/decisions/02-news-press-ingestion-path.md: the EMV tab in
-remedy-pulse-mockup.html is built entirely on press coverage, and before
+index.html is built entirely on press coverage, and before
 this script there was no code, key, or config for any news source at all
 — the decision doc recommends a time-boxed GNews evaluation, and this
 script is that evaluation harness. It does NOT decide the vendor question

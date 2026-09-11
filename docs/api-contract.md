@@ -2,7 +2,7 @@
 
 This is the shared contract two things are built against in parallel:
 `backend/app/api/` (the real implementation, 7.1/7.4) and
-`remedy-pulse-mockup.html`'s data-driven refactor (7.2, and everything
+`index.html`'s data-driven refactor (7.2, and everything
 that rides on it: 7.3/7.5/7.6/7.7). Both must match this document, not
 each other's code, since they're built by separate agents that don't see
 one another's output until a later reconciliation pass. If either side
@@ -50,7 +50,7 @@ Query params: `period` (`7d` default | `30d` | `90d` | `custom` with
 
 **Clarity Index** reuses the exact formula in
 `docs/decisions/01-clarity-index-formula.md` /
-`remedy-pulse-mockup.html`'s `computeClarityIndex()` — port it to Python
+`index.html`'s `computeClarityIndex()` — port it to Python
 against real aggregate data (rating, sentiment mix, response rate,
 mention-volume trend) rather than inventing a second formula.
 

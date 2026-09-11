@@ -69,7 +69,7 @@ diagnosable fact" philosophy) — there's no reason this one aggregate value sho
 - `app/api/routes/status.py`'s `GET /api/status` gains an `isDataSource` field per source (a label,
   not a filter — every source still gets a row, including a failed one, so the per-source failure
   banner still works for classification/reddit_deletion_check).
-- `remedy-pulse-mockup.html`'s `mostRecentSuccessAt()` skips any `status.sources` entry with
+- `index.html`'s `mostRecentSuccessAt()` skips any `status.sources` entry with
   `isDataSource === false`.
 - `docs/api-contract.md` updated in both places (`lastSyncedAt`'s definition, `GET /api/status`'s
   shape) to describe the new behavior, not just the code.

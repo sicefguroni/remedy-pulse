@@ -18,10 +18,10 @@ Repo verification (this session):
 
 - `grep -rni "praw"` across the entire repo (all file types, excluding `.git`): **zero hits** outside of documentation describing the gap (the implementation checklist itself). `backend/requirements.txt` lists exactly four packages — `google-auth`, `google-auth-oauthlib`, `requests`, `python-dotenv` — no PRAW, no `asyncpraw`, no Reddit HTTP client of any kind.
 - `grep -rni "reddit"` across the entire repo: no ingestion code, no OAuth client setup, no User-Agent string construction, no schema field, no scheduled job. The only substantive hits are:
-  - `remedy-pulse-mockup.html:679-686` — one static, hardcoded feed item rendering a Reddit mention (`u/skinseeker_mnl`, `r/PhilippinesSkincare`, "Reach: ~1,200") indistinguishable in the rendered UI from the Google/Instagram/News feed items around it, other than the platform tag and emoji avatar.
-  - `remedy-pulse-mockup.html:548, 1093, 1660` — a hardcoded "Sentiment dip in Reddit thread" alert and a mention of a Reddit thread in the canned AI weekly-summary text, both presented as live findings.
-  - `remedy-pulse-mockup.html:619` — the source-breakdown pie chart shows "Reddit 14%" of mention share as a static number.
-  - `remedy-pulse-mockup.html:1406` — Reddit is one of the platform filter options (`['All', 'Google', 'Reddit', 'Instagram', 'Facebook', 'News', 'TikTok', 'X']`), implying it is a filterable, live-equivalent source in the UI's own data model.
+  - `index.html:679-686` — one static, hardcoded feed item rendering a Reddit mention (`u/skinseeker_mnl`, `r/PhilippinesSkincare`, "Reach: ~1,200") indistinguishable in the rendered UI from the Google/Instagram/News feed items around it, other than the platform tag and emoji avatar.
+  - `index.html:548, 1093, 1660` — a hardcoded "Sentiment dip in Reddit thread" alert and a mention of a Reddit thread in the canned AI weekly-summary text, both presented as live findings.
+  - `index.html:619` — the source-breakdown pie chart shows "Reddit 14%" of mention share as a static number.
+  - `index.html:1406` — Reddit is one of the platform filter options (`['All', 'Google', 'Reddit', 'Instagram', 'Facebook', 'News', 'TikTok', 'X']`), implying it is a filterable, live-equivalent source in the UI's own data model.
   - `docs/README-Remedy-Pulse-Demo.md:15` — "Everything you see... is sample data, not live information pulled from Google, Instagram, Reddit, etc."
   - `docs/README-Remedy-Pulse-Demo.md:51` — "Nothing is connected to real Google, Instagram, X, Reddit, or news data yet."
 
@@ -29,7 +29,7 @@ Repo verification (this session):
 
 The task framing behind this checklist item characterizes the demo guide as listing Reddit among tracked channels "without disclosing it's sample data." Reading the demo guide directly shows this needs qualifying, not just repeating: **the demo guide does carry an explicit, repeated, document-level disclosure** that Reddit data is sample-only and that no real Reddit connection exists (the two quotes above). The gap is narrower and more specific than "no disclosure exists" — it is that:
 
-1. The disclosure lives in a separate companion document (`docs/README-Remedy-Pulse-Demo.md`), not inside the mockup UI itself. Someone who opens `remedy-pulse-mockup.html` directly, without reading the demo guide first, sees the Reddit feed item, alert, pie-chart share, and platform filter rendered with the same visual treatment as sources that actually have backend code (Google) — the only in-UI cue is a single global "Demo" badge in the top-right corner, not a per-item or per-source label.
+1. The disclosure lives in a separate companion document (`docs/README-Remedy-Pulse-Demo.md`), not inside the mockup UI itself. Someone who opens `index.html` directly, without reading the demo guide first, sees the Reddit feed item, alert, pie-chart share, and platform filter rendered with the same visual treatment as sources that actually have backend code (Google) — the only in-UI cue is a single global "Demo" badge in the top-right corner, not a per-item or per-source label.
 2. Neither the mockup nor the demo guide's disclosure communicates the *scale* of the gap — that Reddit isn't "not connected yet" in the same sense Google Reviews is (Google has a working, tested connector script gated only on API access approval — see `backend/README.md`), but has **zero ingestion code of any kind**, and is the only P0 source with a written third-party compliance commitment (C-1 through C-5) that is entirely unimplemented.
 
 ## Options considered

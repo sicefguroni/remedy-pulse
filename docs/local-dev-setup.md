@@ -1,6 +1,6 @@
 # Running Remedy Pulse locally (real backend, not the sample-data mockup)
 
-`remedy-pulse-mockup.html` opens directly in a browser with **no setup at
+`index.html` opens directly in a browser with **no setup at
 all** and shows sample data — see `docs/README-Remedy-Pulse-Demo.md` for
 that path. This doc is for the other mode: the same HTML file, but
 logged in against a real FastAPI backend backed by a real Postgres
@@ -58,7 +58,7 @@ Assign dropdown's roster).
 uvicorn app.api.main:app --reload --port 8000
 ```
 
-**Port must be 8000** — `remedy-pulse-mockup.html`'s `API_BASE` constant
+**Port must be 8000** — `index.html`'s `API_BASE` constant
 is hardcoded to `http://localhost:8000/api`. Leave this running in its
 own terminal.
 
@@ -66,7 +66,7 @@ own terminal.
 
 ```powershell
 cd ..
-start remedy-pulse-mockup.html
+start index.html
 ```
 
 It opens in demo mode (sample data) by default. Click **Log in** next to

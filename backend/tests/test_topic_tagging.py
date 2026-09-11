@@ -114,7 +114,7 @@ def test_tag_topics_returns_empty_list_for_blank_text_without_calling_the_model(
 
 
 def test_topic_taxonomy_has_the_five_mockup_topics_and_labels():
-    # Verbatim match against remedy-pulse-mockup.html's topicMentions keys
+    # Verbatim match against index.html's topicMentions keys
     # and labels — see topic_tagging.py's module docstring.
     assert TOPIC_TAXONOMY == {
         "facial-results": "Facial Results & Glow",

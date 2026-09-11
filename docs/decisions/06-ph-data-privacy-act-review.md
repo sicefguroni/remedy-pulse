@@ -16,7 +16,7 @@ def mask_reviewer_name(display_name):
 That document — referred to throughout the codebase as `RemedyPulseSpec_1` — was searched for directly rather than taking the checklist's claim on faith: `grep -rni "RemedyPulseSpec"` across the entire repository (all file types, excluding `.git`) returns exactly one hit that isn't the checklist itself describing this gap:
 
 ```
-remedy-pulse-mockup.html:982:  <span>Spec ref: RemedyPulseSpec_1 · v0.1 draft</span>
+index.html:982:  <span>Spec ref: RemedyPulseSpec_1 · v0.1 draft</span>
 ```
 
 That is a footer label, not a document. There is no file named anything resembling `RemedyPulseSpec_1` anywhere in this repository, in `docs/`, or referenced by path from any code comment. **Verified: the document this code cites as its legal justification does not exist anywhere a person working from this repo can read it.** This is not a repetition of the checklist's assertion — it is independently confirmed by grep in this session.
@@ -27,14 +27,14 @@ Searched with `grep -rni "§5\.5|§6\.3|§6\.4|§9\.2|§10\b|§11\b|§18\b"` and
 
 | File : Line | What it cites | Context |
 |---|---|---|
-| `remedy-pulse-mockup.html:982` | `RemedyPulseSpec_1` (by name) | Footer: "Spec ref: RemedyPulseSpec_1 · v0.1 draft" |
-| `remedy-pulse-mockup.html:670` | §10 | Card-sub text: "supports the KOL identification feature in §10 of the spec" |
-| `remedy-pulse-mockup.html:683` | §18 | Card-sub text: "New tracked entities per Marketing's §18 update" |
-| `remedy-pulse-mockup.html:878` | §6.3 | EMV tab description: "rate card updated to Media Meter's published card per Gian's §6.3 note" |
-| `remedy-pulse-mockup.html:890` | §6.3 | Rate Card card-sub: "the Media Meter card Gian attached to §6.3" |
-| `remedy-pulse-mockup.html:934` | §6.4 | PeopleAsia EMV row detail: "this replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base" |
-| `remedy-pulse-mockup.html:970` | §5.5 | ANC EMV row detail: "Online capture only, per §5.5" |
-| `remedy-pulse-mockup.html:1238` | §9.2 | Alert-rules modal: "Per Gian's update to §9.2 — routes each item to a Crisis Alert (immediate) or the Daily Digest" |
+| `index.html:982` | `RemedyPulseSpec_1` (by name) | Footer: "Spec ref: RemedyPulseSpec_1 · v0.1 draft" |
+| `index.html:670` | §10 | Card-sub text: "supports the KOL identification feature in §10 of the spec" |
+| `index.html:683` | §18 | Card-sub text: "New tracked entities per Marketing's §18 update" |
+| `index.html:878` | §6.3 | EMV tab description: "rate card updated to Media Meter's published card per Gian's §6.3 note" |
+| `index.html:890` | §6.3 | Rate Card card-sub: "the Media Meter card Gian attached to §6.3" |
+| `index.html:934` | §6.4 | PeopleAsia EMV row detail: "this replaces the §6.4 worked example, which was tuned to the old illustrative Tier 2 base" |
+| `index.html:970` | §5.5 | ANC EMV row detail: "Online capture only, per §5.5" |
+| `index.html:1238` | §9.2 | Alert-rules modal: "Per Gian's update to §9.2 — routes each item to a Crisis Alert (immediate) or the Daily Digest" |
 | `backend/fetch_owned_reviews.py:169` | §11 | Comment inside `mask_reviewer_name()`: "Per spec §11 (PH Data Privacy Act)" |
 | `backend/README.md:87` | §11 | Documentation of `reviews_raw.json`'s output shape: "masked to first-name-plus-initial per the PH Data Privacy Act note in §11 of the spec" |
 | `backend/config.py:78` | §6.3 | Comment on `OUTLET_TIER_MAP`: "Gian/Marketing's call per the PRD's §6.3 note, not an engineering one" |

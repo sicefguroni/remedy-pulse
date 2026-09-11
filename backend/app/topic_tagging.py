@@ -4,7 +4,7 @@ Read docs/decisions/11-topic-tagging-approach.md before touching this file —
 it explains the scoping decision this module implements: tagging each
 item against a known, fixed five-topic list (facial-results,
 staff-service, rejuran, pricing, booking — the mockup's own
-`topicMentions` keys/labels, remedy-pulse-mockup.html), NOT true
+`topicMentions` keys/labels, index.html), NOT true
 unsupervised topic *clustering* (discovering the topics themselves from
 data). The checklist's 6.5 item is titled "Topic clustering," but real
 clustering needs real data volume this project doesn't have live yet —
@@ -73,7 +73,7 @@ from app.models import Mention
 
 logger = logging.getLogger(__name__)
 
-# The five topics the mockup already shows (remedy-pulse-mockup.html,
+# The five topics the mockup already shows (index.html,
 # `topicMentions` — keys and labels copied verbatim from there, not
 # guessed). Keep these in sync if the mockup's own taxonomy ever changes;
 # per the module docstring, migrating to a *different* set of fixed

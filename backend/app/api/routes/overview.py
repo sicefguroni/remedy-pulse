@@ -2,7 +2,7 @@
 
 Clarity Index: ports docs/decisions/01-clarity-index-formula.md's exact
 formula (also implemented client-side today as
-remedy-pulse-mockup.html's computeClarityIndex()) to Python against real
+index.html's computeClarityIndex()) to Python against real
 aggregate data, per docs/api-contract.md's own instruction not to invent
 a second formula.
 

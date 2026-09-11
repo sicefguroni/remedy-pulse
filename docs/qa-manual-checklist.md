@@ -62,7 +62,7 @@ alerts without further navigation."*
 proves `GET /api/overview` (+ `GET /api/overview/trend`, 8.1) returns
 everything that view needs — health score (`clarityIndex`), volume trend
 (`totalMentions.deltaPct`), and outstanding alerts (`activeAlerts`) — in
-one round trip. Code inspection also confirms `remedy-pulse-mockup.html`'s
+one round trip. Code inspection also confirms `index.html`'s
 nav has `class="active"` hardcoded on the Overview tab's `<a>`, and
 `initApp()` populates `STATE.overview` before rendering anything else.
 
@@ -89,7 +89,7 @@ any tab, then T is visible and updates after a successful sync."*
 **Already automated:** `test_p0_11_last_synced_reflects_the_most_recent_successful_run`
 proves the data side — `GET /api/status` and `GET /api/overview`'s
 `lastSyncedAt` both reflect a real run-ledger (`ingestion_runs`) row.
-Code inspection also confirms `remedy-pulse-mockup.html`'s `#syncPill`
+Code inspection also confirms `index.html`'s `#syncPill`
 lives in `<header>`, outside every per-tab `<section class="view">`, so
 the same element renders unconditionally regardless of which tab is
 active.
