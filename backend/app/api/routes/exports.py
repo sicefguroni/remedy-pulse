@@ -49,7 +49,14 @@ def _parse_dt(value: str | None) -> datetime | None:
 
 def _csv_response(fieldnames: list[str], rows: list[dict], filename: str) -> Response:
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    # extrasaction="ignore": `fieldnames` is this export's deliberate
+    # column allowlist, not an assertion that every row dict has exactly
+    # these keys and no others - e.g. reviews_csv's rows come straight
+    # from all_listings(), which also carries `aliases` (checklist 8.8,
+    # UI-only display data with no CSV column of its own). Without this,
+    # DictWriter's default extrasaction="raise" breaks the export the
+    # moment a row dict gains any field this export doesn't list.
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     writer.writerows(rows)
     return Response(

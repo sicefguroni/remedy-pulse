@@ -125,6 +125,16 @@ from fetch_reddit_mentions import DELETED_MARKERS, fullname_kind, get_reddit_cli
 
 SOURCE_NAME = "reddit_deletion_check"
 
+# Checklist 0.24 (docs/decisions/14-last-synced-excludes-non-data-sources.md):
+# this job re-checks rows reddit_job.py already ingested - it never
+# fetches new external data itself, so its own success/failure has no
+# bearing on "is the DATA stale," which is what GET /api/overview's
+# lastSyncedAt and the mockup's sync pill both exist to answer. See
+# app/jobs/classification_job.py's identical flag for the full reasoning,
+# and app/jobs/__init__.py's own docstring for the contract this
+# attribute is part of.
+IS_DATA_SOURCE = False
+
 # See module docstring's "Batching" section for why this exists and why
 # 100 specifically.
 BATCH_SIZE = 100

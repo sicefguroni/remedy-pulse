@@ -230,7 +230,31 @@ def _run_capability(
     """Runs one capability's fetch_fn() under its own start_run(). See the
     module docstring's decision 2 for why "not_configured" gets no ledger
     row at all, while "ok"/"access_denied"/"error" each get one."""
-    result = fetch_fn()
+    try:
+        result = fetch_fn()
+    except Exception as exc:
+        # fetch_fn() (one of fetch_instagram_comments/
+        # fetch_instagram_mentions/fetch_facebook_comments) only converts
+        # two specific failure shapes into its own typed {"status": ...}
+        # result - MetaAccessDenied -> "access_denied",
+        # RetryExhaustedError -> "error" (see fetch_meta_mentions.py's
+        # _graph_get(), which falls through to a plain
+        # resp.raise_for_status() - a genuine non-retryable HTTP error
+        # status, or a malformed JSON body, raises something neither of
+        # those two catches). Uncaught here, that exception would escape
+        # BEFORE start_run() below even opens - meaning this capability's
+        # failure gets NO ledger row at all, which is worse than an ERROR
+        # row: "no row" reads as "never run" via get_source_freshness(),
+        # not "ran and failed," exactly the ambiguity decision 2 above
+        # says only "not_configured" should produce. Record it as this
+        # capability's own ERROR run instead of letting it propagate
+        # uncaught (app.scheduler.run_due_jobs() would still isolate it
+        # from the other two capabilities/jobs either way, but silently,
+        # with nothing in the ledger to explain it).
+        with start_run(session, source=ledger_source) as recorder:
+            recorder.mark(RunStatus.ERROR, error=str(exc))
+        return
+
     if result["status"] == "not_configured":
         return
 

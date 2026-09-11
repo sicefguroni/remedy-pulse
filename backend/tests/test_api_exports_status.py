@@ -92,11 +92,14 @@ def test_status_one_entry_per_registered_job(client, auth_headers, sqlite_sessio
     assert {row["source"] for row in body["sources"]} == {job.SOURCE_NAME for job in JOBS}
 
     for row in body["sources"]:
-        assert set(row.keys()) == {"source", "lastAttemptAt", "lastSuccessAt", "lastStatus", "lastError"}
+        assert set(row.keys()) == {
+            "source", "lastAttemptAt", "lastSuccessAt", "lastStatus", "lastError", "isDataSource",
+        }
 
     google = next(row for row in body["sources"] if row["source"] == "google_reviews")
     assert google["lastStatus"] == "success"
     assert google["lastSuccessAt"] is not None
+    assert google["isDataSource"] is True
 
     places = next(row for row in body["sources"] if row["source"] == "google_places_competitor")
     assert places["lastStatus"] == "access_denied"
@@ -105,6 +108,20 @@ def test_status_one_entry_per_registered_job(client, auth_headers, sqlite_sessio
     never_run = next(row for row in body["sources"] if row["source"] == "reddit")
     assert never_run["lastAttemptAt"] is None
     assert never_run["lastStatus"] is None
+
+
+def test_status_marks_non_data_sources(client, auth_headers):
+    """checklist 0.24 - classification/reddit_deletion_check re-process
+    rows some other job already ingested; they still get a row here
+    (isDataSource is a label, not a filter - see this route's own
+    docstring) but must be tagged false so a consumer computing something
+    like lastSyncedAt itself knows to skip them."""
+    body = client.get("/api/status", headers=auth_headers).json()
+    classification = next(row for row in body["sources"] if row["source"] == "classification")
+    assert classification["isDataSource"] is False
+
+    reddit_deletion = next(row for row in body["sources"] if row["source"] == "reddit_deletion_check")
+    assert reddit_deletion["isDataSource"] is False
 
 
 # --- POST /api/exports/{type} ---

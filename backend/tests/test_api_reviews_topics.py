@@ -103,8 +103,31 @@ def test_reviews_listing_shape(client, auth_headers, sqlite_session):
     body = client.get("/api/reviews", headers=auth_headers).json()
     assert set(body.keys()) == {"listings"}
     item = next(row for row in body["listings"] if row["venue"] == venue)
-    assert set(item.keys()) == {"venue", "rating", "reviewCount", "pendingReplies", "responseRatePct", "status"}
+    assert set(item.keys()) == {
+        "venue", "rating", "reviewCount", "pendingReplies", "responseRatePct", "status", "aliases",
+        "businessProfileUrl",
+    }
     assert item["status"] == "ok"
+    # This venue has no documented aliases (config.OWNED_LISTING_ALIASES
+    # only covers Vertis North and Greenhills) — empty list, not omitted.
+    assert item["aliases"] == []
+    # checklist 8.5 — no real Business Profile URL exists yet for any
+    # branch (config.OWNED_LISTINGS's placeholders) — None, not omitted
+    # or fabricated.
+    assert item["businessProfileUrl"] is None
+
+
+def test_reviews_listing_aliases_from_config_no_reviews_yet(client, auth_headers):
+    """checklist 8.8 — config.OWNED_LISTING_ALIASES, recovered from the
+    pre-refactor mockup's per-branch "Also matches: ..." tooltip. Exercised
+    on a venue with zero ingested reviews (the setdefault/no_reviews path)
+    so both dict-construction sites in all_listings() are covered, not
+    just the one with real Mention rows."""
+    body = client.get("/api/reviews", headers=auth_headers).json()
+    vertis = next(row for row in body["listings"] if row["venue"] == "Remedy — Vertis North")
+    assert vertis["status"] == "no_reviews"
+    assert vertis["aliases"] == ["Remedy Vertis", "Remedy Vertis North"]
+    assert vertis["businessProfileUrl"] is None
 
 
 def test_reviews_reply_marks_has_reply_and_returns_updated_listing(client, auth_headers, sqlite_session):
@@ -127,6 +150,53 @@ def test_reviews_reply_marks_has_reply_and_returns_updated_listing(client, auth_
 
 def test_reviews_reply_unknown_id_is_404(client, auth_headers):
     assert client.post("/api/reviews/999999/reply", headers=auth_headers).status_code == 404
+
+
+# --- POST /api/reviews/by-venue/{venue}/reply (checklist 7.4/8.5) ---
+
+
+def test_reply_by_venue_marks_oldest_pending_review_first(client, auth_headers, sqlite_session):
+    venue = "Remedy — BGC (One Uptown Residence)"
+    older = Mention(
+        source="google_reviews", kind="review", external_id="r-older", venue=venue, rating=2,
+        has_reply=False, published_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    newer = Mention(
+        source="google_reviews", kind="review", external_id="r-newer", venue=venue, rating=3,
+        has_reply=False, published_at=datetime(2026, 2, 1, tzinfo=timezone.utc),
+    )
+    sqlite_session.add_all([older, newer])
+    sqlite_session.commit()
+
+    response = client.post(f"/api/reviews/by-venue/{venue}/reply", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["venue"] == venue
+    assert body["pendingReplies"] == 1  # one of two now replied
+
+    sqlite_session.expire_all()
+    assert sqlite_session.get(Mention, older.id).has_reply is True
+    assert sqlite_session.get(Mention, newer.id).has_reply is False
+
+
+def test_reply_by_venue_no_pending_review_is_404(client, auth_headers, sqlite_session):
+    venue = "Remedy — BGC (One Uptown Residence)"
+    sqlite_session.add(
+        Mention(source="google_reviews", kind="review", external_id="r1", venue=venue, rating=5, has_reply=True)
+    )
+    sqlite_session.commit()
+
+    response = client.post(f"/api/reviews/by-venue/{venue}/reply", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_reply_by_venue_unknown_venue_is_404(client, auth_headers):
+    response = client.post("/api/reviews/by-venue/Not%20A%20Real%20Branch/reply", headers=auth_headers)
+    assert response.status_code == 404
+
+
+def test_reply_by_venue_requires_auth(client):
+    assert client.post("/api/reviews/by-venue/Anywhere/reply").status_code == 401
 
 
 def test_reviews_reply_on_non_review_mention_is_404(client, auth_headers, sqlite_session):

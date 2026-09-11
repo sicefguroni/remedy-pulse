@@ -21,6 +21,21 @@ expose exactly two things:
         alone can't express (e.g. RunStatus.ACCESS_DENIED on a 403 - see
         google_reviews_job.run()).
 
+Optionally, a job module may also expose:
+
+    IS_DATA_SOURCE: bool
+        Checklist 0.24 (docs/decisions/14-last-synced-excludes-non-data-
+        sources.md). Defaults to True (via getattr(job, "IS_DATA_SOURCE",
+        True) at every call site that reads it - app/api/routes/
+        overview.py's lastSyncedAt and app/api/routes/status.py's
+        isDataSource field) for the common case: an adapter that fetches
+        from an external source and writes new Mention rows. Set to False
+        on a job that only re-processes rows some OTHER job already
+        wrote (reddit_deletion_job.py, classification_job.py) - such a
+        job's own success/failure has no bearing on "is the DATA stale,"
+        which is the one thing lastSyncedAt and the mockup's sync pill
+        exist to answer, so it must not count toward either.
+
 This is intentionally not a Protocol-enforced plugin system with
 discovery/registration machinery - there are 2-5 of these jobs total, and
 a plain module plus a list is all that scale needs. `JOBS` below is the
@@ -32,6 +47,7 @@ those files' internals.
 from __future__ import annotations
 
 from app.jobs import (
+    classification_job,
     google_places_job,
     google_reviews_job,
     meta_facebook_comments_job,
@@ -62,6 +78,14 @@ from app.jobs import (
 # for upstream deletion, not ingesting new ones), but it's still exactly
 # "does this source's cadence say it's due? if so, run it," the same
 # shape every other entry in this list is.
+#
+# classification_job (checklist 0.23) is the same kind of exception as
+# reddit_deletion_job: it re-processes existing Mention rows rather than
+# ingesting new ones, but still fits this same "one SOURCE_NAME, one
+# is_due() cadence check" contract - see that module's own docstring for
+# why it was missing entirely until now, and app.scheduler.CADENCE_HOURS
+# for why its cadence is deliberately much shorter than everything else
+# here.
 JOBS = [
     google_reviews_job,
     google_places_job,
@@ -71,6 +95,7 @@ JOBS = [
     meta_instagram_comments_job,
     meta_instagram_mentions_job,
     meta_facebook_comments_job,
+    classification_job,
 ]
 
 # 9.2's is_within_backfill_window() lives in app.repository, NOT here,

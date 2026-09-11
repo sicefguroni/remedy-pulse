@@ -100,15 +100,63 @@ class ReviewsAccessDenied(Exception):
 
 
 def load_credentials():
-    if not os.path.exists(TOKEN_FILE):
-        raise SystemExit(
-            f"No token file at '{TOKEN_FILE}'. Run oauth_setup.py first."
-        )
-    creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    """Raises a plain RuntimeError (not SystemExit) when no credential is
+    available - this function is shared between this script's own CLI
+    `main()` (below, which converts it back to a clean SystemExit for
+    that context) AND app/jobs/google_reviews_job.py's `run()`, which
+    needs an ordinary exception here for the exact reason that job's own
+    module docstring already states for its sibling "no accounts found"
+    check: app.repository.start_run()'s context manager only catches
+    `except Exception`, and SystemExit is a BaseException, not an
+    Exception - it would have propagated straight out of
+    app.scheduler.run_due_jobs()'s loop uncaught, skipping every other
+    due source for the rest of that pass (or crashing run_forever()'s
+    standing process outright) instead of being recorded as one failed
+    ingestion run the way every other failure mode in this job already
+    is.
+
+    Checklist 5.6 (docs/decisions/08-secrets-at-rest.md, tier 2 of its
+    recommendation): if GOOGLE_TOKEN_JSON is set, its contents (the exact
+    JSON `token.json` itself contains) are used directly instead of
+    reading TOKEN_FILE off disk - this is what lets a production host
+    inject the credential as a deploy-time secret/env var rather than the
+    file needing to sit next to the code. `TOKEN_FILE` remains the
+    default (and the only option local dev needs - see that decision
+    doc's own "local development is explicitly out of scope" note); this
+    is additive, not a replacement for it."""
+    token_json_env = os.getenv("GOOGLE_TOKEN_JSON")
+    if token_json_env:
+        creds = Credentials.from_authorized_user_info(json.loads(token_json_env), SCOPES)
+    else:
+        if not os.path.exists(TOKEN_FILE):
+            raise RuntimeError(
+                f"No token file at '{TOKEN_FILE}'. Run oauth_setup.py first "
+                f"(or set GOOGLE_TOKEN_JSON instead of using a file - see "
+                f".env.example)."
+            )
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        with open(TOKEN_FILE, "w") as f:
-            f.write(creds.to_json())
+        if token_json_env:
+            # There is no running-process way to persist a refreshed
+            # token back into an environment variable injected at
+            # process start - that's the inherent tradeoff of choosing
+            # env-var storage over a file (see the decision doc's
+            # "Options considered"). Surfacing the new value loudly is
+            # the honest alternative to either silently losing it (the
+            # next request would then fail once this refreshed token
+            # itself expires) or silently writing it to TOKEN_FILE
+            # instead, which would reintroduce the bare-file-on-disk
+            # exposure this env-var path exists specifically to avoid.
+            print(
+                "Google OAuth token was refreshed. GOOGLE_TOKEN_JSON is now "
+                "stale - update wherever it's set (e.g. your host's secrets "
+                "manager) with this value:\n" + creds.to_json()
+            )
+        else:
+            with open(TOKEN_FILE, "w") as f:
+                f.write(creds.to_json())
     return creds
 
 
@@ -244,7 +292,14 @@ def build_aggregate(listing_name, normalized_reviews, status="ok"):
 
 
 def main():
-    creds = load_credentials()
+    try:
+        creds = load_credentials()
+    except RuntimeError as exc:
+        # load_credentials() itself raises a job-safe RuntimeError now
+        # (see its own docstring) - converted back to SystemExit here so
+        # running this file directly still gets the same clean one-line
+        # exit this repo's other CLI scripts use, with no traceback.
+        raise SystemExit(str(exc)) from exc
     accounts = get_accounts(creds)
     if not accounts:
         raise SystemExit("No Business Profile accounts found for this login.")

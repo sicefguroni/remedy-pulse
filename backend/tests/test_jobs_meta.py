@@ -167,6 +167,52 @@ def test_run_records_independent_ledger_rows_per_capability(sqlite_session, monk
     assert mentions[0].published_at.replace(tzinfo=None) == expected_published_at
 
 
+# --- an unexpected exception from fetch_fn() must still get a ledger row ---
+
+
+def test_run_capability_unexpected_exception_still_gets_an_error_ledger_row(sqlite_session, monkeypatch):
+    """fetch_instagram_comments()/fetch_instagram_mentions()/
+    fetch_facebook_comments() only convert MetaAccessDenied and
+    RetryExhaustedError into their own typed {"status": ...} result -
+    anything else (a genuine non-retryable HTTP error status via
+    fetch_meta_mentions.py's _graph_get() falling through to
+    resp.raise_for_status(), a malformed JSON body, ...) raises instead.
+    Before this was fixed, that exception would have escaped BEFORE
+    start_run() ever opened, leaving this capability with NO ledger row -
+    indistinguishable from "never run" via get_source_freshness(), not
+    "ran and failed." The other two capabilities running fine in the same
+    pass is the second half of this: one capability's unexpected crash
+    must not affect them (already covered by
+    test_run_records_independent_ledger_rows_per_capability's typed-error
+    case; this test adds the untyped-exception case specifically)."""
+    _set_token(monkeypatch)
+
+    def raise_unexpected(*a, **k):
+        raise ValueError("Graph API returned a malformed JSON body")
+
+    monkeypatch.setattr(meta_job, "fetch_instagram_comments", raise_unexpected)
+    monkeypatch.setattr(
+        meta_job, "fetch_instagram_mentions",
+        lambda *a, **k: _result("ok", items=[_item(comment_id="c1", media_id="m1")]),
+    )
+    monkeypatch.setattr(meta_job, "fetch_facebook_comments", lambda *a, **k: _result("not_configured"))
+
+    meta_job.run(sqlite_session)
+    sqlite_session.commit()
+
+    ig_comments_fresh = get_source_freshness(sqlite_session, meta_job.LEDGER_SOURCE_INSTAGRAM_COMMENTS)
+    assert ig_comments_fresh.last_status == RunStatus.ERROR
+    assert "malformed JSON body" in ig_comments_fresh.last_error
+
+    # The other two capabilities are unaffected - one still ingests, the
+    # not_configured one still gets no row.
+    ig_mentions_fresh = get_source_freshness(sqlite_session, meta_job.LEDGER_SOURCE_INSTAGRAM_MENTIONS)
+    assert ig_mentions_fresh.last_status == RunStatus.SUCCESS
+
+    fb_fresh = get_source_freshness(sqlite_session, meta_job.LEDGER_SOURCE_FACEBOOK_COMMENTS)
+    assert fb_fresh.last_status is None
+
+
 # --- Mention.source split: both IG capabilities share "instagram" ---
 
 

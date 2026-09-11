@@ -866,10 +866,10 @@
     // rather than inventing a trend number (same honesty rule the contract states for EMV).
     reviews: {
       listings: [
-        { venue: 'Remedy — BGC (One Uptown Residence)', rating: 5.0, reviewCount: 128, pendingReplies: 0, responseRatePct: 100, status: 'ok', trendLabel: '▲ steady' },
-        { venue: 'Club Remedy — BGC', rating: 4.9, reviewCount: 34, pendingReplies: 1, responseRatePct: 88, status: 'ok', trendLabel: '▲ +0.1' },
-        { venue: 'Remedy — Vertis North', rating: 4.8, reviewCount: 52, pendingReplies: 0, responseRatePct: 95, status: 'ok', trendLabel: '▲ +0.2' },
-        { venue: 'Skin Bar by Remedy — Greenhills Mall', rating: 4.6, reviewCount: 19, pendingReplies: 2, responseRatePct: 80, status: 'ok', trendLabel: '▲ new branch' }
+        { venue: 'Remedy — BGC (One Uptown Residence)', rating: 5.0, reviewCount: 128, pendingReplies: 0, responseRatePct: 100, status: 'ok', trendLabel: '▲ steady', aliases: [], businessProfileUrl: null },
+        { venue: 'Club Remedy — BGC', rating: 4.9, reviewCount: 34, pendingReplies: 1, responseRatePct: 88, status: 'ok', trendLabel: '▲ +0.1', aliases: [], businessProfileUrl: null },
+        { venue: 'Remedy — Vertis North', rating: 4.8, reviewCount: 52, pendingReplies: 0, responseRatePct: 95, status: 'ok', trendLabel: '▲ +0.2', aliases: ['Remedy Vertis', 'Remedy Vertis North'], businessProfileUrl: null },
+        { venue: 'Skin Bar by Remedy — Greenhills Mall', rating: 4.6, reviewCount: 19, pendingReplies: 2, responseRatePct: 80, status: 'ok', trendLabel: '▲ new branch', aliases: ['Remedy GH', 'Remedy Greenhills', 'Skin Bar by Remedy'], businessProfileUrl: null }
       ]
     },
     // GET /api/topics shape.
@@ -909,13 +909,17 @@
     // GET /api/competitors shape.
     competitors: {
       shareOfVoice: [
-        { name: 'Belo', pct: 40, isOwn: false },
-        { name: 'Aivee', pct: 27, isOwn: false, spike: true },
-        { name: 'Remedy', pct: 14, isOwn: true },
-        { name: 'SkinStation', pct: 8, isOwn: false },
-        { name: 'DermHQ', pct: 5, isOwn: false },
-        { name: 'Luminisce', pct: 4, isOwn: false },
-        { name: 'Kamiseta', pct: 2, isOwn: false, isNew: true }
+        { name: 'Belo', pct: 40, isOwn: false, aliases: [] },
+        { name: 'Aivee', pct: 27, isOwn: false, spike: true, aliases: [] },
+        { name: 'Remedy', pct: 14, isOwn: true, aliases: [
+          'Remedy Skin Solutions', 'Remedy Skin', 'Remedy BGC', 'Remedy clinic',
+          'Remedy GH', 'Remedy Greenhills', 'Remedy Vertis', 'Remedy Vertis North',
+          'Skin Bar by Remedy',
+        ] },
+        { name: 'SkinStation', pct: 8, isOwn: false, aliases: [] },
+        { name: 'DermHQ', pct: 5, isOwn: false, aliases: [] },
+        { name: 'Luminisce', pct: 4, isOwn: false, aliases: [] },
+        { name: 'Kamiseta', pct: 2, isOwn: false, isNew: true, aliases: [] }
       ],
       sourceBreakdown: [
         { platform: 'Google Reviews', pct: 34 },
@@ -1085,15 +1089,14 @@
   // write fails), the real POST is fired in the background when not in demo mode, and a failure
   // surfaces honestly via toast rather than silently pretending it saved.
   //
-  // sendReply() is NOT wired to POST /api/reviews/{mention_id}/reply, and that's a real,
-  // deliberate gap, not an oversight: this UI's reply flow operates on a whole LISTING
-  // (l.pendingReplies, a branch-level count — see sendReply() below), matching the mockup's
-  // original per-branch "N pending replies" design, while the API's reply endpoint requires a
-  // SPECIFIC review's mention_id. There is no mapping from "reply to the next pending review at
-  // this branch" to "reply to review #123" without either (a) the UI listing individual pending
-  // reviews to choose from, or (b) the API adding a "reply to any one pending review at this
-  // venue" endpoint — a real product/API design decision, not a wiring task. Left local-only
-  // (matching its pre-existing "(demo)" framing) until that decision is made.
+  // sendReply() (checklist 7.4/8.5, closed) IS wired to a real write endpoint now:
+  // POST /api/reviews/by-venue/{venue}/reply, added specifically to resolve the mismatch this
+  // comment used to describe (this UI's reply flow is branch-level — l.pendingReplies, a count —
+  // while the original POST /api/reviews/{mention_id}/reply needs a specific review id the UI
+  // never had). Neither endpoint posts real reply text to Google — see
+  // docs/decisions/13-review-reply-flow.md — so sendReply() only ever marks this system's own
+  // "replied" state; a human posts the actual reply via the Business Profile link the reply modal
+  // opens (l.businessProfileUrl, null until a real one is configured — see backend/config.py).
   function login(email, password){
     return apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
   }
@@ -1114,6 +1117,9 @@
   }
   function resolveMention(mentionId){
     return apiFetch('/mentions/' + encodeURIComponent(mentionId) + '/resolve', { method: 'POST' });
+  }
+  function replyByVenue(venue){
+    return apiFetch('/reviews/by-venue/' + encodeURIComponent(venue) + '/reply', { method: 'POST' });
   }
 
   // =========================================================================
@@ -1328,11 +1334,22 @@
   function todayForFilters(){ return STATE.isDemoMode ? DEMO_TODAY : new Date(); }
 
   // Wires the sync pill to the REAL GET /api/status response (7.5): the most recent successful
-  // run across every registered source, per the contract's own definition of lastSyncedAt.
+  // run across every registered EXTERNAL DATA source, per the contract's own (updated 2026-09-11,
+  // checklist 0.24) definition of lastSyncedAt.
+  //
+  // Decided (checklist 0.24, docs/decisions/14-last-synced-excludes-non-data-sources.md):
+  // app/jobs/classification_job.py runs every ~15 minutes (re-processing already-ingested rows,
+  // not fetching external data) rather than the ~12h default every fetch-from-an-external-source
+  // job uses - so a source with s.isDataSource === false (classification, reddit_deletion_check)
+  // is excluded here, the same way GET /api/overview's own lastSyncedAt now excludes it
+  // server-side (see app/api/routes/overview.py). Without this, the pill could read "synced 3 min
+  // ago" while every real external data source (Google, Reddit, GNews, Meta) had been stale for
+  // half a day - classification's own success masking exactly the thing P0-11 exists to surface.
   function mostRecentSuccessAt(status, overview){
     let latest = null;
     if (status && Array.isArray(status.sources)){
       status.sources.forEach(s => {
+        if (s.isDataSource === false) return; // checklist 0.24 - see comment above
         if (s.lastSuccessAt){
           const t = new Date(s.lastSuccessAt);
           if (!isNaN(t.getTime()) && (!latest || t > latest)) latest = t;
@@ -2385,6 +2402,12 @@
 
     const tdName = document.createElement('td');
     tdName.textContent = l.venue;
+    // checklist 8.8 — GET /api/reviews's aliases field (config.py's
+    // OWNED_LISTING_ALIASES), the pre-refactor mockup's per-branch "Also
+    // matches: ..." tooltip. Only Vertis North and Greenhills have any.
+    if (l.aliases && l.aliases.length){
+      tdName.title = 'Also matches: ' + l.aliases.join(', ');
+    }
     tr.appendChild(tdName);
 
     const tdRating = document.createElement('td');
@@ -2439,17 +2462,27 @@
     return tag;
   }
 
-  // ---------- Reviews: reply workflow (local-state only — see 7.4 scope note) ----------
+  // ---------- Reviews: reply workflow (checklist 7.4/8.5) ----------
+  // A human posts the actual reply text on Google's own Business Profile interface (the link
+  // below opens it); this modal's job is only to route them there and then record that it's done
+  // — see docs/decisions/13-review-reply-flow.md for why this system never posts reply text
+  // itself.
   let currentReplyListing = null;
   function openReplyModal(l){
     currentReplyListing = l;
+    const bpUrl = l.businessProfileUrl || 'https://business.google.com/';
+    const bpLinkHtml = l.businessProfileUrl
+      ? '<a href="' + escapeHtml(bpUrl) + '" target="_blank" rel="noopener">Open in Business Profile ↗</a>'
+      : '<a href="' + escapeHtml(bpUrl) + '" target="_blank" rel="noopener">Open Business Profile ↗</a>' +
+        ' <span style="color:var(--ink-faint);">(no direct link configured yet for this branch)</span>';
     openModal(
       '<button class="modal-close" onclick="closeModal()">×</button>' +
       '<h4>Reply to review — ' + escapeHtml(l.venue) + '</h4>' +
       '<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:14px;">' + escapeHtml(l.rating.toFixed(1) + ' ★ · ' + l.pendingReplies + ' pending') + '</div>' +
-      '<textarea id="replyText" placeholder="Write a reply…"></textarea>' +
-      '<div style="display:flex;gap:8px;margin-top:14px;">' +
-      '<button class="btn-mini primary" id="modalSendReplyBtn">Send reply</button>' +
+      '<div style="font-size:12px;margin-bottom:12px;">Post your reply on Google\'s own interface, then confirm it here:</div>' +
+      '<div style="margin-bottom:14px;">' + bpLinkHtml + '</div>' +
+      '<div style="display:flex;gap:8px;">' +
+      '<button class="btn-mini primary" id="modalSendReplyBtn">Mark as replied</button>' +
       '<button class="btn-mini" onclick="closeModal()">Cancel</button>' +
       '</div>'
     );
@@ -2460,22 +2493,47 @@
   function sendReply(){
     closeModal();
     const l = currentReplyListing;
-    if (l && l.pendingReplies > 0){
-      const totalPending = l._totalPending || l.pendingReplies;
-      const baseRate = (l._baseResponseRatePct != null) ? l._baseResponseRatePct : l.responseRatePct;
-      l.pendingReplies -= 1;
-      if (l.pendingReplies === 0){
-        l.responseRatePct = 100;
-      } else {
-        // Fill the gap to 100% proportionally across the branch's original pending count (0.14's
-        // fix, preserved): each reply sent nudges the response rate up instead of jumping to 100%.
-        const repliesSent = totalPending - l.pendingReplies;
-        l.responseRatePct = Math.round(baseRate + ((100 - baseRate) / totalPending) * repliesSent);
-      }
-      renderReviewsTab();
-    }
     currentReplyListing = null;
-    showToast('Reply sent' + (STATE.isDemoMode ? ' (demo)' : ' — not saved, write API not wired yet'));
+    if (!l || !(l.pendingReplies > 0)) return;
+
+    const totalPending = l._totalPending || l.pendingReplies;
+    const baseRate = (l._baseResponseRatePct != null) ? l._baseResponseRatePct : l.responseRatePct;
+    l.pendingReplies -= 1;
+    if (l.pendingReplies === 0){
+      l.responseRatePct = 100;
+    } else {
+      // Fill the gap to 100% proportionally across the branch's original pending count (0.14's
+      // fix, preserved): each reply sent nudges the response rate up instead of jumping to 100%.
+      const repliesSent = totalPending - l.pendingReplies;
+      l.responseRatePct = Math.round(baseRate + ((100 - baseRate) / totalPending) * repliesSent);
+    }
+    renderReviewsTab();
+
+    if (STATE.isDemoMode){
+      showToast('Marked as replied (demo)');
+      return;
+    }
+    // Optimistic, same idiom as handleAssign()/resolveAlertItem() above: the local mutation
+    // already happened, the real write (POST /api/reviews/by-venue/{venue}/reply) fires in the
+    // background, and on success STATE.reviews is reconciled to the server's own updated listing
+    // rather than trusting only the client's local arithmetic above.
+    replyByVenue(l.venue)
+      .then(updated => {
+        if (updated && typeof updated === 'object' && STATE.reviews && STATE.reviews.listings){
+          const idx = STATE.reviews.listings.findIndex(row => row.venue === l.venue);
+          // Mutate the existing row object in place (same idiom as handleAssign()'s m.assignedTo
+          // reassignment above) rather than replacing it, so any other reference still pointing
+          // at this row (l included) sees the authoritative values too; re-render in case the
+          // server's real pendingReplies/responseRatePct drifted from the optimistic guess (e.g. a
+          // reply already sent from another session).
+          if (idx !== -1){
+            Object.assign(STATE.reviews.listings[idx], updated);
+            renderReviewsTab();
+          }
+        }
+        showToast('Marked as replied');
+      })
+      .catch(() => showToast('Marked as replied locally — save failed, try again'));
   }
 
   // 8.3: reviews_csv takes no filter params server-side (docs/api-contract.md - it's always
@@ -2657,6 +2715,15 @@
       name.className = 'src-name' + (r.isOwn ? ' us' : '');
       if (r.isOwn) name.style.cssText = 'font-weight:600; color:var(--coral-text);';
       name.appendChild(document.createTextNode(r.name));
+      // checklist 8.8 — the pre-refactor mockup's "Also matches: ..."
+      // tooltip, now sourced from GET /api/competitors's aliases field
+      // (backend/config.py's BRAND_ALIASES) instead of being hand-written
+      // markup. Only Share of Voice rows carry `aliases` (source-breakdown
+      // rows have none), and most names have an empty list — no tooltip
+      // for those, same as the original mockup only tagging Remedy.
+      if (r.aliases && r.aliases.length){
+        name.title = 'Also matches: ' + r.aliases.join(', ');
+      }
       if (r.badge){
         name.appendChild(document.createTextNode(' '));
         const badge = document.createElement('span');
@@ -2758,7 +2825,7 @@
     const ownSov = data.shareOfVoice.find(s => s.isOwn);
     renderPie(
       document.getElementById('sovPieChart'), sovLegend,
-      data.shareOfVoice.map(s => ({ name: s.name, pct: s.pct, isOwn: s.isOwn, badge: s.spike ? '▲ spike' : (s.isNew ? 'New' : null) })),
+      data.shareOfVoice.map(s => ({ name: s.name, pct: s.pct, isOwn: s.isOwn, aliases: s.aliases, badge: s.spike ? '▲ spike' : (s.isNew ? 'New' : null) })),
       ownSov ? (ownSov.name + ' ' + ownSov.pct + '%') : ''
     );
 

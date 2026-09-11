@@ -1,6 +1,6 @@
 # Decision record: secrets at rest — where `token.json` and friends live in production
 
-**Status:** RECOMMENDATION — not yet ratified. This document proposes an approach for the team to review and decide on; nothing here has been agreed or implemented. It covers checklist item 5.6.
+**Status:** PARTIALLY IMPLEMENTED (2026-09-11) — tier 2 below (environment variables) is now real code, not just a recommendation: `fetch_owned_reviews.load_credentials()` reads `GOOGLE_TOKEN_JSON` in preference to `TOKEN_FILE` when it's set (see that function's own docstring, and `.env.example`). Tier 1 (a real secrets manager) remains a recommendation only, unratified, for the reason this document already gives — it depends on a hosting decision (checklist 1.4) that still hasn't landed. Everything below is otherwise unchanged from the original analysis.
 
 ## Context (verified in this session)
 
@@ -64,8 +64,10 @@ Because the hosting/vendor decision (checklist 1.4) is still open, this document
 Adopt, in order of preference once a hosting platform exists:
 
 1. **The chosen platform's native secrets manager** for `token.json`'s contents, `client_secret.json`'s contents, and any `.env` values with the same sensitivity — fetched at runtime, not written to disk on the production host at all if the platform supports that.
-2. **Environment variables injected at deploy time**, only if (1) is unavailable on the chosen platform or not yet wired up — an acceptable interim step, not an end state.
+2. **Environment variables injected at deploy time**, only if (1) is unavailable on the chosen platform or not yet wired up — an acceptable interim step, not an end state. **Implemented (2026-09-11):** `GOOGLE_TOKEN_JSON` — see `fetch_owned_reviews.load_credentials()`. Whatever platform 1.4 eventually lands on, its secrets store can inject this as a plain env var today, with no further code changes needed to reach tier 2. Reaching tier 1 (a real secrets manager fetching the value at runtime instead of it sitting in the process environment) is still open, and still depends on which platform that is.
 3. **Never** a plain file checked into an image or left on a shared production host, even though `.gitignore` already prevents it from reaching source control — those are two different protections and this decision is about the second one.
+
+**A tradeoff tier 2 accepts, worth naming explicitly:** an env var can't be rewritten by the running process. When Google's OAuth token refreshes (which it does periodically — see `fetch_owned_reviews.load_credentials()`), the code can no longer just write the new value back to a file in place, the way it does for `GOOGLE_TOKEN_FILE`. It prints the refreshed token instead, for an operator to copy into wherever `GOOGLE_TOKEN_JSON` is actually set. That's a real operational step someone has to do periodically — not eliminated by this change, only made honest instead of silently failing later when the stale token stops refreshing. Reaching tier 1 removes this specific gap too (a real secrets manager can usually be written to programmatically at refresh time), which is one more reason tier 1 is still the better end state, not just tier 2 with less code.
 
 Local development is explicitly out of scope for a change here — the current file-on-disk-plus-`.gitignore` setup is the right amount of ceremony for one developer's laptop, and nothing above should be read as asking to add secrets-manager overhead to local dev.
 

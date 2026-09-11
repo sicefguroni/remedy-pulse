@@ -129,6 +129,33 @@ def test_overview_response_shape_matches_contract(client, auth_headers, sqlite_s
     datetime.fromisoformat(body["lastSyncedAt"])
 
 
+def test_overview_last_synced_at_excludes_non_data_sources(client, auth_headers, sqlite_session):
+    """checklist 0.24 - classification_job/reddit_deletion_job re-process
+    rows some other job already ingested; their own success has no
+    bearing on external data freshness, so a more-recent successful
+    "classification" run must not make lastSyncedAt look fresher than the
+    real data sources actually are."""
+    stale_data_sync = _now() - timedelta(hours=6)
+    recent_non_data_sync = _now()
+    sqlite_session.add_all(
+        [
+            IngestionRun(source="google_reviews", status=RunStatus.SUCCESS, finished_at=stale_data_sync),
+            IngestionRun(source="classification", status=RunStatus.SUCCESS, finished_at=recent_non_data_sync),
+        ]
+    )
+    sqlite_session.commit()
+
+    body = client.get("/api/overview", headers=auth_headers).json()
+    # SQLite (unlike Postgres) doesn't round-trip tzinfo on a
+    # DateTime(timezone=True) column - compare naive, same pattern used
+    # throughout this test suite for the identical reason (e.g.
+    # test_jobs_news.py's published_at comparisons).
+    last_synced_at = datetime.fromisoformat(body["lastSyncedAt"]).replace(tzinfo=None)
+    # Must reflect the real data source's (older) sync time, not
+    # classification's more recent one.
+    assert abs((last_synced_at - stale_data_sync.replace(tzinfo=None)).total_seconds()) < 1
+
+
 def test_overview_active_alerts_excludes_resolved(client, auth_headers, sqlite_session):
     now = _now()
     sqlite_session.add_all(
