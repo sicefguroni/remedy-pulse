@@ -1,3 +1,5 @@
+import pytest
+
 import fetch_owned_reviews as f
 
 
@@ -126,3 +128,120 @@ def test_build_aggregate_error_status_also_uses_nulls():
     assert agg["status"] == "error"
     assert agg["reviewCount"] is None
     assert agg["rating"] is None
+
+
+# --- load_credentials() / main() error handling ---
+#
+# load_credentials() must raise a plain RuntimeError, not SystemExit, when
+# token.json is missing - it's shared with app/jobs/google_reviews_job.py
+# (which needs an ordinary exception for app.repository.start_run()'s
+# `except Exception` to catch), while main() (this script's own CLI
+# entrypoint) converts that back to SystemExit so running the file
+# directly still exits cleanly with a one-line message, no traceback -
+# see both functions' own docstrings/comments for the full reasoning.
+
+
+def test_load_credentials_missing_token_file_raises_runtime_error_not_system_exit(monkeypatch, tmp_path):
+    monkeypatch.setattr(f, "TOKEN_FILE", str(tmp_path / "does-not-exist.json"))
+    with pytest.raises(RuntimeError, match="No token file"):
+        f.load_credentials()
+
+
+def test_main_converts_missing_token_file_to_clean_system_exit(monkeypatch, tmp_path):
+    monkeypatch.setattr(f, "TOKEN_FILE", str(tmp_path / "does-not-exist.json"))
+    with pytest.raises(SystemExit, match="No token file"):
+        f.main()
+
+
+# --- GOOGLE_TOKEN_JSON (checklist 5.6 / docs/decisions/08-secrets-at-rest.md) ---
+
+
+class _FakeCreds:
+    """Stands in for google.oauth2.credentials.Credentials - controllable
+    .expired/.refresh_token without needing a real, validly-signed OAuth
+    token blob just to exercise load_credentials()'s branching."""
+
+    def __init__(self, expired=False, refresh_token="a-refresh-token"):
+        self.expired = expired
+        self.refresh_token = refresh_token
+        self.refreshed = False
+
+    def refresh(self, request):
+        self.refreshed = True
+
+    def to_json(self):
+        return '{"token": "refreshed-token"}'
+
+
+def test_load_credentials_prefers_env_var_over_file(monkeypatch, tmp_path):
+    token_file = tmp_path / "should-not-be-touched.json"
+    monkeypatch.setattr(f, "TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("GOOGLE_TOKEN_JSON", '{"token": "abc", "refresh_token": "rt"}')
+
+    fake = _FakeCreds(expired=False)
+    captured = {}
+
+    def fake_from_info(info, scopes):
+        captured["info"] = info
+        return fake
+
+    monkeypatch.setattr(f.Credentials, "from_authorized_user_info", fake_from_info)
+
+    creds = f.load_credentials()
+
+    assert creds is fake
+    assert captured["info"] == {"token": "abc", "refresh_token": "rt"}
+    assert not token_file.exists()  # never read, never written
+
+
+def test_load_credentials_falls_back_to_file_when_env_var_unset(monkeypatch, tmp_path):
+    token_file = tmp_path / "token.json"
+    token_file.write_text('{"token": "from-file"}')
+    monkeypatch.setattr(f, "TOKEN_FILE", str(token_file))
+    monkeypatch.delenv("GOOGLE_TOKEN_JSON", raising=False)
+
+    fake = _FakeCreds(expired=False)
+    captured = {}
+
+    def fake_from_file(path, scopes):
+        captured["path"] = path
+        return fake
+
+    monkeypatch.setattr(f.Credentials, "from_authorized_user_file", fake_from_file)
+
+    creds = f.load_credentials()
+
+    assert creds is fake
+    assert captured["path"] == str(token_file)
+
+
+def test_load_credentials_refresh_from_env_var_prints_new_token_not_write_to_file(monkeypatch, tmp_path, capsys):
+    token_file = tmp_path / "should-not-be-written.json"
+    monkeypatch.setattr(f, "TOKEN_FILE", str(token_file))
+    monkeypatch.setenv("GOOGLE_TOKEN_JSON", '{"token": "expired", "refresh_token": "rt"}')
+
+    fake = _FakeCreds(expired=True, refresh_token="rt")
+    monkeypatch.setattr(f.Credentials, "from_authorized_user_info", lambda info, scopes: fake)
+
+    creds = f.load_credentials()
+
+    assert creds.refreshed is True
+    assert not token_file.exists()  # can't rewrite an env var from the running process
+    out = capsys.readouterr().out
+    assert "GOOGLE_TOKEN_JSON" in out
+    assert '"token": "refreshed-token"' in out
+
+
+def test_load_credentials_refresh_from_file_writes_new_token_to_file(monkeypatch, tmp_path):
+    token_file = tmp_path / "token.json"
+    token_file.write_text('{"token": "expired"}')
+    monkeypatch.setattr(f, "TOKEN_FILE", str(token_file))
+    monkeypatch.delenv("GOOGLE_TOKEN_JSON", raising=False)
+
+    fake = _FakeCreds(expired=True, refresh_token="rt")
+    monkeypatch.setattr(f.Credentials, "from_authorized_user_file", lambda path, scopes: fake)
+
+    creds = f.load_credentials()
+
+    assert creds.refreshed is True
+    assert token_file.read_text() == '{"token": "refreshed-token"}'
