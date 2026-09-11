@@ -71,6 +71,7 @@ def run(session: Session) -> None:
             return
 
         all_raw: list[dict[str, Any]] = []
+        quota_error: str | None = None
         for term in NEWS_SEARCH_TERMS:
             try:
                 raw = fetch_articles_for_term(term)
@@ -79,6 +80,20 @@ def run(session: Session) -> None:
                 # try/except: one exhausted-retries term must not abort
                 # the others.
                 continue
+            except RuntimeError as exc:
+                # fetch_articles_for_term() raises this on a GNews 403 -
+                # account-wide (invalid key or the free tier's 100/day
+                # quota spent), not specific to this term, so every
+                # remaining term would just 403 again too. Stop here
+                # (matching main()'s identical fix) rather than either
+                # burning through the rest of NEWS_SEARCH_TERMS for
+                # nothing, or - the bug this replaces - letting the
+                # RuntimeError's SystemExit-typed predecessor escape this
+                # try/except entirely (it wasn't RetryExhaustedError, so
+                # the old code never caught it) and take down the whole
+                # scheduler pass.
+                quota_error = str(exc)
+                break
             all_raw.extend(raw)
 
         all_raw = dedupe_by_url(all_raw)
@@ -120,3 +135,19 @@ def run(session: Session) -> None:
                 raw_payload=raw_article,
             )
             recorder.items_ingested += 1
+
+        if quota_error is not None:
+            # Explicit, not left to start_run()'s automatic status
+            # inference: that logic only marks PARTIAL when
+            # `items_seen and items_ingested < items_seen`, both of which
+            # are falsy when the very first term already 403'd - which
+            # would otherwise get silently recorded as SUCCESS despite
+            # having fetched nothing, the same "silent 403 producing a
+            # fake all-clear" failure mode checklist item 0.2 already
+            # named for the Google reviews connector. PARTIAL when at
+            # least some terms succeeded before the quota/key error hit,
+            # ERROR when none did.
+            recorder.mark(
+                RunStatus.PARTIAL if recorder.items_ingested else RunStatus.ERROR,
+                error=quota_error,
+            )

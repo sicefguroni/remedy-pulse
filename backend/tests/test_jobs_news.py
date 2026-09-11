@@ -127,6 +127,69 @@ def test_run_retry_exhausted_on_one_term_does_not_abort_the_others(sqlite_sessio
     assert mention.url == "https://rappler.com/a1"
 
 
+def test_run_quota_error_stops_early_and_marks_partial_when_some_already_ingested(sqlite_session, monkeypatch):
+    """fetch_articles_for_term() raises a plain RuntimeError (not
+    SystemExit - see its own docstring) on a GNews 403. Before this was
+    fixed, that RuntimeError wasn't RetryExhaustedError, so the old
+    per-term try/except never caught it at all, and it would have
+    propagated out of run() uncaught - and since GNews's free tier caps at
+    100 requests/day (this script's own module docstring), hitting that
+    cap is an ordinary, expected condition once ingestion is running on a
+    real schedule, not a rare setup mistake."""
+    calls = []
+
+    def fake_fetch(term):
+        calls.append(term)
+        if len(calls) == 1:
+            return [_raw_article(url="https://rappler.com/a1")]
+        raise RuntimeError(
+            "GNews returned 403 — this usually means GNEWS_API_KEY is invalid or the "
+            "free-tier daily quota (100 requests/day) is already spent for today."
+        )
+
+    monkeypatch.setattr(news_job, "fetch_articles_for_term", fake_fetch)
+    monkeypatch.setattr(news_job.fetch_news_articles, "API_KEY", "fake-key")
+
+    news_job.run(sqlite_session)
+    sqlite_session.commit()
+
+    # Stops at the term that 403'd - a 403 is account-wide, so every
+    # remaining term would just 403 again for nothing.
+    assert len(calls) == 2
+
+    run_row = sqlite_session.execute(select(IngestionRun)).scalar_one()
+    assert run_row.status == RunStatus.PARTIAL
+    assert "403" in run_row.error
+    assert run_row.items_ingested == 1
+
+    # The article from the one term that succeeded before the 403 hit
+    # must still be ingested, not discarded along with the failed run.
+    mention = sqlite_session.execute(select(Mention)).scalar_one()
+    assert mention.url == "https://rappler.com/a1"
+
+
+def test_run_quota_error_on_first_term_marks_error_not_silently_success(sqlite_session, monkeypatch):
+    def fake_fetch(term):
+        raise RuntimeError("GNews returned 403 — GNEWS_API_KEY is invalid or quota is spent.")
+
+    monkeypatch.setattr(news_job, "fetch_articles_for_term", fake_fetch)
+    monkeypatch.setattr(news_job.fetch_news_articles, "API_KEY", "fake-key")
+
+    news_job.run(sqlite_session)
+    sqlite_session.commit()
+
+    run_row = sqlite_session.execute(select(IngestionRun)).scalar_one()
+    # Must not be silently SUCCESS just because items_seen/items_ingested
+    # are both 0 - start_run()'s automatic status inference defaults to
+    # SUCCESS in exactly that case, which would misreport a total
+    # quota/key failure as "ran fine, nothing to ingest today" - the same
+    # "silent 403 producing a fake all-clear" failure mode checklist item
+    # 0.2 already named for the Google reviews connector.
+    assert run_row.status == RunStatus.ERROR
+    assert "403" in run_row.error
+    assert sqlite_session.execute(select(Mention)).scalars().all() == []
+
+
 def test_run_article_with_no_url_is_seen_but_not_ingested(sqlite_session, monkeypatch):
     no_url_article = _raw_article()
     no_url_article["url"] = None

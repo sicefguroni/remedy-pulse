@@ -62,6 +62,22 @@ MAX_RESULTS_PER_QUERY = 25
 
 
 def fetch_articles_for_term(term):
+    """Raises a plain RuntimeError (not SystemExit) on a GNews 403 - this
+    is a reusable function called both by this script's own main() (which
+    catches RuntimeError alongside RetryExhaustedError and stops early
+    rather than losing this run's already-fetched articles - see main()'s
+    own comment) and by app/jobs/news_job.py's scheduled run() (which
+    needs an ordinary exception for the exact reason
+    app/jobs/google_reviews_job.py's load_credentials() call already
+    established: a SystemExit here is a BaseException, not an Exception,
+    so it would propagate straight out of app.scheduler.run_due_jobs()'s
+    per-job try/except uncaught - skipping every other due source for the
+    rest of that scheduler pass, or crashing the standing process outright
+    in run_forever() mode. A GNews 403 is not a rare setup mistake like a
+    missing key; the free tier's 100-requests/day cap (module docstring)
+    makes quota exhaustion an ordinary, expected condition once real
+    ingestion is running on a schedule - exactly the kind of failure that
+    must not be allowed to take every other source down with it."""
     params = {
         "q": term,
         "lang": LANG,
@@ -71,7 +87,7 @@ def fetch_articles_for_term(term):
     }
     resp = get_with_retry(SEARCH_URL, params=params)
     if resp.status_code == 403:
-        raise SystemExit(
+        raise RuntimeError(
             "GNews returned 403 — this usually means GNEWS_API_KEY is "
             "invalid or the free-tier daily quota (100 requests/day) is "
             "already spent for today."
@@ -133,6 +149,16 @@ def main():
         except RetryExhaustedError as exc:
             print(f"ERROR: request failed (retries exhausted) for {term}: {exc}")
             continue
+        except RuntimeError as exc:
+            # A 403 (see fetch_articles_for_term's own docstring) is
+            # account-wide, not specific to this term - every remaining
+            # term would just 403 again. Stop here rather than either (a)
+            # burning through the rest of NEWS_SEARCH_TERMS for nothing,
+            # like a plain `continue` would, or (b) the previous behavior
+            # of a bare SystemExit, which discarded every article already
+            # fetched from the terms that succeeded before this one hit.
+            print(f"ERROR: {exc} Stopping early; still writing what was already fetched.")
+            break
         print(f"  -> {len(raw)} result(s)")
         all_raw.extend(raw)
         time.sleep(0.2)

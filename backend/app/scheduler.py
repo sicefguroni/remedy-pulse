@@ -75,15 +75,48 @@ def run_due_jobs(session: Session, *, now: datetime | None = None, jobs=None) ->
     app.jobs.JOBS registry) whose cadence has elapsed. Returns the
     SOURCE_NAMEs actually run this pass - a source that isn't due yet is
     silently skipped, not an error. `jobs` is overridable so tests don't
-    have to monkeypatch the module-level registry."""
+    have to monkeypatch the module-level registry.
+
+    One job's failure does not stop the rest of this pass (found and
+    fixed alongside checklist 7.4/8.5/8.8 - no checklist item named it
+    directly, but every per-source adapter's own docstring already
+    promises this exact isolation "a 403 or a retry-exhausted failure on
+    one listing does not stop the others from being fetched" - that
+    promise held WITHIN a job, but not BETWEEN jobs: before this fix, any
+    exception job.run() didn't itself swallow (e.g. load_credentials()
+    raising because token.json doesn't exist yet) propagated straight out
+    of this loop, skipping every other due source for the rest of this
+    pass and, in run_forever()'s standing-process mode, crashing the
+    entire scheduler outright.
+
+    app.repository.start_run()'s context manager marks the failure ERROR
+    in the IngestionRun ledger and re-raises, but that mark is only
+    FLUSHED, not committed, at the point it reaches here - a bare
+    `except: session.rollback()` (the obvious-looking fix) would silently
+    discard the one record of what went wrong, which defeats the entire
+    point of that ledger existing. Try to commit it first; only fall back
+    to rolling back if the commit itself fails (e.g. the underlying DB
+    transaction is already unusable - a Postgres session after certain
+    failures raises on COMMIT the same way it does on any other
+    statement, unlike SQLite, which is more forgiving here too), so a
+    genuinely broken session still doesn't take the next job down with
+    it, at the cost of that one particular failure going unrecorded
+    beyond the print below."""
     now = now or datetime.now(timezone.utc)
     jobs = JOBS if jobs is None else jobs
     ran: list[str] = []
     for job in jobs:
         if is_due(session, job.SOURCE_NAME, now=now):
-            job.run(session)
-            session.commit()
-            ran.append(job.SOURCE_NAME)
+            try:
+                job.run(session)
+                session.commit()
+                ran.append(job.SOURCE_NAME)
+            except Exception as exc:
+                print(f"scheduler: {job.SOURCE_NAME} failed this pass: {exc}")
+                try:
+                    session.commit()
+                except Exception:
+                    session.rollback()
     return ran
 
 

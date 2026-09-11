@@ -191,6 +191,29 @@ def test_reviews_job_no_accounts_marks_error(sqlite_session, monkeypatch):
     assert "No Business Profile accounts" in run_row.error
 
 
+def test_reviews_job_missing_token_file_marks_error_not_systemexit(sqlite_session, monkeypatch):
+    """load_credentials() (fetch_owned_reviews.py, imported unchanged into
+    this job) must raise a plain RuntimeError here, never SystemExit -
+    app.repository.start_run()'s context manager only catches `except
+    Exception`, and SystemExit is a BaseException. Before this was fixed,
+    this exact case would have propagated straight out of
+    app.scheduler.run_due_jobs()'s loop uncaught (see that module's own
+    test coverage for the isolation half of this fix)."""
+
+    def _raise_missing_token():
+        raise RuntimeError("No token file at './token.json'. Run oauth_setup.py first.")
+
+    monkeypatch.setattr(google_reviews_job, "load_credentials", _raise_missing_token)
+
+    with pytest.raises(RuntimeError, match="No token file"):
+        google_reviews_job.run(sqlite_session)
+    sqlite_session.commit()
+
+    run_row = sqlite_session.execute(select(IngestionRun)).scalar_one()
+    assert run_row.status == RunStatus.ERROR
+    assert "No token file" in run_row.error
+
+
 # --- google_places_job ---
 
 

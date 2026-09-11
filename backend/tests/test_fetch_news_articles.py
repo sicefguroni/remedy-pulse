@@ -1,3 +1,5 @@
+import pytest
+
 import fetch_news_articles as n
 
 
@@ -74,3 +76,36 @@ def test_dedupe_by_url_keeps_articles_with_no_url():
     a_no_url = {"title": "no url", "url": None, "source": {"name": "X"}}
     deduped = n.dedupe_by_url([a_no_url, a_no_url])
     assert len(deduped) == 2
+
+
+class _FakeResponse:
+    def __init__(self, status_code, payload=None):
+        self.status_code = status_code
+        self._payload = payload or {}
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+def test_fetch_articles_for_term_403_raises_runtime_error_not_system_exit(monkeypatch):
+    """A GNews 403 must raise a plain RuntimeError, not SystemExit -
+    app/jobs/news_job.py's scheduled run() needs an ordinary exception to
+    catch here (SystemExit is a BaseException, not an Exception - see
+    this function's own docstring for the full reasoning, and
+    app/jobs/google_reviews_job.py's load_credentials() for the identical
+    fix applied there first)."""
+    monkeypatch.setattr(n, "get_with_retry", lambda *a, **k: _FakeResponse(403))
+    with pytest.raises(RuntimeError, match="403"):
+        n.fetch_articles_for_term('"Remedy BGC"')
+
+
+def test_fetch_articles_for_term_ok_returns_articles(monkeypatch):
+    monkeypatch.setattr(
+        n, "get_with_retry", lambda *a, **k: _FakeResponse(200, {"articles": [_raw_article()]})
+    )
+    articles = n.fetch_articles_for_term('"Remedy BGC"')
+    assert len(articles) == 1
+    assert articles[0]["url"] == "https://rappler.com/a1"

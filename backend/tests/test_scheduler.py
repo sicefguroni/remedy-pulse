@@ -8,6 +8,9 @@ Google."""
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from sqlalchemy import select
+
+from app.models import IngestionRun, RunStatus
 from app.repository import start_run
 from app.scheduler import is_due, run_due_jobs
 
@@ -18,6 +21,18 @@ def _fake_job(source_name, calls):
         with start_run(session, source=source_name) as run:
             run.items_seen = 1
             run.items_ingested = 1
+
+    return SimpleNamespace(SOURCE_NAME=source_name, run=_run)
+
+
+def _failing_job(source_name, calls, *, error=RuntimeError("boom")):
+    def _run(session):
+        calls.append(source_name)
+        # Mirrors real job behavior (google_reviews_job.run(), via
+        # start_run()'s own re-raise): the failure is recorded in the
+        # IngestionRun ledger first, then propagates out of job.run().
+        with start_run(session, source=source_name):
+            raise error
 
     return SimpleNamespace(SOURCE_NAME=source_name, run=_run)
 
@@ -105,6 +120,39 @@ def test_run_due_jobs_handles_multiple_independent_sources(sqlite_session):
 
     assert set(ran) == {"source_a", "source_b"}
     assert set(calls) == {"source_a", "source_b"}
+
+
+def test_run_due_jobs_one_source_failing_does_not_stop_the_others(sqlite_session, capsys):
+    """The fix this test protects: before it, an exception job.run()
+    didn't itself swallow propagated straight out of this loop (job.run()
+    was called with no try/except at all), skipping every other due
+    source for the rest of the pass - or, in run_forever()'s standing-
+    process mode, crashing the scheduler outright. Every per-source
+    adapter's own docstring already promises this isolation WITHIN a job
+    (one bad listing doesn't stop the others); this is the same promise
+    BETWEEN jobs in one scheduler pass."""
+    calls = []
+    jobs = [_failing_job("source_a", calls), _fake_job("source_b", calls)]
+
+    ran = run_due_jobs(sqlite_session, jobs=jobs)
+
+    # source_a's own exception must not have prevented source_b from
+    # running in this same pass.
+    assert calls == ["source_a", "source_b"]
+    assert ran == ["source_b"]
+
+    run_a = sqlite_session.execute(
+        select(IngestionRun).where(IngestionRun.source == "source_a")
+    ).scalar_one()
+    assert run_a.status == RunStatus.ERROR
+    assert "boom" in run_a.error
+
+    run_b = sqlite_session.execute(
+        select(IngestionRun).where(IngestionRun.source == "source_b")
+    ).scalar_one()
+    assert run_b.status == RunStatus.SUCCESS
+
+    assert "source_a failed this pass" in capsys.readouterr().out
 
 
 def test_run_due_jobs_defaults_to_the_real_jobs_registry():
