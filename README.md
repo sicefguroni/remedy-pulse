@@ -33,7 +33,7 @@ listed with their real reasons in
 | Blocked on | What it needs | Who can unblock it |
 | --- | --- | --- |
 | Google Places (competitor ratings) | Billing enabled on the Cloud project — the key is valid, the API returns `REQUEST_DENIED` without it. Also needs the real `place_id`s; `backend/config.py` still holds `REPLACE_ME` placeholders. | Us, today |
-| Reddit API (richer per-post data) | A free self-serve script app at reddit.com/prefs/apps. The public-feed source above covers Reddit meanwhile. | Us, today |
+| Reddit API (richer per-post data) | Nothing we can do. Self-serve registration is closed — every token now needs manual approval under Reddit's Responsible Builder Policy, and the free path requires declaring non-commercial use, which contradicts the commercial Data Access Request we have already signed. That request is pending and unanswered. The public-feed source above covers Reddit meanwhile. | Reddit |
 | GNews | Nothing — the key works. Every configured brand search term returns zero results, because Remedy has almost no press coverage yet. Kept as a second opinion; the RSS sources carry the load. | N/A |
 | Remedy's own Google reviews | A Business Profile API access request. No SLA. | Google |
 | Instagram / Facebook | Meta App Review, separately, for each of three permission scopes. | Meta |
@@ -115,16 +115,20 @@ In order:
 1. **Enable billing on the Google Cloud project and fill in the real
    `place_id`s** in `backend/config.py` (they are still `REPLACE_ME`).
    That turns competitor ratings on. Both are ours to do, today.
-2. **Register the free Reddit script app** for richer per-post data and
-   to bring the deletion-propagation job into scope for Reddit rows.
+2. **Get a ruling on Reddit content reaching the classifier.** The signed
+   Data Access Request says Reddit data is "not resold, redistributed, or
+   used to train any model"; the classifier sends every mention to Groq.
+   Inference is not training, but that is a call for whoever signed it.
+   See [`docs/decisions/07-reddit-c4-no-resale-control.md`](docs/decisions/07-reddit-c4-no-resale-control.md).
 3. **Tune the search and relevance terms** in `backend/config.py` with
    Marketing. They are a first pass written by an engineer, and the
    Mentions feed is only as good as they are.
 4. **Get the EMV rate card signed off** so `grossEmv`/`netEmv` can stop
    being `null`.
 
-Google Business Profile and Meta App Review remain genuinely external and
-are calendar time, not engineering time. Everything above them is not.
+Google Business Profile, Meta App Review and Reddit Data Access are
+genuinely external and unanswered — calendar time, not engineering time.
+Everything above them is not.
 
 See [`docs/implementation-checklist.md`](docs/implementation-checklist.md)
 for the itemized status of every requirement.

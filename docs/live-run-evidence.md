@@ -116,6 +116,9 @@ The three sources that produced all 39 rows need **no key and no
 account**. `GROQ_API_KEY` is the only credential required to reproduce
 the classification and topic-tagging half; signup is self-serve and free.
 
+One caveat on that, raised under "Unresolved" below: those jobs send every
+mention's text to Groq, and that now includes Reddit content.
+
 Run everything through the project venv. Invoking the scheduler with a
 system Python that lacks the dependencies records an `ERROR` ledger row
 reading "The `groq` package is not installed" — which looks like a broken
@@ -152,12 +155,14 @@ fetched and deliberately rejected as off-topic.
 | `google_places_competitor` | success, 0 rows | Every `place_id` in `config.py` is still `REPLACE_ME`. Separately, the API key is valid but the Cloud project has **no billing enabled** — a direct call returns `REQUEST_DENIED: You must enable Billing`. Both ours to fix. |
 | `news_gnews` | success, 0 rows | The key works. Every configured Remedy brand term returns `totalArticles: 0` — the brand has almost no press coverage. Not a defect. |
 | `google_reviews` | error | `No token file at './token.json'` — needs the Business Profile API access request Google has not granted. |
-| `reddit` (praw) | error | `Missing required Reddit credential(s)` — a free self-serve script app that was never registered. |
+| `reddit` (praw) | error | `Missing required Reddit credential(s)`. **Not obtainable by us.** Reddit closed self-serve registration: app creation is now gated behind the Responsible Builder Policy and every OAuth token needs manual approval. The free path asks you to declare developer / researcher / moderator — and we have already signed a commercial Data Access Request stating "Commercial developer / enterprise partner... not personal or academic use." Taking the free path would contradict that in writing, which the policy explicitly prohibits. The commercial request is pending and unanswered. |
 | `reddit_deletion_check` | error | Same credential. **This matters beyond data volume:** it is the 48-hour deletion-propagation commitment made in writing in the Reddit Data Access application. It has never run. |
 | Instagram / Facebook ×3 | not_configured | Meta App Review, three separate scopes. |
 
-Two of these — Places billing and the Reddit script app — are ours, cost
-nothing, and need no approval from anyone.
+**One** of these is ours and costs nothing: Google Places billing. It was
+described as two in an earlier draft of this document — the Reddit script
+app was self-serve when the connector was written and is not any more.
+Corrected rather than left standing.
 
 ### Open items found during this run
 
@@ -168,14 +173,26 @@ nothing, and need no approval from anyone.
    unpriced rather than guessed, so **the EMV tab has nothing to price
    until Marketing extends that map.** It is a business-judgment call, not
    an engineering one.
-2. **Deletion propagation does not cover `reddit_public` rows.**
+2. **Reddit content now reaches an LLM, against a signed commitment.**
+   The submitted Reddit Data Access Request states that Reddit data "is not
+   resold, redistributed, or used to train any model"
+   (`docs/decisions/07-reddit-c4-no-resale-control.md`). The `reddit_public`
+   source added in this change stores Reddit text, and the classification
+   and topic-tagging jobs send every mention to Groq — so 7 Reddit threads
+   have already been sent. Inference is not training, which is a defensible
+   reading, but decision record 07 flags the inference case as arguable and
+   predicted this exact situation before it happened. **This needs a ruling
+   from whoever signed the request (Angelo Mojica), not an engineer's
+   judgement.** Until then the volume is small and the fix is cheap: record
+   07 already specifies a source tag checked before any LLM call.
+3. **Deletion propagation does not cover `reddit_public` rows.**
    `reddit_deletion_job` re-checks via praw, the credential this source
    exists to not need. An unauthenticated re-check path is not written.
    Stated here rather than assumed to work.
-3. **Search and relevance terms are an engineer's first pass.** The
+4. **Search and relevance terms are an engineer's first pass.** The
    Mentions feed is only as good as `config.py`'s query lists; Marketing
    should review them.
-4. **No alerts fired.** `activeAlerts: 0` is correct — one Negative item
+5. **No alerts fired.** `activeAlerts: 0` is correct — one Negative item
    was routed `digest`, not `crisis`. The crisis path has not been
    exercised on real data because no genuine crisis-grade mention has
    appeared yet.
