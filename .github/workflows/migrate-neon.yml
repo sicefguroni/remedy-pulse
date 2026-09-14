@@ -1,0 +1,34 @@
+name: One-off Neon migration (manual)
+
+# Temporary, manual-only workflow: runs `alembic upgrade head` against
+# whichever Postgres DATABASE_URL secret is configured (Neon in
+# docs/runbook-deploy-free-tier.md §4). Exists because the developer's
+# local network blocks outbound port 5432, so the §4 "run it from your
+# own machine" step can't reach Neon directly from there — GitHub's
+# runners can. This is not meant to replace that step going forward;
+# delete this file once the migration has been confirmed to succeed.
+#
+# workflow_dispatch only — never runs on a schedule or push, so it can't
+# race a boot-time migration the way the runbook's note warns against.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run alembic upgrade head
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: alembic upgrade head
