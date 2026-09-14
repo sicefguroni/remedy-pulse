@@ -31,6 +31,7 @@ Usage:
     python -m app.admin list-users
     python -m app.admin reset-password --email you@example.com
     python -m app.admin check
+    python -m app.admin reddit-compliance
 """
 
 from __future__ import annotations
@@ -214,6 +215,79 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reddit_compliance(args: argparse.Namespace) -> int:
+    """Answer the one question the signed Reddit application commits us
+    to: is every stored Reddit row being re-checked for upstream deletion
+    inside 48 hours?
+
+    Deliberately NOT the same question as "did the deletion job succeed."
+    A pass can report SUCCESS having verified three rows while forty sit
+    untouched for a week — the ledger would look healthy and the
+    commitment would be broken. This reads the rows themselves, which is
+    the only way to get an answer that means anything.
+
+    Exits non-zero when any row is overdue, so this can be wired into a
+    monitor later without being rewritten."""
+    from app.jobs.reddit_public_deletion_job import (
+        COMMITMENT_WINDOW_HOURS,
+        TARGET_SOURCE,
+        rows_overdue_for_verification,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    with session_scope() as session:
+        held = session.execute(
+            select(func.count(Mention.id)).where(
+                Mention.source == TARGET_SOURCE, Mention.deleted_at.is_(None)
+            )
+        ).scalar_one()
+        scrubbed = session.execute(
+            select(func.count(Mention.id)).where(
+                Mention.source == TARGET_SOURCE, Mention.deleted_at.isnot(None)
+            )
+        ).scalar_one()
+
+        print(
+            f"Commitment: remove deleted Reddit content within "
+            f"{COMMITMENT_WINDOW_HOURS}h."
+        )
+        print("Source: docs/Remedy Pulse_Reddit Data Access_Use Case.pdf\n")
+        print(f"Rows held:                             {held}")
+        print(f"Rows scrubbed after upstream deletion: {scrubbed}")
+
+        if held == 0:
+            print("\nNothing held, so nothing to verify.")
+            return 0
+
+        overdue = rows_overdue_for_verification(session, now=now)
+        if not overdue:
+            print(
+                f"\nOK — every held row was verified within the last "
+                f"{COMMITMENT_WINDOW_HOURS}h."
+            )
+            return 0
+
+        print(
+            f"\nOVERDUE — {len(overdue)} row(s) not verified in "
+            f"{COMMITMENT_WINDOW_HOURS}h:"
+        )
+        for row in overdue[:10]:
+            updated = row.updated_at
+            if updated is not None and updated.tzinfo is None:
+                updated = updated.replace(tzinfo=timezone.utc)
+            age = (now - updated).total_seconds() / 3600 if updated else float("inf")
+            print(f"  #{row.id:<6} {row.external_id:<16} last verified {age:.0f}h ago")
+        if len(overdue) > 10:
+            print(f"  ... and {len(overdue) - 10} more")
+        print(
+            "\nRun `python -m app.scheduler` to work the queue. If this stays\n"
+            "overdue, the deletion job is being rate-limited faster than it can\n"
+            "keep up — its ledger row carries the real reason."
+        )
+    return 1
+
+
 def cmd_generate_secret(args: argparse.Namespace) -> int:
     """Print a value suitable for SESSION_SECRET_KEY.
 
@@ -244,6 +318,12 @@ def build_parser() -> argparse.ArgumentParser:
     check = sub.add_parser("check", help="What the pipeline has actually ingested and classified")
     check.add_argument("--hours", type=float, default=24.0, help="Ledger window (default: 24)")
     check.set_defaults(func=cmd_check)
+
+    compliance = sub.add_parser(
+        "reddit-compliance",
+        help="Is the 48-hour Reddit deletion commitment actually being kept?",
+    )
+    compliance.set_defaults(func=cmd_reddit_compliance)
 
     secret = sub.add_parser("generate-secret", help="Print a value for SESSION_SECRET_KEY")
     secret.set_defaults(func=cmd_generate_secret)

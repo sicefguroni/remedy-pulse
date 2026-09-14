@@ -59,6 +59,7 @@ from app.jobs import (
     news_job,
     reddit_deletion_job,
     reddit_job,
+    reddit_public_deletion_job,
     reddit_public_rss_job,
     topic_tagging_job,
 )
@@ -104,10 +105,17 @@ from app.jobs import (
 # above was supposed to cover (news, news, Reddit) rather than replacing
 # it: the gated jobs stay registered and return better data the day their
 # access exists.
+#
+# reddit_public_deletion_job is the deletion re-check for the rows
+# reddit_public_rss_job writes. It is listed immediately after it on
+# purpose: reddit_deletion_job below covers source="reddit" only, through
+# PRAW, so without this entry the rows we actually hold would be the one
+# part of the store the 48-hour commitment did not reach.
 JOBS = [
     google_news_rss_job,
     bing_news_rss_job,
     reddit_public_rss_job,
+    reddit_public_deletion_job,
     google_reviews_job,
     google_places_job,
     news_job,

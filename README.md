@@ -17,6 +17,12 @@ to reproduce it.
 | Bing News RSS | A partly different outlet set from the same queries | 13 articles |
 | Reddit public search | Threads naming a tracked clinic, or asking for a derma recommendation | 7 threads |
 
+Deleted Reddit posts are re-checked and scrubbed within the 48 hours the
+signed Data Access application commits to — without an API credential,
+which is why it works today. `python -m app.admin reddit-compliance` says
+whether the promise is actually being kept. See
+[`docs/live-run-evidence.md`](docs/live-run-evidence.md).
+
 Those 39 items were classified for sentiment and alert routing (Groq) and
 tagged for topic, both on a schedule — **39 of 39 classified, 39 of 39
 tagged, 0 pending** — from an empty database, in one unattended
@@ -45,7 +51,7 @@ rather than invented. `tier` is likewise `null` for any outlet not in
 `config.OUTLET_TIER_MAP`, so an unpriced outlet shows as unpriced rather
 than silently mispriced.
 
-409 backend tests pass and CI is green, but note what that does and does
+431 backend tests pass and CI is green, but note what that does and does
 not establish: it was true throughout a period when no source was
 returning data and no one could log in. Treat
 [`docs/live-run-evidence.md`](docs/live-run-evidence.md) as the status of

@@ -12,6 +12,51 @@ instead.
 
 ---
 
+## 2026-09-14 — Honour the 48-hour Reddit deletion commitment without an API credential
+
+The signed Data Access application commits to removing deleted Reddit
+content within 48 hours. `reddit_deletion_job.py` implements that through
+PRAW — and has recorded `Missing required Reddit credential(s)` on every
+run it has ever had. **The commitment had never once been honoured**, and
+the new `reddit_public` source made that concrete rather than theoretical
+by storing real Reddit posts nothing re-checked.
+
+New `app/jobs/reddit_public_deletion_job.py` closes it with the same
+public feed the ingestion job uses, so it works today rather than waiting
+on an approval that may never arrive.
+
+The endpoint was found by probing, because the obvious ones are gone:
+`/api/info.json` and `/comments/<id>.json` both return 403 to non-OAuth
+clients now; `/comments/<id>.rss` returns 200. Critically, a missing post
+returns **404 with a valid empty feed** while rate limiting returns **429
+with a zero-length body** — cleanly distinguishable, which is what makes
+this safe.
+
+**The failure policy is deliberately the inverse of the PRAW job's.**
+That job treats any fetch failure as a deletion, which is sound for PRAW
+(it separates not-found from transport failure itself). It would be
+dangerous here: unauthenticated Reddit rate-limits hard — 2 of 7 rows
+were 429'd on the first live pass — and a scrub cannot be undone. This
+job scrubs only on positive evidence (a 404, or a `[deleted]`/`[removed]`
+tombstone). A 429, 5xx, network error, unparseable body, or a comment
+whose presence cannot be established is recorded *unverified*, left
+untouched, and retried.
+
+Verified live in both directions: 5 rows conclusively confirmed alive
+with the 2 rate-limited rows left intact, and a real Reddit 404 scrubbing
+content and author while keeping `url`/`venue`/`source` for the audit
+trail.
+
+`python -m app.admin reddit-compliance` answers the question the job's own
+status cannot — whether every held row has actually been verified inside
+the window — and exits non-zero when any is overdue.
+
+Comments are best-effort by design: a gone parent thread or a tombstoned
+body is conclusive, but a comment merely absent from its parent's feed is
+**not** treated as deleted, because the feed truncates long threads.
+
+Tests: 409 → 431.
+
 ## 2026-09-14 — Run it on real data: three key-free sources, a working login, and four bugs only a live run could find
 
 A review of the shipped project found that no source was returning data,

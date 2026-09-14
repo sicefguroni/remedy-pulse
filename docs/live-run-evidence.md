@@ -156,7 +156,7 @@ fetched and deliberately rejected as off-topic.
 | `news_gnews` | success, 0 rows | The key works. Every configured Remedy brand term returns `totalArticles: 0` — the brand has almost no press coverage. Not a defect. |
 | `google_reviews` | error | `No token file at './token.json'` — needs the Business Profile API access request Google has not granted. |
 | `reddit` (praw) | error | `Missing required Reddit credential(s)`. **Not obtainable by us.** Reddit closed self-serve registration: app creation is now gated behind the Responsible Builder Policy and every OAuth token needs manual approval. The free path asks you to declare developer / researcher / moderator — and we have already signed a commercial Data Access Request stating "Commercial developer / enterprise partner... not personal or academic use." Taking the free path would contradict that in writing, which the policy explicitly prohibits. The commercial request is pending and unanswered. |
-| `reddit_deletion_check` | error | Same credential. **This matters beyond data volume:** it is the 48-hour deletion-propagation commitment made in writing in the Reddit Data Access application. It has never run. |
+| `reddit_deletion_check` | error | Same credential. This is the PRAW half of the 48-hour deletion commitment and has never run. The rows we actually hold are now covered instead by `reddit_public_deletion_check` — see "The 48-hour Reddit deletion commitment" below. |
 | Instagram / Facebook ×3 | not_configured | Meta App Review, three separate scopes. |
 
 **One** of these is ours and costs nothing: Google Places billing. It was
@@ -185,10 +185,9 @@ Corrected rather than left standing.
    from whoever signed the request (Angelo Mojica), not an engineer's
    judgement.** Until then the volume is small and the fix is cheap: record
    07 already specifies a source tag checked before any LLM call.
-3. **Deletion propagation does not cover `reddit_public` rows.**
-   `reddit_deletion_job` re-checks via praw, the credential this source
-   exists to not need. An unauthenticated re-check path is not written.
-   Stated here rather than assumed to work.
+3. **Deletion propagation now covers `reddit_public` rows** — closed,
+   see the section below. It was listed here as open in the first draft
+   of this document.
 4. **Search and relevance terms are an engineer's first pass.** The
    Mentions feed is only as good as `config.py`'s query lists; Marketing
    should review them.
@@ -198,6 +197,120 @@ Corrected rather than left standing.
    appeared yet.
 
 ---
+
+---
+
+## The 48-hour Reddit deletion commitment
+
+The signed Data Access application commits to removing deleted Reddit
+content and author data within 48 hours. `reddit_deletion_job.py`
+implements that through PRAW — and has recorded `Missing required Reddit
+credential(s)` on every run it has ever had, because those credentials
+were never obtained and, as of this week, cannot be. **The commitment had
+never once been honoured.**
+
+Worse, the new `reddit_public` source made the exposure real rather than
+theoretical: it put actual Reddit posts in the database, and
+`reddit_deletion_job` is scoped to `source="reddit"`, so nothing
+re-checked them at all.
+
+`app/jobs/reddit_public_deletion_job.py` closes this without a
+credential, using the same public feed the ingestion job uses.
+
+### How an item is re-checked without a credential
+
+Probed live first, because the obvious endpoints are gone:
+
+| Endpoint | Result |
+| --- | --- |
+| `/api/info.json?id=t3_…` | **403** — OAuth clients only now |
+| `/comments/<id>.json` | **403** — same |
+| `/comments/<id>.rss` | **200**, submission and comments as Atom entries |
+
+And the distinction everything depends on, also observed directly:
+
+- An id Reddit does not have → **HTTP 404**, valid but empty feed.
+- Being rate-limited → **HTTP 429**, zero-length body.
+
+### Why this job's failure policy is the opposite of the PRAW one
+
+`reddit_deletion_job._is_deleted_upstream()` treats *any* fetch failure as
+a deletion, deliberately: erring toward scrubbing beats missing a real
+deletion. That is sound for PRAW, which separates not-found from transport
+failure itself.
+
+It would be dangerous here. Unauthenticated Reddit rate-limits hard — **2
+of 7 rows were 429'd on the first live pass** — and a scrub cannot be
+undone. Reading a 429 as a deletion would destroy the store on a bad
+afternoon.
+
+So this job scrubs **only on positive evidence**: a 404, or a body that is
+Reddit's own `[deleted]`/`[removed]` tombstone. A 429, a 5xx, a network
+error, an unparseable body, or a comment whose presence cannot be
+established is recorded as *unverified*, left untouched, and retried next
+pass.
+
+### Verified live, both directions
+
+```
+$ python -m app.scheduler          # the real 7 stored rows
+reddit_public_deletion_check  partial  seen=5  ingested=0
+  2 row(s) unverified this pass — t3_1vqhoo4: rate-limited or unreachable
+  (GET .../comments/1vqhoo4.rss failed after 4 retries: last status 429)
+```
+
+5 rows conclusively confirmed still live, 0 scrubbed, and **the 2
+rate-limited rows were left intact** — under the PRAW job's policy both
+would have been destroyed.
+
+Then the positive path, against a real Reddit 404:
+
+```
+before : 'This post was deleted by its author' | author: someone | deleted_at: None
+after  : None                                  | author: None    | deleted_at: 2026-09-14 08:04:06+00
+url kept for the audit trail: https://www.reddit.com/r/x/comments/zzzzzzz/y/
+```
+
+Content and author gone; `url`, `venue`, `source` and `published_at` kept
+— the commitment covers Reddit's content and author data, not our own
+record of having once observed the item, and that record is what lets us
+prove the scrub happened.
+
+### Proving it is actually being kept
+
+The job's own SUCCESS status does not answer that — a pass can succeed
+having checked three rows while forty sit untouched. This reads the rows:
+
+```
+$ python -m app.admin reddit-compliance
+Commitment: remove deleted Reddit content within 48h.
+Source: docs/Remedy Pulse_Reddit Data Access_Use Case.pdf
+
+Rows held:                             7
+Rows scrubbed after upstream deletion: 0
+
+OK — every held row was verified within the last 48h.
+```
+
+It exits non-zero when any row is overdue, so it can be wired to a monitor
+later without being rewritten.
+
+### Limits, stated
+
+- **Comments are best-effort.** A comment has no feed of its own. A gone
+  parent thread is conclusive; a tombstoned body is conclusive; a comment
+  merely *absent* from its parent's feed is **not** treated as deleted,
+  because the feed truncates long threads. Recorded unverified instead.
+  The current corpus is entirely submissions, so this path is
+  forward-looking.
+- **Rate limiting still bites.** `BATCH_SIZE` is 25 with a 6-second gap,
+  and a pass gives up after 3 consecutive 429s rather than burning the
+  remaining rows' turns. At 7 rows and a 6-hour cadence there is wide
+  headroom under 48h; past a few hundred rows the cadence needs tightening
+  and `reddit-compliance` is what will say so.
+- **This does not substitute for API access.** It honours the commitment
+  for the rows we actually hold. The PRAW job stays registered for the day
+  the pending application is answered.
 
 ## Bugs this run found
 
@@ -247,7 +360,7 @@ scanned, and CI fails on a committed secret. Full write-up:
 
 ## Test suite
 
-409 passed, 1 skipped (was 345). The additions cover the three new
+431 passed, 1 skipped (was 345). The additions cover the three new
 sources, the RSS layer, the topic-tagging job, the admin CLI, and the four
 bugs above. Stated last, deliberately: the suite was green the whole time
 this system was not working, and this document — not the test count — is
