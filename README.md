@@ -4,22 +4,52 @@ A real-time reputation monitoring dashboard for Remedy, replacing Media Meter/Me
 
 ## Status
 
-The backend, API, and dashboard frontend are fully built and tested (345 backend tests passing, CI green) — well past demo/mockup stage. `index.html` shows sample data if you're not logged in, and real data pulled from the sources below once you are.
+Everything below has been run end to end against live data and the output
+checked in the database. Counts and dates come from that run, recorded in
+[`docs/live-run-evidence.md`](docs/live-run-evidence.md) with the commands
+to reproduce it.
 
-**Live today, no approval needed:**
+**Working on real data (verified 2026-09-14, no key or approval required):**
 
-- The full FastAPI backend (`backend/app/api/`) — real Postgres persistence, real authentication, every endpoint in [`docs/api-contract.md`](docs/api-contract.md).
-- Real ingestion: news/press coverage via GNews, and competitor rating benchmarks via Google Places (both self-serve — a Places API key with billing enabled is the only setup step).
-- Real sentiment classification and crisis/digest alert routing (Groq), running on a schedule.
-- A free-tier deploy runbook ([`docs/runbook-deploy-free-tier.md`](docs/runbook-deploy-free-tier.md)) — Cloudflare Pages + Render + Neon + GitHub Actions.
+| Source | What it returns | Last verified run |
+| --- | --- | --- |
+| Google News RSS | Philippine press coverage of Remedy and tracked competitors | 19 articles |
+| Bing News RSS | A partly different outlet set from the same queries | 13 articles |
+| Reddit public search | Threads naming a tracked clinic, or asking for a derma recommendation | 7 threads |
 
-**Built and tested, but not yet live against real data** — each blocked on an external party's approval, not on code (see [`backend/README.md`](backend/README.md) for exactly where each stands):
+Those 39 items were classified for sentiment and alert routing (Groq) and
+tagged for topic, both on a schedule — **39 of 39 classified, 39 of 39
+tagged, 0 pending** — from an empty database, in one unattended
+`python -m app.scheduler` pass taking 6 minutes. Login and the API were
+exercised against that same data.
 
-- **Remedy's own Google reviews** — Google gates the reviews endpoint behind a Business Profile API access request with no SLA.
-- **Reddit mentions, and the 48-hour deletion-propagation job that access commits to** — needs real Reddit credentials, plus a separate pending approval for the commercial Data Access tier this project committed to in writing.
-- **Instagram/Facebook mentions and comments** — needs Meta App Review approval, separately, for each of three permission scopes.
+The Reddit source reported `PARTIAL`, not `SUCCESS`: two of seven queries
+were rate-limited. That and every other source still returning nothing are
+listed with their real reasons in
+[`docs/live-run-evidence.md`](docs/live-run-evidence.md).
 
-The EMV (earned media value) formula is deliberately not computed — it needs an editorial-judgment sign-off from Marketing/Finance that hasn't happened yet; every article's `grossEmv`/`netEmv` is honestly `null` rather than invented. See [`docs/implementation-checklist.md`](docs/implementation-checklist.md) for the full, itemized status of every requirement.
+**Built, but returning nothing until someone completes a setup step:**
+
+| Blocked on | What it needs | Who can unblock it |
+| --- | --- | --- |
+| Google Places (competitor ratings) | Billing enabled on the Cloud project — the key is valid, the API returns `REQUEST_DENIED` without it. Also needs the real `place_id`s; `backend/config.py` still holds `REPLACE_ME` placeholders. | Us, today |
+| Reddit API (richer per-post data) | A free self-serve script app at reddit.com/prefs/apps. The public-feed source above covers Reddit meanwhile. | Us, today |
+| GNews | Nothing — the key works. Every configured brand search term returns zero results, because Remedy has almost no press coverage yet. Kept as a second opinion; the RSS sources carry the load. | N/A |
+| Remedy's own Google reviews | A Business Profile API access request. No SLA. | Google |
+| Instagram / Facebook | Meta App Review, separately, for each of three permission scopes. | Meta |
+
+The EMV (earned media value) formula is deliberately not computed — it
+needs an editorial-judgment sign-off from Marketing/Finance that hasn't
+happened yet; every article's `grossEmv`/`netEmv` is honestly `null`
+rather than invented. `tier` is likewise `null` for any outlet not in
+`config.OUTLET_TIER_MAP`, so an unpriced outlet shows as unpriced rather
+than silently mispriced.
+
+409 backend tests pass and CI is green, but note what that does and does
+not establish: it was true throughout a period when no source was
+returning data and no one could log in. Treat
+[`docs/live-run-evidence.md`](docs/live-run-evidence.md) as the status of
+record, not the test count.
 
 ## Repo layout
 
@@ -33,6 +63,43 @@ docs/        API contract, decision records, runbooks, and the implementation ch
 
 ## Getting started
 
+### Real data in about five minutes
+
+No API keys needed for the three sources that carry the load. From a
+clone:
+
+```bash
+cd backend
+docker compose up -d                        # Postgres on :5434
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env                        # the DATABASE_URL default already matches
+
+python -m app.admin generate-secret         # paste into .env as SESSION_SECRET_KEY
+alembic upgrade head
+
+python -m app.admin create-user --email you@example.com --name "Your Name"
+python -m app.scheduler                     # one ingestion + classification pass
+python -m app.admin check                   # what actually landed
+
+uvicorn app.api.main:app --port 8000        # then open ../index.html and log in
+```
+
+`python -m app.admin check` is the command to reach for whenever you want
+to know whether this thing is working. It prints rows per source, how much
+the classifier has processed, and the real status and error of each
+source's last run — read from the database, not from any summary.
+
+On Windows use `.venv\Scripts\pip` and `.venv\Scripts\python`. Run
+everything through the project venv: invoking the scheduler with a system
+Python that lacks the dependencies produces an `ERROR` ledger row reading
+"The `groq` package is not installed", which looks like a broken
+classifier rather than a wrong interpreter.
+
+**Sending this repo to someone:** use `python scripts/package_release.py`,
+never a folder zip. It builds the archive from git-tracked files only and
+refuses to write one containing anything credential-shaped. See
+[`docs/security/2026-09-14-env-in-distributed-archive.md`](docs/security/2026-09-14-env-in-distributed-archive.md).
+
 **To view the demo:** open [`index.html`](index.html) in any browser. See [`docs/README-Remedy-Pulse-Demo.md`](docs/README-Remedy-Pulse-Demo.md) for a full walkthrough of what's real vs. sample, and things to try.
 
 **To set up the backend** (ingestion connectors, Google Cloud steps, API access requirements, and known limitations for each source): see [`backend/README.md`](backend/README.md).
@@ -43,4 +110,21 @@ docs/        API contract, decision records, runbooks, and the implementation ch
 
 ## What's next
 
-Going live against real Google reviews, Reddit, and Meta data is gated on three separate external approvals (see "Status" above) — chasing those is calendar time, not engineering work. Everything else that's actually buildable without an approval or a payment has been built; see [`docs/implementation-checklist.md`](docs/implementation-checklist.md) for what's left and why each remaining item is blocked.
+In order:
+
+1. **Enable billing on the Google Cloud project and fill in the real
+   `place_id`s** in `backend/config.py` (they are still `REPLACE_ME`).
+   That turns competitor ratings on. Both are ours to do, today.
+2. **Register the free Reddit script app** for richer per-post data and
+   to bring the deletion-propagation job into scope for Reddit rows.
+3. **Tune the search and relevance terms** in `backend/config.py` with
+   Marketing. They are a first pass written by an engineer, and the
+   Mentions feed is only as good as they are.
+4. **Get the EMV rate card signed off** so `grossEmv`/`netEmv` can stop
+   being `null`.
+
+Google Business Profile and Meta App Review remain genuinely external and
+are calendar time, not engineering time. Everything above them is not.
+
+See [`docs/implementation-checklist.md`](docs/implementation-checklist.md)
+for the itemized status of every requirement.

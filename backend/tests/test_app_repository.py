@@ -182,3 +182,100 @@ def test_ingestion_run_row_is_queryable_directly(sqlite_session):
     ).scalar_one()
     assert row.status == RunStatus.SUCCESS
     assert row.items_ingested == 10
+
+
+# --- enrichment preservation on re-ingest (see repository.ENRICHMENT_FIELDS) ---
+#
+# These cover a bug that was live and silent: every ingestion adapter
+# passes sentiment=None (correctly - a connector must not invent one), and
+# the upsert's last-write-wins rule applied that NULL to the stored value,
+# erasing the classifier's verdict on every 12-hourly re-fetch. Because
+# classified_at is not among the fields an adapter passes, it survived -
+# leaving the row classified_at-set and sentiment-NULL, which
+# classify_unclassified_batch() never selects again. The mention stayed
+# blank forever while every status surface called it classified.
+#
+# Only a SECOND ingestion pass over the same item can produce it, which is
+# why one clean run and a green suite both missed it.
+
+
+def _classify(session, mention):
+    """Stand in for app.jobs.classification_job + topic_tagging_job having
+    run over this row, without calling a model."""
+    from datetime import datetime, timezone
+
+    mention.sentiment = "Negative"
+    mention.sentiment_confidence = 0.93
+    mention.alert_category = "crisis"
+    mention.topics = ["staff-service"]
+    mention.classified_at = datetime.now(timezone.utc)
+    session.flush()
+
+
+def _reingest(session, **overrides):
+    fields = {
+        "source": "reddit_public",
+        "kind": "mention",
+        "external_id": "t3_abc",
+        "text": "Terrible service at the BGC branch",
+        # Exactly what every ingestion adapter passes.
+        "sentiment": None,
+        **overrides,
+    }
+    upsert_mention(session, **fields)
+    session.flush()
+
+
+def test_reingest_does_not_erase_the_classifier_verdict(sqlite_session):
+    _reingest(sqlite_session)
+    mention = sqlite_session.execute(select(Mention)).scalars().one()
+    _classify(sqlite_session, mention)
+
+    _reingest(sqlite_session)  # the next 12-hourly pass
+
+    sqlite_session.refresh(mention)
+    assert mention.sentiment == "Negative"
+    assert mention.sentiment_confidence == 0.93
+    assert mention.alert_category == "crisis"
+    assert mention.topics == ["staff-service"]
+
+
+def test_reingest_still_updates_fields_the_adapter_owns(sqlite_session):
+    """The narrowing must not turn into "never update anything". A review
+    whose text changed upstream should still reflect the new state -
+    last-write-wins remains correct for adapter-owned fields."""
+    _reingest(sqlite_session)
+    mention = sqlite_session.execute(select(Mention)).scalars().one()
+    _classify(sqlite_session, mention)
+
+    _reingest(sqlite_session, text="Edited: actually they fixed it", url="https://example.com/new")
+
+    sqlite_session.refresh(mention)
+    assert mention.text == "Edited: actually they fixed it"
+    assert mention.url == "https://example.com/new"
+    assert mention.sentiment == "Negative"  # still preserved
+
+
+def test_a_real_incoming_sentiment_still_overwrites(sqlite_session):
+    """google_reviews_job derives a placeholder sentiment from the star
+    rating (6.2). A non-NULL incoming value is a real value and must win -
+    this preserves NULLs only, not every prior value."""
+    _reingest(sqlite_session, source="google_reviews", kind="review", sentiment="Positive")
+    mention = sqlite_session.execute(select(Mention)).scalars().one()
+    _classify(sqlite_session, mention)
+
+    _reingest(sqlite_session, source="google_reviews", kind="review", sentiment="Positive")
+
+    sqlite_session.refresh(mention)
+    assert mention.sentiment == "Positive"
+
+
+def test_reingest_leaves_the_row_reclassifiable_if_never_classified(sqlite_session):
+    """A row ingested twice before the classifier ever saw it must still
+    be picked up: classified_at stays NULL, sentiment stays NULL."""
+    _reingest(sqlite_session)
+    _reingest(sqlite_session)
+
+    mention = sqlite_session.execute(select(Mention)).scalars().one()
+    assert mention.sentiment is None
+    assert mention.classified_at is None

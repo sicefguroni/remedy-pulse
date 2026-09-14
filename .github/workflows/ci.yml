@@ -35,6 +35,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Runs BEFORE the dependency install, deliberately: it needs nothing
+      # installed, and a commit carrying a credential should fail in
+      # seconds rather than after a full build. A zip of this repo was
+      # once sent for review with live API keys inside it; this is the
+      # automated half of making that unrepeatable (scripts/
+      # package_release.py is the other half). See
+      # docs/security/2026-09-14-env-in-distributed-archive.md.
+      - name: Secret scan
+        run: python scripts/package_release.py --out /tmp/release-check.zip
+
       - name: Install dependencies
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
