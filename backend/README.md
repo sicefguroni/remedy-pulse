@@ -17,10 +17,25 @@ Submit that request as early as possible — it's the long pole here, not
 the code. Everything else in this folder (OAuth setup, competitor
 ratings via Places API) works without waiting on Google's approval.
 
+## Whose account: read this before step 1
+
+Every credential below can be registered under any Google/Groq/Reddit/
+Meta account that completes the signup flow — the provider doesn't
+enforce who it has to be. That is exactly the trap. Two of these steps
+are **not actually a free choice** despite looking like one (marked
+below), and the rest quietly stop working the day whoever's account it
+was loses access, with no error until a source goes dark. Register all
+of it under a Remedy-owned account (a shared team login, or a personal
+account added as a manager/developer on a company asset) — not a
+personal or working email, however convenient that is to spin up right
+now.
+
 ## Setup steps
 
 1. **Create a Google Cloud project** (console.cloud.google.com), name it
-   something like "Remedy Pulse".
+   something like "Remedy Pulse". Use a Remedy-owned Google account —
+   the OAuth login in step 8 has to be this same account or a manager on
+   it, so pick it here rather than retrofitting later.
 2. **Enable APIs**: "My Business Account Management API",
    "My Business Business Information API", and "Places API".
 3. **Request Business Profile API access** using the link above — do this
@@ -29,7 +44,11 @@ ratings via Places API) works without waiting on Google's approval.
    Credentials → OAuth client ID → type "Desktop app". Download the JSON.
 5. **Create a Places API key**: APIs & Services → Credentials → Create
    Credentials → API key. Set a budget alert — this one's billed per
-   request past a free quota.
+   request past a free quota. Enabling billing needs a real payment
+   card, but the free monthly quota comfortably covers this project's
+   volume (a handful of competitors, checked twice a day) — use a
+   company card, not a personal one, since it's attached to the same
+   Cloud project this integration runs under indefinitely.
 6. **Copy `.env.example` to `.env`** and fill in the path to your
    downloaded OAuth JSON and your Places API key.
 7. **Install dependencies**:
@@ -42,7 +61,10 @@ ratings via Places API) works without waiting on Google's approval.
    ```
    This opens a browser window — log in as whichever Google account
    manages Remedy's Business Profile listings (must already have
-   verified ownership).
+   verified ownership). **Not a free choice**: Google only returns
+   locations that exact logged-in account can see, so this has to be
+   whoever already administers Remedy's listings on
+   business.google.com, not whichever account happens to be signed in.
 9. **Find your location IDs**: run `python fetch_owned_reviews.py` once
    with `config.py` unfilled — it'll fetch every location the logged-in
    account can see and print their IDs so you can match them to Remedy's
@@ -52,10 +74,19 @@ ratings via Places API) works without waiting on Google's approval.
     run `python fetch_competitor_ratings.py`.
 11. **News/press coverage (separate from Google entirely)**: sign up for
     a free GNews API key at https://gnews.io (self-serve, no approval
-    wait), paste it into `.env` as `GNEWS_API_KEY`, then run
-    `python fetch_news_articles.py`. See
+    wait) under a Remedy-owned mailbox, paste it into `.env` as
+    `GNEWS_API_KEY`, then run `python fetch_news_articles.py`. See
     `docs/decisions/02-news-press-ingestion-path.md` for why GNews was
     picked as the first option to evaluate.
+
+Same rule for the two credentials that live outside this numbered
+sequence: `GROQ_API_KEY` (`.env.example`, Phase 6 below) should be
+signed up for under a Remedy-owned account, not an individual
+contributor's; and the pending Reddit Data Access application
+(`docs/Remedy Pulse_Reddit Data Access_Use Case.pdf`) was already
+submitted as Remedy under `ai@remedy.ph` — whichever Reddit account
+eventually authenticates the approved integration has to match that,
+since the application itself states who is doing the accessing.
 
 ## What you get
 
