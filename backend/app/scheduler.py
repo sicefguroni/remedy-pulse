@@ -50,6 +50,23 @@ CADENCE_HOURS: dict[str, float] = {
     # lower once real classification volume/latency data exists to tune
     # against, not preemptively further than this.
     "classification": 0.25,
+    # app/jobs/topic_tagging_job.py is enrichment too, but answers to a
+    # different deadline than the classifier directly above: a topic is
+    # an aggregate-reporting attribute for the Topics tab, and nobody is
+    # paged because a mention has not been categorized yet. 1h keeps the
+    # Topics tab current within a working session without spending a
+    # model call per mention on the 15-minute tick that exists for alert
+    # routing. See that job's module docstring.
+    "topic_tagging": 1.0,
+    # app/jobs/reddit_public_deletion_job.py answers to a deadline none
+    # of the others have: a signed commitment to remove deleted Reddit
+    # content within 48 hours. At the 12-hour default a row could sit up
+    # to 12 hours before its turn even comes around, and BATCH_SIZE caps
+    # a pass at 25 rows, so the store has to be walked several times
+    # inside the window. 6h gives four passes a day - comfortable
+    # headroom under 48h with room for rate-limited passes that verify
+    # nothing. Tighten if the store grows past a few hundred rows.
+    "reddit_public_deletion_check": 6.0,
 }
 
 

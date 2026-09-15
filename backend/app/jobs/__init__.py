@@ -31,7 +31,8 @@ Optionally, a job module may also expose:
         isDataSource field) for the common case: an adapter that fetches
         from an external source and writes new Mention rows. Set to False
         on a job that only re-processes rows some OTHER job already
-        wrote (reddit_deletion_job.py, classification_job.py) - such a
+        wrote (reddit_deletion_job.py, classification_job.py,
+        topic_tagging_job.py) - such a
         job's own success/failure has no bearing on "is the DATA stale,"
         which is the one thing lastSyncedAt and the mockup's sync pill
         exist to answer, so it must not count toward either.
@@ -47,7 +48,9 @@ those files' internals.
 from __future__ import annotations
 
 from app.jobs import (
+    bing_news_rss_job,
     classification_job,
+    google_news_rss_job,
     google_places_job,
     google_reviews_job,
     meta_facebook_comments_job,
@@ -56,6 +59,9 @@ from app.jobs import (
     news_job,
     reddit_deletion_job,
     reddit_job,
+    reddit_public_deletion_job,
+    reddit_public_rss_job,
+    topic_tagging_job,
 )
 
 # scheduler.py and status_report.py both iterate this list - never the
@@ -85,8 +91,31 @@ from app.jobs import (
 # is_due() cadence check" contract - see that module's own docstring for
 # why it was missing entirely until now, and app.scheduler.CADENCE_HOURS
 # for why its cadence is deliberately much shorter than everything else
-# here.
+# here. topic_tagging_job is that same shape again, for the same reason
+# and found the same way - see its own docstring.
+#
+# google_news_rss_job, bing_news_rss_job and reddit_public_rss_job are
+# the three sources that need no key, no account and no approval (see
+# backend/fetch_rss.py and docs/decisions/15-free-sources-first.md).
+# They are listed FIRST deliberately - app.scheduler.run_due_jobs()
+# iterates this list in order, so the sources that can actually return
+# data run before the ones still waiting on a credential or an approval,
+# and a pass that is cut short for any reason has already done the work
+# that produces rows. Each duplicates a capability an approval-gated job
+# above was supposed to cover (news, news, Reddit) rather than replacing
+# it: the gated jobs stay registered and return better data the day their
+# access exists.
+#
+# reddit_public_deletion_job is the deletion re-check for the rows
+# reddit_public_rss_job writes. It is listed immediately after it on
+# purpose: reddit_deletion_job below covers source="reddit" only, through
+# PRAW, so without this entry the rows we actually hold would be the one
+# part of the store the 48-hour commitment did not reach.
 JOBS = [
+    google_news_rss_job,
+    bing_news_rss_job,
+    reddit_public_rss_job,
+    reddit_public_deletion_job,
     google_reviews_job,
     google_places_job,
     news_job,
@@ -96,6 +125,7 @@ JOBS = [
     meta_instagram_mentions_job,
     meta_facebook_comments_job,
     classification_job,
+    topic_tagging_job,
 ]
 
 # 9.2's is_within_backfill_window() lives in app.repository, NOT here,

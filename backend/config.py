@@ -245,3 +245,141 @@ REDDIT_SEARCH_TERMS = list(dict.fromkeys(
     ]
     + BRAND_ALIASES["Remedy"]
 ))
+
+
+# ---------------------------------------------------------------------------
+# Key-free, approval-free sources (see backend/fetch_rss.py and
+# docs/decisions/15-free-sources-first.md).
+#
+# Everything above this line needs something obtained from a third party
+# before it returns a single row: an OAuth grant, billing enabled on a
+# Cloud project, a script-app credential, an App Review outcome, an API
+# key. A review of a running instance found every one of them either
+# erroring on a missing credential or reporting SUCCESS with
+# items_seen=0. The three query lists below drive sources that need none
+# of that — Google News, Bing News and Reddit all serve public search
+# feeds over plain HTTP — and so they are what actually proves the
+# pipeline end to end while the approvals above are still pending.
+# ---------------------------------------------------------------------------
+
+# Queries sent to BOTH free news feeds (Google News RSS and Bing News
+# RSS), one request per query per feed, deduplicated by URL within each
+# feed's own job.
+#
+# Deliberately WIDER than NEWS_SEARCH_TERMS above, and the difference is
+# the point. NEWS_SEARCH_TERMS is an exact-phrase list of Remedy's own
+# brand names, and against live GNews every one of those terms returns
+# totalArticles=0 — Remedy has effectively no press coverage yet, so a
+# brand-only term list makes a working news source indistinguishable
+# from a broken one. These queries keep the brand terms (they are what
+# matters the day coverage does appear) but add the tracked competitors
+# and the category itself, both of which return real Philippine coverage
+# today and both of which the product already needs: the Competitors tab
+# benchmarks against exactly these names, and the EMV tab prices whatever
+# outlet covers them.
+FREE_NEWS_QUERIES = [
+    '"Remedy Skin Clinic"',
+    '"Skin Bar by Remedy"',
+    '"Belo Medical Group"',
+    '"Aivee Clinic"',
+    '"Kamiseta Skin Clinic"',
+    '"SkinStation"',
+    '"Luminisce"',
+    "skin clinic Philippines",
+    "aesthetic clinic Philippines",
+]
+
+# Google News RSS search endpoint. hl/gl/ceid pin results to
+# English-language Philippine coverage, matching the lang/country params
+# fetch_news_articles.py already sends GNews — so the two news sources
+# are scoped to the same market and their results are comparable rather
+# than accidentally different populations.
+GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss/search"
+GOOGLE_NEWS_RSS_PARAMS = {"hl": "en-PH", "gl": "PH", "ceid": "PH:en"}
+
+# Bing News RSS search endpoint. Kept as a SECOND news source rather than
+# picking one: the two index different outlets (a hand-check of the same
+# query returned Rappler and Manila Bulletin from Google, and a partly
+# different set from Bing), and record_ingestion()'s (source,
+# external_id) uniqueness means an article both of them carry is stored
+# once per source rather than silently double-counted into one.
+BING_NEWS_RSS_URL = "https://www.bing.com/news/search"
+BING_NEWS_RSS_PARAMS = {"format": "RSS", "cc": "PH", "setlang": "en"}
+
+# Reddit's public search feed — reddit.com/search.rss, NOT the praw/OAuth
+# path fetch_reddit_mentions.py uses. Both are free and neither is the
+# elevated commercial Data Access tier, but the OAuth path still needs a
+# registered script app and an account's credentials in .env, and that
+# never got done; this one needs nothing but a User-Agent. Kept alongside
+# the praw adapter rather than replacing it: praw returns richer
+# per-post data (score, subreddit, edited state) and is the better source
+# the day those credentials exist.
+REDDIT_PUBLIC_SEARCH_URL = "https://www.reddit.com/search.rss"
+
+# Queries sent to REDDIT_PUBLIC_SEARCH_URL, one request each. Same
+# reasoning as FREE_NEWS_QUERIES: brand terms alone return almost
+# nothing, so the tracked competitors and the category conversation are
+# included — a thread asking "derm reco in BGC?" is exactly the kind of
+# item the Mentions tab exists to surface, whether or not it names
+# Remedy. Owner: Marketing should review/tune this list.
+REDDIT_PUBLIC_QUERIES = [
+    '"Remedy Skin Clinic"',
+    '"Skin Bar by Remedy"',
+    '"Belo Medical Group"',
+    '"Aivee Clinic"',
+    '"skin clinic" manila',
+    '"derma clinic" philippines',
+    "dermatologist BGC",
+]
+
+# Reddit prefixes every fullname with a type code. Only t3_ (a post) and
+# t1_ (a comment) are items a human wrote that this system should treat
+# as a mention; search.rss also returns t5_ rows, which are SUBREDDITS
+# matching the query — r/MANILA came back for "skin clinic manila" with a
+# 2008 creation date. Ingesting one would put a subreddit's sidebar
+# blurb in the Mentions feed as if someone had said it.
+REDDIT_PUBLIC_ITEM_PREFIXES = ("t3_", "t1_")
+
+
+# Relevance gating for app/jobs/reddit_public_rss_job.py. Two lists, not
+# one, because they are checked against different scopes — see
+# is_relevant() in that module for why.
+#
+# This exists because the first live run brought back "26 [M4A] Looking
+# for someone interesting to hang out with" as a top mention. Reddit's
+# search is loose — a broad query like "dermatologist BGC" matches
+# threads on the strength of one incidental word, and
+# REDDIT_PUBLIC_QUERIES has to be broad or it returns nothing at all
+# (which is exactly the failure mode the brand-only NEWS_SEARCH_TERMS
+# already demonstrated). So relevance is enforced on the returned text
+# rather than by narrowing the queries: the query decides what Reddit is
+# asked for, these decide what is worth a human's attention.
+
+# Named entities. Matched anywhere in the post — someone naming a clinic
+# mid-thread is still a real mention of it.
+#
+# Derived from the tracked entities already defined above rather than
+# hand-listed, so adding a competitor to COMPETITOR_PLACE_IDS or an alias
+# to BRAND_ALIASES widens this automatically and the two cannot drift.
+REDDIT_PUBLIC_ENTITY_TERMS = [
+    term.lower()
+    for term in dict.fromkeys(
+        ["Remedy"]
+        + list(COMPETITOR_PLACE_IDS)
+        + [alias for aliases in BRAND_ALIASES.values() for alias in aliases]
+    )
+]
+
+# The category conversation itself. Matched in the TITLE ONLY: a thread
+# asking for a derma recommendation is a genuine lead even when it names
+# nobody — it is the Mentions tab's whole reason to exist — but a long
+# off-topic post that says "dermatologist" once in passing is not.
+REDDIT_PUBLIC_CATEGORY_TERMS = [
+    "skin clinic",
+    "derma clinic",
+    "derma",
+    "dermatologist",
+    "aesthetic clinic",
+    "skin care clinic",
+    "skincare clinic",
+]

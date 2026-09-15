@@ -47,6 +47,37 @@ from app.models import (
 )
 from config import BACKFILL_WINDOW_DAYS
 
+# Columns written by an ENRICHMENT job (app/jobs/classification_job.py,
+# app/jobs/topic_tagging_job.py), not by the ingestion adapter that
+# fetched the row. On a re-ingest, an incoming NULL for one of these
+# leaves the stored value alone instead of overwriting it.
+#
+# This is a bug fix, and the bug was live. Every ingestion adapter passes
+# `sentiment=None` explicitly (correctly — a connector must never invent
+# a sentiment; see any job module's own comment saying so). Without this,
+# upsert_mention()'s documented "last-write-wins per field" applied to
+# that NULL too, so the 12-hourly re-fetch of any item still present
+# upstream erased the classifier's verdict.
+#
+# What made it silent rather than self-healing: classified_at is NOT in
+# the fields an adapter passes, so it survived the same upsert untouched.
+# The row was therefore left with classified_at set and sentiment NULL —
+# and classify_unclassified_batch() selects on `classified_at IS NULL`,
+# so it never looked at that row again. The mention stayed permanently
+# blank: absent from the sentiment filter, the topic sentiment split, and
+# the alert routing, while every status surface reported it as
+# classified.
+#
+# Found by running two ingestion passes over the same live data and
+# looking at the rows afterwards. A single pass cannot produce it, which
+# is why a green test suite and a clean first run both missed it.
+#
+# "last-write-wins" remains correct for every field the adapter DOES own
+# — a review whose text or reply status changed upstream should reflect
+# the new state — so this deliberately narrows that rule rather than
+# replacing it.
+ENRICHMENT_FIELDS = frozenset({"sentiment", "sentiment_confidence", "alert_category", "topics"})
+
 
 def _upsert_insert(session: Session, values: dict[str, Any]):
     """Build the right dialect's ON CONFLICT upsert statement. Postgres is
@@ -71,7 +102,14 @@ def _upsert_insert(session: Session, values: dict[str, Any]):
 
     stmt = insert_fn(Mention).values(**values)
     update_cols = {
-        col: getattr(stmt.excluded, col)
+        col: (
+            # See ENRICHMENT_FIELDS: for a column an ingestion adapter
+            # does not own, an incoming NULL must leave the stored value
+            # alone instead of erasing it.
+            func.coalesce(getattr(stmt.excluded, col), getattr(Mention, col))
+            if col in ENRICHMENT_FIELDS
+            else getattr(stmt.excluded, col)
+        )
         for col in values
         if col not in ("source", "external_id")
     }
@@ -93,6 +131,15 @@ def upsert_mention(session: Session, **fields: Any) -> bool:
     the current truth, which is correct for polling: a review whose text
     or reply status changed should reflect the new state, not the first
     one ever seen).
+
+    ONE exception: a NULL incoming value for a column in
+    ENRICHMENT_FIELDS (sentiment, sentiment_confidence, alert_category,
+    topics) leaves the stored value alone. Those columns belong to the
+    classification and topic-tagging jobs, not to the adapter that
+    fetched the row, and every adapter passes them as None. See
+    ENRICHMENT_FIELDS for the bug this fixes. A non-NULL incoming value
+    still wins, so google_reviews_job's star-derived sentiment
+    placeholder behaves exactly as before.
 
     Returns True if this call inserted a new row, False if it updated an
     existing one. This is determined with an explicit SELECT for

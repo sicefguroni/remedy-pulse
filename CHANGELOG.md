@@ -12,6 +12,119 @@ instead.
 
 ---
 
+## 2026-09-14 — Honour the 48-hour Reddit deletion commitment without an API credential
+
+The signed Data Access application commits to removing deleted Reddit
+content within 48 hours. `reddit_deletion_job.py` implements that through
+PRAW — and has recorded `Missing required Reddit credential(s)` on every
+run it has ever had. **The commitment had never once been honoured**, and
+the new `reddit_public` source made that concrete rather than theoretical
+by storing real Reddit posts nothing re-checked.
+
+New `app/jobs/reddit_public_deletion_job.py` closes it with the same
+public feed the ingestion job uses, so it works today rather than waiting
+on an approval that may never arrive.
+
+The endpoint was found by probing, because the obvious ones are gone:
+`/api/info.json` and `/comments/<id>.json` both return 403 to non-OAuth
+clients now; `/comments/<id>.rss` returns 200. Critically, a missing post
+returns **404 with a valid empty feed** while rate limiting returns **429
+with a zero-length body** — cleanly distinguishable, which is what makes
+this safe.
+
+**The failure policy is deliberately the inverse of the PRAW job's.**
+That job treats any fetch failure as a deletion, which is sound for PRAW
+(it separates not-found from transport failure itself). It would be
+dangerous here: unauthenticated Reddit rate-limits hard — 2 of 7 rows
+were 429'd on the first live pass — and a scrub cannot be undone. This
+job scrubs only on positive evidence (a 404, or a `[deleted]`/`[removed]`
+tombstone). A 429, 5xx, network error, unparseable body, or a comment
+whose presence cannot be established is recorded *unverified*, left
+untouched, and retried.
+
+Verified live in both directions: 5 rows conclusively confirmed alive
+with the 2 rate-limited rows left intact, and a real Reddit 404 scrubbing
+content and author while keeping `url`/`venue`/`source` for the audit
+trail.
+
+`python -m app.admin reddit-compliance` answers the question the job's own
+status cannot — whether every held row has actually been verified inside
+the window — and exits non-zero when any is overdue.
+
+Comments are best-effort by design: a gone parent thread or a tombstoned
+body is conclusive, but a comment merely absent from its parent's feed is
+**not** treated as deleted, because the feed truncates long threads.
+
+Tests: 409 → 431.
+
+## 2026-09-14 — Run it on real data: three key-free sources, a working login, and four bugs only a live run could find
+
+A review of the shipped project found that no source was returning data,
+nobody could log in, and a `.env` with live keys had gone out inside a
+review archive. Everything below was verified by running it, not by
+reading it — see [`docs/live-run-evidence.md`](docs/live-run-evidence.md)
+for the run, the counts, and what is still honestly broken.
+
+**Three sources that need no key, no account and no approval.** Google
+News RSS, Bing News RSS, and Reddit's public search feed, over a new
+shared `backend/fetch_rss.py` (stdlib XML parsing, no new dependency).
+From an empty database, one `python -m app.scheduler` pass now ingests
+**39 real items in 6 minutes** and classifies and topic-tags all of them.
+One is genuine Remedy brand coverage, found on the same day GNews
+returned zero for every configured brand term. The approval-gated
+adapters stay registered and return better data the day their access
+exists.
+
+**A login that can actually be created.** `app.auth.create_user()` had no
+caller outside the test suite — no CLI, no seed, no signup — so a
+reviewer had no account and every feature behind the login was
+unreachable. New `python -m app.admin`: `create-user`, `reset-password`,
+`list-users`, `generate-secret`, and `check` (what the pipeline has
+actually ingested and classified, read from the database). Also fixed:
+nothing in the `uvicorn` import path called `load_dotenv()`, so the API
+signed sessions with a random per-process key even when
+`SESSION_SECRET_KEY` was set — tokens silently stopped verifying on every
+restart.
+
+**Topic tagging was never wired to run.** `app/topic_tagging.py` was
+complete and tested with no caller, the same defect the classifier had.
+Every mention sat at `topics = NULL` and the Topics tab rendered empty
+against a full database. New `app/jobs/topic_tagging_job.py`, hourly.
+
+**Enrichment was erased on every re-ingest.** Every adapter passes
+`sentiment=None` (correctly), and `upsert_mention`'s last-write-wins rule
+applied that NULL to the stored value — so each 12-hourly re-fetch wiped
+the classifier's verdict. It did not self-heal: `classified_at` survived
+the same upsert, and `classify_unclassified_batch()` selects on
+`classified_at IS NULL`, so the row stayed permanently blank while every
+status surface called it classified. Fixed via
+`repository.ENRICHMENT_FIELDS`. Only a second pass over the same item can
+produce this, which is why a green suite and a clean first run both
+missed it.
+
+**Two feed-format bugs**, both found by reading a live response: Google
+News guids exceed `external_id`'s `VARCHAR(512)` and killed a real insert
+(now hashed, not truncated — they share long prefixes and the column is
+part of a UNIQUE constraint); and Bing's outlet lives in `<News:Source>`
+under a namespace URI that *is the query URL*, so every Bing article had
+a null outlet and therefore a null EMV tier.
+
+**Secrets out of everything.** `scripts/package_release.py` builds review
+archives with `git archive` — tracked files only, so an untracked `.env`
+is never a candidate rather than being filtered out — then re-scans the
+finished archive and deletes it on any finding. Wired into CI. Nothing
+sensitive was ever committed (verified against full history); the root
+cause was compressing the folder, which does not read `.gitignore`. Full
+write-up in
+[`docs/security/2026-09-14-env-in-distributed-archive.md`](docs/security/2026-09-14-env-in-distributed-archive.md).
+
+**README corrected.** The Status section claimed GNews and Google Places
+were live; neither was returning a row. It now states what was verified,
+what is blocked and on whom, and that the test count is not the status of
+record.
+
+Tests: 345 → 409 passing.
+
 ## 2026-09-12 — [#20](https://github.com/sicefguroni/remedy-pulse/pull/20) Update README's Status section
 
 The root README was frozen at Phase 0 ("demo/mockup stage... nothing
